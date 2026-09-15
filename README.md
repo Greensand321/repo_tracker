@@ -24,6 +24,7 @@ time-to-first-productive-action it removes.
 | Understand the product | [`docs/spec/bearing-spec-v0.3.html`](docs/spec/bearing-spec-v0.3.html) *(open in a browser)* |
 | See what it should look like | [`docs/design/`](docs/design/README.md) |
 | Know why something was decided | [`docs/decisions/decision-log.md`](docs/decisions/decision-log.md) |
+| Answer the questions blocking the build | [`docs/decisions/open-questions.md`](docs/decisions/open-questions.md) |
 | Find the full documentation map | [`docs/README.md`](docs/README.md) |
 
 ## Repository layout
@@ -33,13 +34,14 @@ repo_tracker/
 ├── bearing/          ← program files: the Python package (Phase 0 engine goes here)
 ├── tests/            ← test suite + deterministic git fixture builder
 ├── pyproject.toml    ← packaging; installs the `bearing` command
+├── .github/workflows ← repo infrastructure (branch-sync workflow)
 └── docs/             ← everything written so far
     ├── STATUS.md         where the project stands, and the next action
-    ├── ROADMAP.md        Phase 0–4, what is in each, current status
+    ├── ROADMAP.md        features → code, build order, module inventory
     ├── spec/             canonical product spec (v0.3)
     ├── plans/            implementation plans
     ├── design/           the mockups we are building toward
-    ├── decisions/        locked decisions + the reasons behind them
+    ├── decisions/        locked decisions, and the questions still open
     └── archive/          superseded material, kept for its reasoning
 ```
 
@@ -48,9 +50,13 @@ repo_tracker/
 
 ## Current state
 
-Nothing is implemented yet. The spec, the design direction, and a fully-specified
-Phase 0 plan are done — the repo is staged so implementation can start cold.
-See [`docs/STATUS.md`](docs/STATUS.md).
+Nothing is implemented yet. The spec, the design direction, and a fully-specified Phase 0
+plan are done; the roadmap maps every feature to the code that implements it.
+
+**Five questions block the start of Phase 0** — [`docs/decisions/open-questions.md`](docs/decisions/open-questions.md).
+The largest is Q1: whether branches are created by you locally or by agents pushing to
+origin. Phase 0 reads local git signals — reflog, working tree, stashes — and a branch
+that only ever existed on origin produces none of them.
 
 ## Ground rules (from the spec — do not re-litigate)
 

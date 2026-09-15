@@ -22,9 +22,10 @@ of every working session** — it is the file that makes this repo pick-up-able,
 the same job Bearing itself does for branches.
 
 ### `ROADMAP.md`
-Phases 0–4: what is in each, what is explicitly *not*, exit criteria, current status.
-Also reconciles the two numbering schemes floating around ("Phase 0" vs "Milestone 0"
-vs "tier 0" — all the same thing).
+**The cohesive plan.** Phases 0–4: every feature mapped to the code that implements it,
+the dependency spine, a step-by-step Phase 0 build order, a master module inventory, and
+the known gaps in the plan. Also reconciles the three numbering schemes floating around
+("Phase 0" vs "Milestone 0" vs "tier 0" — all the same thing).
 
 ### `spec/`
 | File | What it is |
@@ -44,12 +45,22 @@ HTML snapshot; `dashboard-concept.html` is the fullest expression of the eventua
 dashboard.
 
 ### `decisions/`
-`decision-log.md` — every locked decision in one table, with its source and date, plus
-the questions still open. Check here before reopening an argument.
+| File | What it is |
+|---|---|
+| `decision-log.md` | Every locked decision in one table, with its reason, source, and date. Check here before reopening an argument. |
+| `open-questions.md` | **Questions needing the owner's answer**, each with why it matters and the default that ships if it goes unanswered. Q1–Q5 are blocking. |
 
 ### `archive/`
 Superseded documents kept because the reasoning in them is still good: spec v0.1, and
 the three workflow-paradigm mockups that led to choosing dashboard-first.
+
+## Not in `docs/`
+
+`.github/workflows/sync-branches.yml` — repo infrastructure, not part of the Bearing
+product. A manually-triggered workflow that merges `main` into every branch (and,
+optionally, every branch into `main` first), reporting per-branch conflicts. It defaults
+to a dry run. It is worth reading: it solves, in CI and after the fact, a piece of what
+Bearing aims to answer locally and in advance — see `decisions/open-questions.md` Q15.
 
 ## Conventions
 
