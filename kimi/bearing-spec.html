@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bearing — Product & Technical Spec</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --panel: #ffffff;
+    --ink: #1c2130;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --accent: #4f46e5;
+    --accent-soft: #eef2ff;
+    --green: #059669;
+    --amber: #d97706;
+    --red: #dc2626;
+    --cyan: #0891b2;
+    --term-bg: #0f1420;
+    --term-ink: #d7dce5;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .wrap { display: flex; max-width: 1200px; margin: 0 auto; }
+  nav {
+    position: sticky; top: 0; align-self: flex-start;
+    width: 270px; height: 100vh; overflow-y: auto;
+    padding: 28px 18px; border-right: 1px solid var(--line);
+    background: var(--panel);
+    flex: 0 0 auto;
+  }
+  nav .brand { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+  nav .brand span { color: var(--accent); }
+  nav .ver { font-size: 12px; color: var(--muted); margin: 2px 0 18px; }
+  nav a {
+    display: block; color: var(--muted); text-decoration: none;
+    font-size: 13px; padding: 4px 8px; border-radius: 6px;
+  }
+  nav a:hover { background: var(--accent-soft); color: var(--accent); }
+  nav a.sub { padding-left: 20px; font-size: 12.5px; }
+  main { flex: 1; padding: 40px 48px 120px; min-width: 0; }
+  h1 { font-size: 30px; letter-spacing: -0.03em; margin: 0 0 4px; }
+  h2 {
+    font-size: 21px; letter-spacing: -0.02em; margin: 46px 0 12px;
+    padding-top: 14px; border-top: 1px solid var(--line);
+  }
+  h3 { font-size: 16px; margin: 26px 0 8px; }
+  h4 { font-size: 14px; margin: 18px 0 6px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  a { color: var(--accent); }
+  code {
+    font-family: var(--mono); font-size: 12.5px;
+    background: #eef0f4; padding: 1px 5px; border-radius: 4px;
+  }
+  pre {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px; overflow-x: auto;
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.55;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .badge {
+    display: inline-block; font-size: 11px; font-weight: 600;
+    padding: 2px 8px; border-radius: 999px; letter-spacing: 0.02em;
+  }
+  .b-draft { background: #fef3c7; color: #92400e; }
+  .b-phase { background: var(--accent-soft); color: var(--accent); }
+  .b-pend { background: #fee2e2; color: var(--red); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px 20px; margin: 14px 0;
+  }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .callout {
+    border-left: 4px solid var(--accent); background: var(--accent-soft);
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 14px 0;
+  }
+  .callout.warn { border-color: var(--amber); background: #fffbeb; }
+  .callout.no { border-color: var(--red); background: #fef2f2; }
+  .tag { font-family: var(--mono); font-size: 11.5px; padding: 1px 6px; border-radius: 4px; }
+  .t-stale { background: #fef3c7; color: #92400e; }
+  .t-ok { background: #d1fae5; color: #065f46; }
+  .t-risk { background: #fee2e2; color: #991b1b; }
+  .t-info { background: #e0f2fe; color: #075985; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12.5px; }
+  /* ---------- mockups ---------- */
+  .mock-label {
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted); margin: 30px 0 8px;
+  }
+  .term {
+    background: var(--term-bg); border-radius: 12px; overflow: hidden;
+    box-shadow: 0 12px 30px rgba(15,20,32,0.25); border: 1px solid #1e2637;
+  }
+  .term .bar {
+    display: flex; align-items: center; gap: 7px;
+    padding: 10px 14px; background: #161c29; border-bottom: 1px solid #232c3d;
+  }
+  .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
+  .term .title { margin-left: 8px; color: #7c8798; font-size: 12px; font-family: var(--mono); }
+  .term .body {
+    padding: 16px 18px; font-family: var(--mono); font-size: 12.5px;
+    color: var(--term-ink); line-height: 1.65; white-space: pre-wrap;
+  }
+  .term .body .c-accent { color: #a5b4fc; font-weight: 700; }
+  .term .body .c-dim { color: #6b7280; }
+  .term .body .c-green { color: #6ee7b7; }
+  .term .body .c-amber { color: #fcd34d; }
+  .term .body .c-red { color: #fca5a5; }
+  .term .body .c-cyan { color: #67e8f9; }
+  .term .body .hl { background: #1e2637; border-radius: 4px; }
+  .browser {
+    background: var(--panel); border-radius: 12px; overflow: hidden;
+    box-shadow: 0 12px 30px rgba(15,20,32,0.15); border: 1px solid var(--line);
+  }
+  .browser .chrome {
+    display: flex; align-items: center; gap: 7px; padding: 10px 14px;
+    background: #eef0f4; border-bottom: 1px solid var(--line);
+  }
+  .browser .url {
+    margin-left: 10px; background: #fff; border: 1px solid var(--line);
+    border-radius: 6px; padding: 3px 10px; font-size: 11.5px; color: var(--muted);
+    font-family: var(--mono); flex: 1;
+  }
+  .browser .page { padding: 20px 22px; }
+  .dash-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .dash-head h4 { margin: 0; color: var(--ink); text-transform: none; letter-spacing: -0.01em; font-size: 17px; }
+  .stats { display: flex; gap: 10px; margin: 14px 0; flex-wrap: wrap; }
+  .stat { background: #f7f8fa; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; min-width: 96px; }
+  .stat b { display: block; font-size: 20px; letter-spacing: -0.02em; }
+  .stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .bcard {
+    border: 1px solid var(--line); border-left: 4px solid var(--accent);
+    border-radius: 10px; padding: 12px 14px; margin: 10px 0; background: #fff;
+  }
+  .bcard.stale { border-left-color: var(--amber); }
+  .bcard.risk { border-left-color: var(--red); }
+  .bcard.ready { border-left-color: var(--green); }
+  .bcard .top { display: flex; justify-content: space-between; gap: 10px; }
+  .bcard .name { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  .bcard .meta { font-size: 11.5px; color: var(--muted); font-family: var(--mono); }
+  .bcard .desc { font-size: 12.5px; margin: 6px 0 0; }
+  .bcard .next { font-size: 12.5px; margin: 4px 0 0; color: #374151; }
+  .bcard .next b { color: var(--accent); }
+  .timeline { display: flex; gap: 3px; margin: 10px 0; }
+  .tl { height: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+        font-size: 10.5px; color: #fff; font-family: var(--mono); overflow: hidden; white-space: nowrap; }
+  .tl.a { background: #4f46e5; } .tl.b { background: #0891b2; }
+  .tl.c { background: #059669; } .tl.d { background: #d97706; } .tl.e { background: #db2777; }
+  .tl.blank { background: #e5e7eb; color: #9ca3af; }
+  .tl-axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); font-family: var(--mono); }
+  .diagram { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+  .dbox {
+    flex: 1; min-width: 140px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px; text-align: center; font-size: 12.5px;
+  }
+  .dbox b { display: block; font-size: 13px; margin-bottom: 3px; }
+  .dbox.accent { border-color: var(--accent); background: var(--accent-soft); }
+  .arrow { align-self: center; color: var(--muted); font-size: 18px; }
+  .kv { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; font-size: 13.5px; }
+  .kv dt { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .kv dd { margin: 0; }
+  footer { margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+  @media (max-width: 900px) {
+    nav { display: none; }
+    main { padding: 28px 20px 80px; }
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav>
+  <div class="brand">Bearing<span>.</span></div>
+  <div class="ver">Product &amp; Technical Spec · v0.2</div>
+  <a href="#overview">1. Overview</a>
+  <a href="#problem">2. Problem &amp; Motivation</a>
+  <a href="#goals">3. Goals &amp; Non-Goals</a>
+  <a href="#concepts">4. Core Concepts</a>
+  <a href="#sources">5. Data Sources</a>
+  <a href="#features">6. Feature Set &amp; Phases</a>
+  <a href="#model">7. Data Model</a>
+  <a href="#arch">8. Architecture</a>
+  <a href="#llm">9. LLM Usage &amp; Cost</a>
+  <a href="#privacy">10. Privacy &amp; Security</a>
+  <a href="#config">11. Configuration</a>
+  <a href="#cli">12. CLI Surface</a>
+  <a href="#stack">13. Delivery &amp; Stack</a>
+  <a href="#mockups">14. Mockups</a>
+  <a href="#metrics">15. Success Metrics</a>
+  <a href="#rollout">16. Rollout Plan</a>
+  <a href="#questions">17. Open Questions</a>
+  <a href="#appendix">18. Appendix: Heuristics</a>
+</nav>
+
+<main>
+  <h1>Bearing</h1>
+  <p class="muted" style="margin-top:0">
+    A context-restoration system for developers juggling many branches across many repos.
+    <span class="badge b-draft">DRAFT v0.3</span>
+    <span class="badge b-phase">STACK: PYTHON CLI</span>
+  </p>
+  <p class="small muted">Working title. Intended for review of <em>intent</em> before implementation. Last updated: 13 Sep 2026.</p>
+
+  <div class="callout">
+    <strong>One-line pitch:</strong> when you sit back down, Bearing tells you — in ten seconds —
+    <em>where you were, what state each branch is in, and what to do next.</em>
+  </div>
+
+  <div class="callout warn">
+    <strong>v0.2 — decisions from owner review (13 Sep 2026):</strong>
+    (1) The advisor is built <em>last</em>, on the complete data layer — never half-finished.
+    (2) Branch names are always literal git names; Bearing never invents display names.
+    (3) Parking notes are scratchpad one-liners, not a journal.
+    (4) LLM features deferred to the advisor phase; v1 is fully deterministic.
+    (5) CLI cut to three commands; GitHub via <code>gh</code> passthrough; heuristics simplified.
+    Details: §6, §9, §12, §17, §18.<br>
+    <strong>v0.3:</strong> the dashboard is a committed Phase 2 deliverable in three views (§14.2) — the owner's
+    daily surface is visual, not the terminal. The CLI is the engine's plumbing. A Phase 0 implementation
+    plan for handoff exists at <code>bearing-phase0-plan.md</code>.
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="overview">1. Overview</h2>
+  <p>
+    Bearing is a local-first tool that reconstructs your working context from signals you
+    already produce (git reflog, working tree, stashes, commits) plus GitHub metadata
+    (PRs, reviews, CI). It produces a prioritized <strong>brief</strong> — a short,
+    human-readable answer to "where was I?" — and optionally enriches it with an LLM
+    summary of work-in-progress and a suggested next step.
+  </p>
+  <p>
+    It is designed around one insight: <strong>the expensive part of switching tasks is not
+    the work, it is rebuilding the mental model.</strong> Every feature is judged by how
+    much time-to-first-productive-action it removes.
+  </p>
+
+  <div class="grid3">
+    <div class="card"><h4>Phase 0</h4><p class="small">Read local git + GitHub, emit a Markdown brief. No LLM required.</p></div>
+    <div class="card"><h4>Phase 1</h4><p class="small">Reflog session reconstruction, parking notes, LLM WIP summaries.</p></div>
+    <div class="card"><h4>Phase 2+</h4><p class="small">Dashboard, hygiene radar, analytics, conversational agent.</p></div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="problem">2. Problem &amp; Motivation</h2>
+  <p><strong>Observed by the user:</strong></p>
+  <ul>
+    <li>Dozens of open branches across ~4 projects.</li>
+    <li>Resuming work is slow: even a lunch break can cost up to an hour of ramp-up.</li>
+    <li>The bottleneck is tracking <em>which</em> branch holds which piece of work and what state each is in.</li>
+    <li>Existing tools (GitHub UI, <code>git status</code>) show facts, not a <em>narrative</em> of intent.</li>
+  </ul>
+  <p><strong>Root causes:</strong></p>
+  <ol>
+    <li><strong>Working memory spillover.</strong> Branch state lives in the developer's head, not on disk.</li>
+    <li><strong>Unbounded branch count.</strong> Stale/abandoned branches create background noise and merge risk.</li>
+    <li><strong>No session boundary.</strong> Git records commits, not "what I was in the middle of."</li>
+    <li><strong>Scattered signals.</strong> Local state, GitHub PR/CI state, and intent live in different places.</li>
+  </ol>
+
+  <!-- ============================================================ -->
+  <h2 id="goals">3. Goals &amp; Non-Goals</h2>
+  <div class="grid2">
+    <div>
+      <h4>Goals</h4>
+      <ul>
+        <li>Restore context after an interruption in &lt; 1 minute.</li>
+        <li>Give an at-a-glance state of every branch across every configured repo.</li>
+        <li>Surface the <em>next concrete action</em> per active branch.</li>
+        <li>Reduce branch count by flagging stale, abandoned, merge-ready, and conflict-prone branches.</li>
+        <li>Be local-first and fast. v1 is fully deterministic — no LLM, no network required.</li>
+      </ul>
+    </div>
+    <div>
+      <h4>Non-Goals</h4>
+      <ul>
+        <li>Not a CI/CD tool or a replacement for the GitHub UI.</li>
+        <li>Not a team/management analytics product (v1 is single-developer).</li>
+        <li>Not an autonomous agent that merges, pushes, or rewrites history.</li>
+        <li>Not a note-taking app — parking notes are one-liners, not a journal.</li>
+        <li>No generated content — no LLM-invented branch names, summaries, or prose in v1. Identity and naming come from git.</li>
+        <li>No mandatory cloud service or account beyond a GitHub token.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="concepts">4. Core Concepts</h2>
+
+  <h3>4.1 Branch State</h3>
+  <p>A normalized snapshot of one branch: position, divergence, activity, working-tree changes, PR/CI, and derived flags.</p>
+
+  <h3>4.2 Session Reconstruction <span class="badge b-phase">key idea</span></h3>
+  <p>
+    The git <strong>reflog</strong> records every HEAD movement with a timestamp
+    (checkouts, commits, rebases, resets, merges, stash operations). Bearing groups reflog
+    entries into <strong>work sessions</strong> by detecting inactivity gaps (e.g. &gt; 30 min),
+    producing a timeline of "what I actually did, in order, across which branches."
+  </p>
+  <div class="callout">
+    This is the mechanism that answers <em>"where was I?"</em> without asking the user to
+    maintain any state. It is the single most important differentiator. Most tools ignore the reflog.
+  </div>
+
+  <h3>4.3 The Brief</h3>
+  <p>The primary output. A prioritized, scannable document with sections:</p>
+  <ol>
+    <li><strong>Pick up where you left off</strong> — the most recent branch, enriched with WIP + next step.</li>
+    <li><strong>Other active work</strong> — recently touched branches still in flight.</li>
+    <li><strong>Needs a decision</strong> — stale, diverged, merge-ready, or conflict-prone branches.</li>
+    <li><strong>Parking notes</strong> — anything you explicitly left for yourself.</li>
+  </ol>
+
+  <h3>4.4 Parking Notes</h3>
+  <p>
+    Before stepping away you can run <code>bearing park "one line"</code>. It is stored against
+    the current repo/branch and resurfaced in the next brief. A lightweight, deterministic
+    substitute for fragile self-memory. <strong>Scope: a scratchpad.</strong> One line, enough to
+    resume a line of thinking later — not a journal, not structured data.
+  </p>
+
+  <h3>4.5 Naming</h3>
+  <p>
+    Branches are always displayed by their <strong>literal git name</strong>. Bearing never
+    generates or substitutes display names — recognition comes from your own naming discipline,
+    and identity stays unambiguous when you go back to the terminal. The only personal layer
+    on top of git identity is the parking note.
+  </p>
+
+  <!-- ============================================================ -->
+  <h2 id="sources">5. Data Sources</h2>
+  <table>
+    <thead><tr><th>Source</th><th>Signals</th><th>Used by</th><th>Requires</th></tr></thead>
+    <tbody>
+      <tr><td>Local git — reflog</td><td>HEAD movements, timestamps, action types, branch switches, rebases, resets, stashes</td><td>Session reconstruction, "where was I"</td><td>local repo</td></tr>
+      <tr><td>Local git — refs</td><td>branch list, upstream tracking, ahead/behind vs base</td><td>Fleet scan, flags</td><td>local repo</td></tr>
+      <tr><td>Local git — working tree</td><td>modified/staged/untracked/deleted, stash list</td><td>Branch state</td><td>local repo</td></tr>
+      <tr><td>Local git — history</td><td>commits, diffstat, file churn, TODO/FIXME introduced</td><td>WIP summary, analytics</td><td>local repo</td></tr>
+      <tr><td>GitHub API</td><td>PRs, reviews, CI status, issues, branch compare</td><td>Merge-readiness, CI flags</td><td>token (optional)</td></tr>
+      <tr><td>Parking notes</td><td>user-authored one-liners</td><td>Brief</td><td>local file</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============================================================ -->
+  <h2 id="features">6. Feature Set &amp; Phases</h2>
+
+  <h3>Phase 0 — Brief (local, deterministic)</h3>
+  <ul>
+    <li>Discover configured repos and enumerate branches.</li>
+    <li>Compute branch state: ahead/behind, working-tree counts, stashes, last activity, diffstat.</li>
+    <li>Parse reflog into recent actions and a last-touched ordering.</li>
+    <li>Emit a Markdown brief ordered by recency, with attention flags.</li>
+    <li>No LLM, no network required.</li>
+  </ul>
+
+  <h3>Phase 1 — Context</h3>
+  <ul>
+    <li>Reflog <strong>session reconstruction</strong> with timeline (<code>bearing sessions</code>).</li>
+    <li><code>bearing park</code> scratchpad notes, resurfaced per branch.</li>
+    <li>GitHub PR/CI enrichment (merge-readiness, reviews) via <code>gh</code> CLI passthrough — no token management.</li>
+  </ul>
+
+  <h3>Phase 2 — Surfaces &amp; Hygiene</h3>
+  <ul>
+    <li>Shell-startup one-liner (<code>bearing shell-init</code>) — the brief meets you on every terminal open.</li>
+    <li>Fleet dashboard (<code>bearing open</code>) — a renderer over the same Brief JSON, in three switchable views (§14.2): <strong>The Bridge</strong> (resume-first, default), <strong>The Map</strong> (spatial), <strong>The Logbook</strong> (timeline). Literal git names throughout; advisor panel deferred to Phase 4.</li>
+    <li><strong>Hygiene &amp; Risk Radar:</strong> stale, old-base, merge-ready, conflict-prone, safe-to-delete.</li>
+  </ul>
+
+  <h3>Phase 3 — Insight <span class="badge b-phase">optional</span></h3>
+  <ul>
+    <li>Velocity &amp; churn analytics; <strong>hotspot</strong> files (frequent change × size); <strong>file coupling</strong> (files that change together).</li>
+    <li>"Almost done" detection and "decision debt" (branches representing unmade decisions).</li>
+  </ul>
+
+  <h3>Phase 4 — Advisor &amp; LLM <span class="badge b-phase">built last, on purpose</span></h3>
+  <ul>
+    <li>LLM WIP summaries and suggested next steps — only once every underlying data layer is complete and stable.</li>
+    <li>Conversational advisor over the full data layer — it draws from <em>all</em> Bearing data, so it is never started half-finished.</li>
+    <li>Caching keyed by branch head SHA; budget caps (see §9).</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <h2 id="model">7. Data Model (proposed JSON)</h2>
+
+  <h4>BranchState</h4>
+  <pre>{
+  "repo": "api-service",
+  "name": "feat/webhooks",
+  "base": "main",
+  "headSha": "a1b2c3d",
+  "lastActivity": "2026-09-12T12:17:00Z",   // max(reflog touch, commit date) for this branch
+  "lastAction": "commit",              // commit | checkout | rebase | reset | stash | merge
+  "ahead": 6, "behind": 0,             // vs base
+  "workingTree": null,                 // repo-level; populated only on the checked-out branch
+  "stashes": 1,
+  "filesTouched": 7,
+  "diffstat": { "additions": 214, "deletions": 38, "files": 7 },
+  "pr": { "number": 512, "state": "open", "ci": "failing", "review": "changes_requested" },
+  "flags": ["active", "ci_failing"],
+  "summary": { "wip": "...", "nextStep": "..." }   // LLM, optional
+}</pre>
+
+  <h4>Session</h4>
+  <pre>{
+  "start": "2026-09-12T09:02:00Z",
+  "end":   "2026-09-12T12:17:00Z",
+  "repos": ["api-service", "web-app"],
+  "branchesTouched": ["api-service/feat/webhooks", "web-app/fix/auth-refresh"],
+  "actions": [
+    { "ts": "2026-09-12T11:50:00Z", "type": "checkout", "branch": "feat/webhooks" },
+    { "ts": "2026-09-12T12:17:00Z", "type": "commit",   "branch": "feat/webhooks", "sha": "a1b2c3d" }
+  ],
+  "note": "optional parking note if written at session end"
+}</pre>
+
+  <h4>Brief</h4>
+  <pre>{
+  "generatedAt": "2026-09-12T13:04:00Z",
+  "sessions": [ /* most recent first */ ],
+  "branches": [ /* BranchState, prioritized */ ],
+  "attention": ["api-service/feat/webhooks", "mobile/exp/new-nav"],
+  "parkingNotes": [
+    { "branch": "api-service/feat/webhooks", "text": "idempotency key edge case", "at": "..." }
+  ]
+}</pre>
+
+  <!-- ============================================================ -->
+  <h2 id="arch">8. Architecture</h2>
+  <div class="diagram">
+    <div class="dbox accent"><b>Collectors</b>git · GitHub · notes</div>
+    <div class="arrow">→</div>
+    <div class="dbox"><b>Analyzer</b>divergence · staleness · sessions · flags</div>
+    <div class="arrow">→</div>
+    <div class="dbox"><b>Summarizer</b>LLM (optional) · cache</div>
+    <div class="arrow">→</div>
+    <div class="dbox"><b>Renderer</b>Markdown · HTML · JSON</div>
+  </div>
+  <p>
+    Layers are independently replaceable. <strong>Renderers and the LLM summarizer are
+    optional</strong>: the Analyzer output (the <code>Brief</code> JSON) is itself the product,
+    and any surface can render it. This is what allows the same engine to back a CLI, a web
+    dashboard, a VS Code panel, or a conversational agent.
+  </p>
+
+  <h4>Suggested module boundaries</h4>
+  <table>
+    <thead><tr><th>Module</th><th>Responsibility</th><th>Pure?</th></tr></thead>
+    <tbody>
+      <tr><td><code>collect/git</code></td><td>Read reflog, refs, working tree, stash, log.</td><td>I/O</td></tr>
+      <tr><td><code>collect/github</code></td><td>Fetch PR/review/CI metadata (optional).</td><td>I/O</td></tr>
+      <tr><td><code>analyze/branch</code></td><td>Compute divergence, flags, diffstat.</td><td>Pure</td></tr>
+      <tr><td><code>analyze/session</code></td><td>Group reflog into sessions.</td><td>Pure</td></tr>
+      <tr><td><code>analyze/prioritize</code></td><td>Order branches for the brief.</td><td>Pure</td></tr>
+      <tr><td><code>summarize</code></td><td>LLM WIP/next-step + cache.</td><td>I/O</td></tr>
+      <tr><td><code>render/*</code></td><td>Markdown / HTML / TUI / JSON.</td><td>Pure</td></tr>
+      <tr><td><code>store/notes</code></td><td>Parking notes persistence.</td><td>I/O</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============================================================ -->
+  <h2 id="llm">9. LLM Usage &amp; Cost <span class="badge b-phase">DEFERRED — PHASE 4</span></h2>
+  <p class="small muted">
+    Nothing in this section is built until Phase 4, when the advisor starts. v1 ships with none of it.
+    Kept here so the eventual design is already thought through.
+  </p>
+  <ul>
+    <li><strong>Deferred.</strong> v1 delivers a deterministic brief from git facts — the LLM is a Phase 4 addition, not a dependency.</li>
+    <li><strong>Granularity:</strong> one request per active branch (not per commit).</li>
+    <li><strong>Payload:</strong> compact — branch name, base, commit subject lines, diffstat, notable hunks, TODO/FIXME, PR title. Not full diffs unless small.</li>
+    <li><strong>Model:</strong> a cheap/fast model is sufficient (summarization, not reasoning).</li>
+    <li><strong>Caching:</strong> key = <code>{branch, headSha, configHash}</code>. Repeat runs on unchanged branches are free and offline.</li>
+    <li><strong>Budget controls:</strong> max requests per run, max tokens per request, hard skip above a diff-size threshold.</li>
+    <li><strong>Endpoint:</strong> OpenCode Zen (pay-as-you-go, OpenAI-compatible). See §10.</li>
+  </ul>
+  <div class="callout warn">
+    <strong>Billing note:</strong> this is a personal automation, not a coding-agent workload.
+    Use Opencode <strong>Zen</strong> (per-token) rather than the Go subscription, whose terms
+    target coding agents and monitor for abuse.
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="privacy">10. Privacy &amp; Security</h2>
+  <ul>
+    <li><strong>Local-first.</strong> Repo contents never leave the machine unless the LLM summarizer is enabled.</li>
+    <li>When enabled, only the minimal excerpt needed for a summary is transmitted; full history is never uploaded.</li>
+    <li>GitHub token read from environment or OS keychain; never written to config in plaintext.</li>
+    <li>No telemetry. No account creation by default.</li>
+    <li>Read-only against repos: Bearing never pushes, merges, rebases, or deletes without an explicit, separate command.</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <h2 id="config">11. Configuration</h2>
+  <pre># bearing.toml  (location: ~/.bearing/bearing.toml — paths appended by "bearing add .")
+
+[repos]
+paths = [
+  "C:/dev/api-service",
+  "C:/dev/web-app",
+  "C:/dev/mobile",
+  "C:/dev/docs-site",
+]
+
+[defaults]
+base = "main"            # staleness threshold is a constant (7 days) — one knob is enough
+                         # session gap (30 min) and brief size (12) are constants, not config
+
+[github]
+enabled = true           # uses "gh" CLI passthrough — no token in this file, ever
+
+[llm]
+enabled = false          # Phase 4; ignored entirely until the advisor milestone
+
+[notes]
+path = "~/.bearing/notes.json"</pre>
+
+  <!-- ============================================================ -->
+  <h2 id="cli">12. CLI Surface (proposed)</h2>
+  <table>
+    <thead><tr><th>Command</th><th>Phase</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>bearing brief [--repo X] [--json]</code></td><td>0</td><td>The product. Always computed fresh — git is fast, so there is no scan/refresh step.</td></tr>
+      <tr><td><code>bearing park "note"</code></td><td>1</td><td>Attach a scratchpad one-liner to the current repo/branch.</td></tr>
+      <tr><td><code>bearing sessions [--days 7]</code></td><td>1</td><td>Reconstructed work sessions / timeline.</td></tr>
+      <tr><td><code>bearing add .</code></td><td>1</td><td>Register the current directory as a tracked repo (appends to config).</td></tr>
+      <tr><td><code>bearing shell-init</code></td><td>2</td><td>Emit a shell/PowerShell snippet showing a one-line brief on terminal open.</td></tr>
+      <tr><td><code>bearing open</code></td><td>2</td><td>Open the fleet dashboard.</td></tr>
+      <tr><td><code>bearing prune</code></td><td>2+</td><td>List stale/merged/safe-to-delete branches. <strong>List-only, forever</strong> — deletion stays manual git.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <strong>Cut from v0.1:</strong> <code>bearing scan</code> (redundant — the brief is always computed fresh),
+    <code>bearing config</code> (edit the TOML directly), and scheduled digests (shell-init covers the morning case).
+    Fewer commands, fewer tests, less to learn.
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="stack">13. Delivery &amp; Stack <span class="badge b-phase">DECIDED: PYTHON ENGINE</span></h2>
+  <p>
+    <strong>Decision (v0.3): a Python engine</strong> over a pure core, calling the
+    <code>git</code> binary via subprocess (no heavy git bindings) and <code>gh</code> for GitHub.
+    The owner's daily surface is the <strong>dashboard</strong>, not the terminal — so the local web
+    view is a committed Phase 2 deliverable (§14.2), served by the same Python process. No JS framework
+    required for v1; the three-view designs are specced in §14 and prototyped in this repo.
+    Ordering still matters: Phase 0 builds and tests the engine; the dashboard is a renderer over
+    tested Brief JSON, which is what keeps the leap from backend to frontend cheap.
+    Electron and VS Code stay out.
+  </p>
+  <table>
+    <thead><tr><th>Option</th><th>Pros</th><th>Cons</th></tr></thead>
+    <tbody>
+      <tr><td><strong>A. Python CLI</strong></td><td>Fastest to build; excellent git/GitHub libs; best engine for later UIs.</td><td>Distribution needs packaging; UI requires a second layer.</td></tr>
+      <tr><td><strong>B. Node/TypeScript CLI</strong></td><td>Shares language with a future web dashboard / VS Code extension.</td><td>Slightly heavier tooling; git plumbing less ergonomic than Python.</td></tr>
+      <tr><td><strong>C. Python engine + local web UI</strong></td><td>Best of both: reusable engine, rich dashboard.</td><td>Two components to run; more moving parts.</td></tr>
+      <tr><td><strong>D. Electron desktop app</strong></td><td>Always-available, native-feeling tray app.</td><td>Heaviest; slowest to first value; overkill for Phase 0.</td></tr>
+      <tr><td><strong>E. VS Code extension</strong></td><td>Lives where you code; status bar + panel.</td><td>Editor-locked; can't be used from a plain terminal.</td></tr>
+      <tr><td><strong>F. Go single binary</strong></td><td>Trivial distribution; fast startup for shell hook.</td><td>Slowest iteration; fewer high-level GitHub conveniences.</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted">Recommendation: <strong>A now, then C</strong> — start with a Python CLI over a pure engine, add a local web dashboard in Phase 2. Electron/VS Code are postponed until the engine proves itself.</p>
+
+  <!-- ============================================================ -->
+  <h2 id="mockups">14. Mockups</h2>
+  <p class="muted small">Illustrative only — to review intent, not final visual design. The interactive prototypes in this repo (<code>bearing-prototype.html</code>, switchable with ← → or <code>?variant=</code>) are the visual reference for §14.2 — exploratory but close: per §4.5 the product renders literal git branch names, notes are scratchpad one-liners, and no advisor until Phase 4.</p>
+
+  <div class="mock-label">14.1 — Terminal brief (<code>bearing brief</code>)</div>
+  <div class="term">
+    <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="title">bearing — brief</span></div>
+    <div class="body"><span class="c-accent">BEARING</span>  ·  Tue 12 Sep 2026, 13:04  ·  4 repos  ·  37 branches
+
+<span class="c-dim">You were last working 47m ago on</span> <span class="c-cyan">api-service/feat/webhooks</span>
+<span class="c-dim">before that:</span> web-app/fix/auth-refresh  ·  docs/site-revamp
+
+<span class="c-accent">── PICK UP WHERE YOU LEFT OFF ────────────────────────────────</span>
+<span class="c-cyan">▸ api-service/feat/webhooks</span>        <span class="c-dim">(47m ago · commit)</span>
+    WIP: signature verification implemented; retry logic stubbed.
+    <span class="c-green">Next:</span> handle 410 responses + add tests.
+    <span class="c-red">[!] CI failing (2 tests)</span>   <span class="c-dim">ahead 6 · behind 0 · 3 uncommitted</span>
+
+<span class="c-accent">── OTHER ACTIVE WORK ─────────────────────────────────────────</span>
+<span class="c-cyan">▸ web-app/fix/auth-refresh</span>          <span class="c-dim">(3h ago · checkout)</span>
+    Token refresh now uses rotating secret. PR #482 open, 1 approval.
+    <span class="c-green">Next:</span> address review comment on error handling.
+    <span class="c-amber">[~] behind 4</span>   <span class="c-dim">merge-ready after 1 comment</span>
+
+<span class="c-accent">── NEEDS A DECISION ──────────────────────────────────────────</span>
+<span class="c-cyan">▸ mobile/exp/new-nav</span>                 <span class="c-dim">(9d ago · commit)</span>
+    Prototype only. 1 commit, diverged <span class="c-amber">23 ahead / 41 behind</span>.
+    <span class="c-amber">[?] stale</span> — keep, rebase, or close?
+
+<span class="c-accent">── PARKING NOTES ─────────────────────────────────────────────</span>
+    "api-service webhooks: don't forget the idempotency key edge case"
+                                               <span class="c-dim">(from yesterday)</span>
+
+<span class="c-dim">tip: run</span> bearing park "..." <span class="c-dim">before you step away.</span></div>
+  </div>
+
+  <div class="mock-label">14.2 — Dashboard: three views (Phase 2) <span class="badge b-phase">THE VISION</span></div>
+  <div class="card">
+    <p>
+      The owner's daily surface is the dashboard, not the terminal. One dashboard, three switchable
+      views — all renderers over the same Brief JSON. Interactive prototypes:
+      <a href="http://127.0.0.1:8123/bearing-prototype.html?variant=A">The Bridge</a> ·
+      <a href="http://127.0.0.1:8123/bearing-prototype.html?variant=B">The Map</a> ·
+      <a href="http://127.0.0.1:8123/bearing-prototype.html?variant=C">The Logbook</a>.
+      A static Bridge snapshot is delivered early (Phase 0, <code>bearing brief --html</code>) so the
+      tool is visually usable from day one; the interactive three-view dashboard follows at Phase 2.
+    </p>
+    <div class="grid3">
+      <div><h4>The Bridge (default)</h4><p class="small">Dashboard-first, resume-first. One clear thing on top: a "pick up where you left off" card — last-touched branch, last actions, uncommitted files, next step. Below: attention flags (merge-ready, uncommitted, stale decisions), then per-project lanes of branch cards.</p></div>
+      <div><h4>The Map</h4><p class="small">Spatial overview. Projects as islands, branches as trails whose warmth encodes recency — walked today glows, weeks-old grows moss, stale goes dashed. "You are here" marker on the active branch. Hover for state; click for the dossier.</p></div>
+      <div><h4>The Logbook</h4><p class="small">Timeline-first. The week as one interleaved stream across branches — commits, notes, parks, CI events — answering "how the work unfolded," not just where it stands. Feeds off session reconstruction (Milestone 1).</p></div>
+    </div>
+    <p class="small"><strong>Translation rules, prototype → product:</strong></p>
+    <ul class="small">
+      <li><strong>Literal git names everywhere.</strong> The prototypes' invented display names ("The token refresh thing") are exploration artifacts — the product shows <code>repo / branch-name</code>. Recognition comes from naming discipline (§4.5).</li>
+      <li><strong>Notes are scratchpad one-liners</strong> (§4.4) — rendered on cards and in the dossier, never prose blocks.</li>
+      <li><strong>No advisor panel until Phase 4.</strong> The prototypes' advisor rail becomes a deterministic "next actions" list derived from flags.</li>
+      <li>Shared across all three views: the <strong>dossier drawer</strong> (branch detail — note, ahead/behind, activity, session story) and the <strong>attention flags</strong> bar.</li>
+    </ul>
+  </div>
+
+  <div class="mock-label">14.3 — Bridge wireframe: state cards (Phase 2)</div>
+  <div class="browser">
+    <div class="chrome"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="url">localhost:8787/bearing</span></div>
+    <div class="page">
+      <div class="dash-head">
+        <h4>Fleet overview</h4>
+        <span class="meta" style="font-family:var(--mono);font-size:12px;color:var(--muted)">updated 13:04 · 4 repos</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>37</b><span>branches</span></div>
+        <div class="stat"><b>6</b><span>active</span></div>
+        <div class="stat"><b>4</b><span>merge-ready</span></div>
+        <div class="stat"><b>11</b><span>stale</span></div>
+        <div class="stat"><b>3</b><span>CI failing</span></div>
+      </div>
+
+      <div class="bcard ready">
+        <div class="top"><span class="name">api-service / fix/rate-limit</span><span class="tag t-ok">merge-ready</span></div>
+        <div class="meta">2h ago · ahead 3 · CI passing · PR #509 · 2 approvals</div>
+        <div class="next"><b>Next:</b> merge and close.</div>
+      </div>
+
+      <div class="bcard risk">
+        <div class="top"><span class="name">api-service / feat/webhooks</span><span class="tag t-risk">CI failing</span></div>
+        <div class="meta">47m ago · ahead 6 · 3 uncommitted · PR #512</div>
+        <div class="next"><b>Next:</b> handle 410 responses + add tests.</div>
+      </div>
+
+      <div class="bcard stale">
+        <div class="top"><span class="name">mobile / exp/new-nav</span><span class="tag t-stale">stale · diverged</span></div>
+        <div class="meta">9d ago · 23 ahead / 41 behind · no PR</div>
+        <div class="next"><b>Decide:</b> keep, rebase, or close?</div>
+      </div>
+
+      <div class="bcard" style="border-left-color:var(--cyan)">
+        <div class="top"><span class="name">web-app / fix/auth-refresh</span><span class="tag t-info">in review</span></div>
+        <div class="meta">3h ago · behind 4 · PR #482 · changes requested</div>
+        <div class="next"><b>Next:</b> address error-handling comment.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mock-label">14.4 — Session timeline (<code>bearing sessions</code>)</div>
+  <div class="browser">
+    <div class="chrome"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="url">bearing — sessions · today</span></div>
+    <div class="page">
+      <p class="small muted" style="margin-top:0">Each block is a contiguous span of activity reconstructed from the git reflog. Gaps &gt; 30 min start a new session.</p>
+      <div class="timeline">
+        <div class="tl a" style="flex:2">webhooks</div>
+        <div class="tl blank" style="flex:1">lunch</div>
+        <div class="tl b" style="flex:2">auth-refresh</div>
+        <div class="tl c" style="flex:1">docs</div>
+        <div class="tl blank" style="flex:1">break</div>
+        <div class="tl a" style="flex:3">webhooks</div>
+      </div>
+      <div class="tl-axis"><span>09:00</span><span>10:30</span><span>12:00</span><span>13:30</span><span>15:00</span><span>16:30</span></div>
+      <div class="kv" style="margin-top:14px">
+        <dt>09:02 – 11:14</dt><dd>api-service/feat/webhooks — 4 commits, 1 rebase</dd>
+        <dt>11:48 – 13:22</dt><dd>web-app/fix/auth-refresh — 2 commits, opened PR #482</dd>
+        <dt>13:26 – 13:51</dt><dd>docs/site-revamp — 1 commit</dd>
+        <dt>14:20 – 16:40</dt><dd>api-service/feat/webhooks — 2 commits, CI failing</dd>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="metrics">15. Success Metrics</h2>
+  <table>
+    <thead><tr><th>Metric</th><th>Target</th><th>How measured</th></tr></thead>
+    <tbody>
+      <tr><td>Time to first productive action after interruption</td><td>&lt; 1 min (from ~1 hr)</td><td>Self-reported / timed check</td></tr>
+      <tr><td>Open branch count</td><td>Steady decrease</td><td><code>bearing scan</code> over weeks</td></tr>
+      <tr><td>Stale branches (&gt; staleness threshold)</td><td>Down 50% in a month</td><td>Flag aggregation</td></tr>
+      <tr><td>Brief generation time</td><td>&lt; 5 s (no LLM)</td><td>Timing</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============================================================ -->
+  <h2 id="rollout">16. Rollout Plan</h2>
+  <ol>
+    <li><strong>Milestone 0</strong> — repo discovery, branch state, Markdown brief (no LLM, no network).</li>
+    <li><strong>Milestone 1</strong> — reflog sessions + parking notes + <code>bearing add</code>.</li>
+    <li><strong>Milestone 2</strong> — <code>gh</code> PR/CI enrichment + merge-readiness flags.</li>
+    <li><strong>Milestone 3</strong> — shell-startup hook + fleet dashboard + hygiene radar.</li>
+    <li><strong>Milestone 4</strong> — analytics (optional; only if still wanted).</li>
+    <li><strong>Milestone 5</strong> — LLM summaries + conversational advisor, built last on the complete data layer.</li>
+  </ol>
+
+  <!-- ============================================================ -->
+  <h2 id="questions">17. Open Questions</h2>
+  <h3>Resolved in v0.2</h3>
+  <ul>
+    <li><strong>Delivery surface</strong> — Python CLI (§13). The dashboard is deferred until the brief proves itself in daily use.</li>
+    <li><strong>LLM in v1</strong> — No. Fully deterministic first; LLM arrives with the advisor in Phase 4.</li>
+    <li><strong>Advisor timing</strong> — last, by design. It draws from all Bearing data, so building it early means building it half-finished.</li>
+    <li><strong>Branch display names</strong> — literal git names only (§4.5). No generated names.</li>
+    <li><strong>Brief cadence</strong> — on-demand plus shell-startup one-liner. Scheduled digests cut.</li>
+    <li><strong>GitHub auth</strong> — <code>gh</code> CLI passthrough. If <code>gh</code> isn't authenticated, GitHub features silently no-op.</li>
+    <li><strong>Safe-to-delete</strong> — list-only, permanently (read-only principle).</li>
+    <li><strong>Exclusions</strong> — default skip-list: <code>dependabot/*</code>, <code>renovate/*</code>; configurable.</li>
+  </ul>
+  <h3>Still open</h3>
+  <ul>
+    <li>Windows-first details: PowerShell profile hook for <code>shell-init</code>, path handling in config.</li>
+    <li>Reflog timestamps need normalization when comparing activity across repos — trivial, but note it.</li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <h2 id="appendix">18. Appendix: Heuristics &amp; Defaults</h2>
+  <table>
+    <thead><tr><th>Flag</th><th>Heuristic (default)</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag t-ok">active</span></td><td>Touched — via reflog: checkout, commit, rebase, not just commits — within <code>staleness_days</code> (7).</td></tr>
+      <tr><td><span class="tag t-stale">stale</span></td><td>No activity for &ge; <code>staleness_days</code> and not merged.</td></tr>
+      <tr><td><span class="tag t-risk">diverged</span></td><td>Behind base by &gt; 20 commits. (v0.1's "&gt; 3× ahead" rule removed — a branch that's far ahead is finished work waiting to merge, not a risk.)</td></tr>
+      <tr><td><span class="tag t-risk">conflict-risk</span></td><td>Files changed on both branch and base since fork point.</td></tr>
+      <tr><td><span class="tag t-ok">merge-ready</span></td><td>Open PR + passing CI + required approvals + no conflicts.</td></tr>
+      <tr><td><span class="tag t-info">safe-to-delete</span></td><td>Merged into base, or no unique commits vs base. ("Superseded" removed — uncomputable without guessing intent.)</td></tr>
+      <tr><td><span class="tag t-info">almost-done</span></td><td>PR open, CI green, approvals present, untouched &gt; 1 day (nudge to merge).</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted">All thresholds configurable.</p>
+
+  <footer>
+    Bearing — spec v0.2 · reviewed and simplified · next step: Milestone 0.
+  </footer>
+</main>
+</div>
+</body>
+</html>

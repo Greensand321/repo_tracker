@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<!--
+  PROTOTYPE — throwaway. Question: "What should the Bearing dashboard look like?"
+  Three structurally different variants, switchable via ?variant=A|B|C (bottom bar or ← → keys):
+    A — The Bridge .... hero resume card + fleet lanes + advisor rail (dashboard-first)
+    B — The Map ....... spatial cartography: projects as islands, branches as trails
+    C — The Logbook ... timeline-first: the week as an interleaved stream + ⌘K advisor
+  Run: open this file directly, or `python -m http.server 8123` and visit
+  http://localhost:8123/bearing-prototype.html
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bearing — prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="bearing.css">
+</head>
+<body class="vA">
+  <div id="app"></div>
+  <div id="scrim"></div>
+  <aside id="drawer" aria-hidden="true"></aside>
+  <div id="fieldnotes"></div>
+  <div id="tooltip"></div>
+  <div id="toast"></div>
+  <div id="switcher">
+    <button id="swPrev" aria-label="previous variant">←</button>
+    <div id="swLabel">
+      <span id="swName">A — The Bridge</span>
+      <span id="swState"></span>
+    </div>
+    <button id="swNext" aria-label="next variant">→</button>
+  </div>
+  <script src="bearing.js"></script>
+</body>
+</html>
