@@ -3,6 +3,22 @@
 **Status:** ready for implementation handoff · **Date:** 13 Sep 2026 · **Plan version:** 1.0
 **Companion documents:** `bearing-spec.html` (product spec v0.3, same folder), prototype GUI (`bearing-prototype.html` + `bearing.css` + `bearing.js`, same folder).
 
+> # ⛔ SUPERSEDED — 15 Sep 2026
+>
+> **Do not implement from this document.** It plans a local-first terminal CLI that reads
+> local git. The owner's requirements ([`../requirements.md`](../requirements.md)) established
+> that branches are created by AI agents and pushed to origin, that GitHub is the data
+> source, and that the product is a GUI with no terminal surface. The activity model at the
+> centre of this plan — built on local reflog and working-tree state — produces nothing for
+> those branches.
+>
+> **Still worth mining:** §5 (the exact git commands, if local repos are ever read), §7 (the
+> flag heuristics and thresholds, now settings rather than constants), §10 (the test
+> strategy), and §12 (the edge cases). Kept in `plans/` rather than `archive/` for that
+> reason; it moves to `archive/` once its replacement is written.
+>
+> ---
+>
 > **Repo note (added 15 Sep 2026, during the repo reorganization).** Two things below are
 > out of date, and are corrected in [`README.md`](README.md) rather than edited into this
 > plan: §3 says to create a fresh repository — that is now *this* repo (`repo_tracker`),

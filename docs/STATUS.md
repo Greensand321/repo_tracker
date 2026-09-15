@@ -1,71 +1,59 @@
 # Status — where the project stands
 
-**Updated:** 15 Sep 2026 · **Phase:** 0 (not started) · **Branch:** `claude/kind-meitner-cpis9v`
+**Updated:** 15 Sep 2026 · **Stage:** planning · **Branch:** `claude/kind-meitner-cpis9v`
 
-> Keep this file short and current. It is the first thing to read after any time away —
-> the same job Bearing does for branches, done by hand for the repo itself.
+> Keep this short and current. It is the first thing to read after any time away.
 
 ---
 
 ## Where we are
 
-Planning is done and now cross-checked. Nothing is implemented.
+**The product changed on 15 Sep 2026**, when the owner answered the first round of
+questions. It is not the tool the old spec describes.
 
-- Spec is at **v0.3**, its major questions resolved (`spec/bearing-spec-v0.3.html`).
-- Phase 0 plan is **ready for handoff** — exact commands, schemas, thresholds (`plans/phase-0-plan.md`).
-- **`ROADMAP.md` is the cohesive plan**: every feature mapped to the code that implements
-  it, the dependency spine, a Phase 0 build order, and a master module inventory.
-- Visual direction settled: dashboard-first, "The Bridge" layout (`design/`).
-- Repo reorganized 15 Sep; branch-sync workflow moved to `.github/workflows/`.
+| | Old documents assumed | Actually true |
+|---|---|---|
+| Who writes the code | The owner, at a keyboard | **AI agents**, each session on its own branch, pushed to origin |
+| Data source | Local git — reflog, working tree, stashes | **GitHub.** Local signals are empty for agent branches. |
+| Surface | A terminal CLI printing markdown | **A GUI.** No terminal. |
+| Content | Branch state: ahead/behind, flags, SHAs | **Plain English** — what was committed, not when |
+| Organizing | Nothing | **Milestones → Goals → Tasks → Branches**, plus tags |
+| Sync | A folder replicated by Dropbox | **A cloud backend**, two machines daily |
+| Success | Fewer branches | **More branches**, less mental load |
+
+Written up in [`requirements.md`](requirements.md). Both implementation plans are
+superseded; `ROADMAP.md` is rebuilt around Stages 1–5.
 
 ## The next concrete action
 
-**Answer the blocking questions in [`decisions/open-questions.md`](decisions/open-questions.md).**
-There are 29; five of them change what Phase 0 *is*:
+**Answer the two blocking items in [`decisions/open-questions.md`](decisions/open-questions.md).**
 
-| | Question | What it changes |
+| | | |
 |---|---|---|
-| **Q1** | Are branches created by you locally, or by agents pushing to origin? | Whether GitHub is the primary data source. Could move `collect_github.py` into Phase 0 and rewrite the activity model. |
-| **Q2** | What fills the "what was I doing" prose in v1? | Whether notes (Phase 1) or the LLM (Phase 4) move earlier, or v1 ships facts only. |
-| **Q3** | How do notes get entered, with no terminal? | Whether Phase 0 stays one static HTML file or needs a local server. |
-| **Q4** | How do you launch it? | Whether Phase 0 needs a launcher, a scheduled task, or a server. |
-| **Q5** | What does the pickup card *do* when clicked? | Whether read-only gets a narrow, deliberate exception. |
+| **Q30** | **The stack.** Local program + browser UI, pure browser page, or desktop app — and Python or TypeScript. | Blocks all of Stage 1 |
+| **C1** | **Where the LLM goes.** You said defer it; you also ranked it your #2 priority and made it responsible for goal upkeep. It is currently at Stage 2. | Blocks the stage order |
 
-Q6, Q16, Q17, Q22 and Q23 take a minute each and unblock a lot.
+Then six smaller ones: C4 (scale), C5 (time display), C6 (evolving tasks), Q31 (which
+mockup), Q32 (goal cardinality), Q34 (GitHub auth).
 
-## Once unblocked — the Phase 0 build order
+## Then — Stage 1
 
-Full detail in `ROADMAP.md`. In sequence:
+Get the git history on screen in plain English: authenticate to GitHub, list repos and
+branches, fetch commit history and PR/CI state per branch, cache it, render it into the
+chosen mockup. No LLM, no goals, no sync.
 
-1. `tests/fixture_builder.py` — deterministic repos with pinned dates. Everything is
-   tested against it, so it is genuinely first.
-2. `bearing/model.py` — dataclasses only; forces the schema decisions early.
-3. `bearing/collect_git.py` — the single I/O boundary. Every subprocess call lives here.
-4. `bearing/config.py` — load, validate, resolve bases, first-run message.
-5. `bearing/analyze_branch.py` — **Q1 bites here.** Flags, activity model, conflict-risk.
-6. `bearing/nextstep.py` → `prioritize.py`
-7. `bearing/render_json.py` → `render_markdown.py` (golden files)
-8. `bearing/render_html.py` — the Bridge snapshot. **The deliverable that matters.**
-9. `bearing/cli.py` — thin.
-10. Integration, perf, and the read-only assertion test.
+*"That's really the biggest thing that needs to be solved to prove this is possible."*
 
-Steps 1–4 are safe to start before Q1 is answered; step 5 is not.
+## Nothing is implemented
 
-## Watch out for
-
-- **The activity model is the subtle part.** A checkout is recorded in *HEAD's* reflog, not
-  the branch's. A branch with an old tip commit but a recent checkout must still rank as
-  recent. Required test.
-- **Timezones.** Parse ISO-8601 with offsets, convert to aware UTC immediately, never
-  compare naive datetimes across repos.
-- **Windows first.** Paths with spaces and backslashes, end to end. Never build shell
-  strings.
-- **Read-only is a hard invariant**, not a goal. There is an acceptance test for it.
+`bearing/` holds a Python CLI skeleton from the old design. It is three small files and
+**will likely be deleted** once Q30 is answered — do not build on it.
 
 ## Log
 
 | Date | What happened |
 |---|---|
-| 13 Sep 2026 | Spec v0.1 → v0.2 → v0.3; build plan v0.2; Phase 0 plan written; mockups explored, dashboard-first chosen |
-| 15 Sep 2026 | Repo reorganized: `docs/` structure, roadmap, decision log, package skeleton at root |
-| 15 Sep 2026 | `sync-branches.yml` → `.github/workflows/`; roadmap expanded to features + code; 29 open questions raised, 5 blocking |
+| 13 Sep 2026 | Spec v0.1 → v0.3; build plan v0.2; Phase 0 plan; mockups explored, dashboard-first chosen |
+| 15 Sep 2026 | Repo reorganized: `docs/` structure, roadmap, decision log, package skeleton |
+| 15 Sep 2026 | `sync-branches.yml` → `.github/workflows/`; roadmap expanded; 29 questions raised |
+| 15 Sep 2026 | **Owner answered. Product substantially redefined.** `requirements.md` written; roadmap rebuilt as Stages 1–5; decision log restructured; both plans marked superseded; 6 conflicts and 11 new questions raised |

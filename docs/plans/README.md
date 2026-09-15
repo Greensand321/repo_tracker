@@ -2,8 +2,17 @@
 
 | File | Scope | Status |
 |---|---|---|
-| `phase-0-plan.md` | Phase 0 / Milestone 0 — the Brief engine | **Current. Ready for implementation handoff.** |
-| `build-plan-v0.2.md` | Whole-product architecture and milestones M0–M7 | Reference. Partly superseded — see below. |
+| `phase-0-plan.md` | A local-first CLI "Brief engine" | **⛔ Superseded 15 Sep 2026.** Do not implement from it. |
+| `build-plan-v0.2.md` | Whole-product architecture and milestones M0–M7 | **⛔ Largely superseded.** Mine it for patterns, not for plans. |
+
+**There is no current implementation plan.** [`../requirements.md`](../requirements.md) and
+[`../ROADMAP.md`](../ROADMAP.md) are the live documents; a Stage 1 plan gets written once
+the stack is chosen (open question Q30).
+
+Both files below were written for a different product: a local-first terminal CLI reading
+local git for a developer working at a keyboard. What is actually being built is a GUI
+dashboard over work that AI agents did on GitHub. See `requirements.md` §9 for the full
+list of assumptions that changed.
 
 ## `phase-0-plan.md` — what to build now
 

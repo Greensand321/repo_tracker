@@ -1,16 +1,16 @@
-# repo_tracker — *Bearing*
+# repo_tracker
 
 > Designed to organize tasks in a workflow that is easy to pick up where it was left.
 > No more losing track of which branch was in charge of which problem.
 
-**Bearing** is the tool this repo builds: a local-first, read-only context-restoration
-system for a solo developer juggling ~40 branches across ~4 repos. When you sit back
-down it answers, in ten seconds: *where was I, what state is every branch in, what
-deserves attention next.*
+A **personal reference dashboard** over every branch in every repo. AI agents do the work —
+one branch per session, pushed to GitHub, sessions running a week or more. This reads all
+of it and shows, in plain English, what each thread is actually doing.
 
-The core insight it is built around: **the expensive part of switching tasks is not the
-work, it is rebuilding the mental model.** Every feature is judged by how much
-time-to-first-productive-action it removes.
+It is a place to get your bearings, not a place to work. It never touches your repos.
+
+The point is not fewer branches — it is **holding more of them at once, with less mental
+load.**
 
 ---
 
@@ -18,30 +18,29 @@ time-to-first-productive-action it removes.
 
 | If you want to… | Read |
 |---|---|
+| **Understand what this is** | [`docs/requirements.md`](docs/requirements.md) |
 | Know what to do **right now** | [`docs/STATUS.md`](docs/STATUS.md) |
-| See the phases and what's in each | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
-| Build the first milestone | [`docs/plans/phase-0-plan.md`](docs/plans/phase-0-plan.md) |
-| Understand the product | [`docs/spec/bearing-spec-v0.3.html`](docs/spec/bearing-spec-v0.3.html) *(open in a browser)* |
-| See what it should look like | [`docs/design/`](docs/design/README.md) |
+| **Answer what's blocking the build** | [`docs/decisions/open-questions.md`](docs/decisions/open-questions.md) |
+| See the stages and what's in each | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 | Know why something was decided | [`docs/decisions/decision-log.md`](docs/decisions/decision-log.md) |
-| Answer the questions blocking the build | [`docs/decisions/open-questions.md`](docs/decisions/open-questions.md) |
+| See what it should look like | [`docs/design/`](docs/design/README.md) |
 | Find the full documentation map | [`docs/README.md`](docs/README.md) |
 
 ## Repository layout
 
 ```
 repo_tracker/
-├── bearing/          ← program files: the Python package (Phase 0 engine goes here)
-├── tests/            ← test suite + deterministic git fixture builder
-├── pyproject.toml    ← packaging; installs the `bearing` command
+├── bearing/          ← leftover CLI skeleton from the old design; do not build on it
+├── tests/
 ├── .github/workflows ← repo infrastructure (branch-sync workflow)
-└── docs/             ← everything written so far
-    ├── STATUS.md         where the project stands, and the next action
-    ├── ROADMAP.md        features → code, build order, module inventory
-    ├── spec/             canonical product spec (v0.3)
-    ├── plans/            implementation plans
+└── docs/
+    ├── requirements.md   what the tool actually is  ← start here
+    ├── STATUS.md         where things stand, and the next action
+    ├── ROADMAP.md        Stages 1–5, in priority order
+    ├── decisions/        decisions + their reasons, and the open questions
     ├── design/           the mockups we are building toward
-    ├── decisions/        locked decisions, and the questions still open
+    ├── spec/             ⛔ old product spec — superseded
+    ├── plans/            ⛔ old implementation plans — superseded
     └── archive/          superseded material, kept for its reasoning
 ```
 
@@ -50,19 +49,22 @@ repo_tracker/
 
 ## Current state
 
-Nothing is implemented yet. The spec, the design direction, and a fully-specified Phase 0
-plan are done; the roadmap maps every feature to the code that implements it.
+Planning. Nothing is implemented.
 
-**Five questions block the start of Phase 0** — [`docs/decisions/open-questions.md`](docs/decisions/open-questions.md).
-The largest is Q1: whether branches are created by you locally or by agents pushing to
-origin. Phase 0 reads local git signals — reflog, working tree, stashes — and a branch
-that only ever existed on origin produces none of them.
+The product was substantially redefined on 15 Sep 2026 once the owner's workflow was
+understood — branches come from AI agents on GitHub, not from a developer at a keyboard.
+The older spec and plans describe a different tool and are marked superseded.
 
-## Ground rules (from the spec — do not re-litigate)
+**Two things block the first build** — the stack, and where the LLM belongs. Both are in
+[`docs/decisions/open-questions.md`](docs/decisions/open-questions.md).
 
-1. **Read-only.** Bearing never writes to your repos. Not a branch, not a stash, nothing.
-2. **Offline & deterministic first.** Phase 0–3 need no network and no LLM.
-3. **The Brief JSON is the product.** Every surface — terminal, HTML, dashboard — is a
-   renderer over it.
-4. **Literal git branch names, always.** Bearing never invents display names.
-5. **The advisor is built last**, on a complete data layer, never half-finished.
+## Ground rules
+
+1. **Your repos are read-only. Forever.** No push, no merge, no branch, no stash. The tool's
+   own data — goals, tags, notes, comments — lives in its own database, never in your repos.
+2. **GitHub is the data source.** Agent branches are never checked out locally, so local git
+   state is empty for them.
+3. **Plain English is the headline.** Commit messages and summaries first; SHAs and
+   timestamps small.
+4. **One canonical data structure**; every view renders it and computes nothing itself.
+5. **The literal branch name is always shown**, so you can always find the thing.

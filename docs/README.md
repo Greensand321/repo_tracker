@@ -4,15 +4,20 @@ Everything written about Bearing lives here. Source code lives at the repo root.
 
 ## What is authoritative
 
+**Read [`requirements.md`](requirements.md) first.** On 15 Sep 2026 the owner's answers
+changed the product substantially — from a local-first terminal CLI reading local git, to a
+GUI dashboard over work AI agents did on GitHub. Most of the older documents were written
+for the former.
+
 When two documents disagree, this is the order of precedence:
 
-1. **`spec/bearing-spec-v0.3.html`** — the product spec. The spec always wins.
-2. **`plans/phase-0-plan.md`** — the implementation plan for the current milestone.
-3. **`decisions/decision-log.md`** — locked decisions, with the document each came from.
-4. **`plans/build-plan-v0.2.md`** — architecture and milestones. Still the best source
-   for architecture (§2, §5), safety (§8), and testing (§9) — but its *ordering* of the
-   advisor was overturned by spec v0.3. See the note in `plans/README.md`.
-5. **`archive/`** — superseded. Read for reasoning, never for instructions.
+1. **`requirements.md`** — what the tool actually is. Always wins.
+2. **`ROADMAP.md`** — the stages, in the owner's priority order.
+3. **`decisions/decision-log.md`** — decisions with their reasons, and what was overturned.
+4. **`spec/bearing-spec-v0.3.html`** — the old product spec. Still the best writing on the
+   *problem*; wrong about the solution. Awaiting a v0.4 rewrite.
+5. **`plans/`** — ⛔ both plans are superseded. Mine them for patterns, not for instructions.
+6. **`archive/`** — superseded. Read for reasoning, never for instructions.
 
 ## Contents
 
@@ -21,11 +26,15 @@ Where the project stands and what the next concrete action is. **Update this at 
 of every working session** — it is the file that makes this repo pick-up-able, which is
 the same job Bearing itself does for branches.
 
+### `requirements.md`
+**What the tool is**, written from the owner's own answers: the real workflow it serves,
+the functional requirements, the two data planes, the constraints, the non-goals, and a
+table of every assumption the old spec got wrong.
+
 ### `ROADMAP.md`
-**The cohesive plan.** Phases 0–4: every feature mapped to the code that implements it,
-the dependency spine, a step-by-step Phase 0 build order, a master module inventory, and
-the known gaps in the plan. Also reconciles the three numbering schemes floating around
-("Phase 0" vs "Milestone 0" vs "tier 0" — all the same thing).
+Stages 1–5 in the owner's priority order: git history on screen · LLM insight over it ·
+the organizing layer · sync · packaging. Plus what is deferred indefinitely and why, and
+what is blocked right now.
 
 ### `spec/`
 | File | What it is |

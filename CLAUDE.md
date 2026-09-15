@@ -1,48 +1,61 @@
 # Working in this repo
 
-This repo builds **Bearing** — a local-first, read-only tool that reconstructs a
-developer's working context across many branches and repos. Start with
-[`docs/STATUS.md`](docs/STATUS.md) for where things stand, then
-[`docs/ROADMAP.md`](docs/ROADMAP.md).
+This repo builds a **personal reference dashboard**: it reads every branch across the
+owner's GitHub repos and shows, in plain English, what each thread of work is doing.
+
+**Read [`docs/requirements.md`](docs/requirements.md) first**, then
+[`docs/STATUS.md`](docs/STATUS.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+> ⚠️ The product was substantially redefined on 15 Sep 2026. The spec in `docs/spec/` and
+> both files in `docs/plans/` describe a *different tool* — a local-first terminal CLI
+> reading local git. **Do not implement from them.** `requirements.md` outranks everything.
+
+## The one thing to understand
+
+Branches here are created by **AI agents** (Claude Code, t3 code) — one branch per session,
+pushed to origin, sessions running a week or more. They are never checked out on the
+owner's machines. So **local git signals — reflog, working tree, stashes — are empty for
+the branches that matter.** GitHub is the data source. Any design that leans on local git
+state is wrong by construction.
 
 ## Layout
 
-- **Root is program files.** `bearing/` (the package), `tests/`, `pyproject.toml`.
-- **`docs/` is everything written.** `spec/` · `plans/` · `design/` · `decisions/` · `archive/`.
-- Document precedence when sources disagree: **spec v0.3 > phase-0 plan > build plan v0.2
-  > archive.** `docs/archive/` is reasoning, never instructions.
+- **Root is program files.** `docs/` is everything written.
+- Precedence: `requirements.md` > `ROADMAP.md` > `decisions/decision-log.md` > `spec/` >
+  `plans/` > `archive/`. The last three are superseded — reasoning, never instructions.
+- `bearing/` is a leftover CLI skeleton from the old design. Do not build on it.
 
-## Hard rules — these are invariants, not preferences
+## Hard rules
 
-1. **Never write to a tracked repo.** Bearing reads. No branch, no stash, no ref, no config
-   change, ever. There is an acceptance test for this.
-2. **Python 3.11+, stdlib only.** No third-party runtime dependencies. `tomllib`,
-   `argparse`, `subprocess`. Test tooling may be dev-only.
-3. **All git access goes through `collect_git.py`**, via `subprocess` with porcelain or
-   machine formats. Never parse human-readable git output. Never build shell strings —
-   always pass argument lists, because Windows paths have spaces in them.
-4. **Purity:** `cli.py`, `config.py`, and `collect_git.py` do I/O. Everything below them is
-   pure and unit-testable without a real repo. Keep it that way — that is where the tests
-   live and where correctness is guaranteed.
-5. **Literal git branch names**, always rendered as `repo / branch-name`. Bearing never
-   invents display names, whatever the mockups show.
-6. **No LLM, no network, until Phase 4.** No HTTP client code of any kind before then.
-7. **Windows-first.** Paths with spaces and backslashes must work end-to-end. Timestamps
-   are parsed with explicit offsets and compared in UTC — never naive.
+1. **Two data planes.** *Plane A* — the owner's repos — is **strictly read-only forever**:
+   no push, merge, branch, stash, or config change, ever. *Plane B* — milestones, goals,
+   tags, notes, comments, settings — is the tool's own database, written freely. Never
+   write Plane B data into a git repo.
+2. **GUI only.** No terminal as a product surface, no markdown output, no CLI-shaped
+   design. A command-line entry point may exist for debugging; nothing is shaped by it.
+3. **Plain English is the headline.** Commit messages, PR titles, LLM summaries. SHAs,
+   ahead/behind counts and timestamps are supporting metadata, shown small.
+4. **One canonical data structure; every surface renders it.** If a view needs a fact, put
+   the fact in the structure — never compute it inside the view.
+5. **I/O at the edges, pure logic in the middle.** Fetching and storage at the boundary;
+   pure, testable functions between. That is where the tests go.
+6. **The literal git branch name is always shown and always searchable.** An LLM-generated
+   title may sit alongside it, clearly marked — never instead of it.
+7. **Nothing hardcoded.** Thresholds and display caps belong in settings.
+8. **Windows-first.** Two machines, used daily. Paths with spaces must work.
 
 ## Before adding anything
 
-Check [`docs/decisions/decision-log.md`](docs/decisions/decision-log.md). Several of these
-were settled twice; the reason is recorded alongside each one so it can be re-evaluated
-rather than just re-argued. Check the phase in
-[`docs/ROADMAP.md`](docs/ROADMAP.md) too — each phase names what it explicitly does *not*
-build. "Do not build, do not stub" means exactly that.
+Check [`docs/decisions/decision-log.md`](docs/decisions/decision-log.md) — §3 lists what
+was already overturned and why, so dead ideas do not get rebuilt. Check the stage in
+[`docs/ROADMAP.md`](docs/ROADMAP.md): each one names what it explicitly does *not* include.
+
+**Two questions currently block implementation** — the stack (Q30) and where the LLM goes
+(C1), in [`docs/decisions/open-questions.md`](docs/decisions/open-questions.md). Do not
+start Stage 1 before they are answered.
 
 ## When you finish a session
 
 Update `docs/STATUS.md`: where things stand, the next concrete action, and a row in the
-log. That file is what makes this repo pick-up-able — the same job Bearing does for
-branches, done by hand.
-
-If you locked a decision, add it to the decision log with its reason. If a document was
-superseded, move it to `docs/archive/` and record what replaced it — do not delete it.
+log. If you settled a decision, add it to the decision log **with its reason**. If a
+document was superseded, say so in it and record what replaced it — do not delete it.

@@ -1,57 +1,75 @@
 # Decision log
 
-Every locked decision in one place, with where it came from. **Check here before
-reopening an argument.** If a decision is overturned, do not delete the row — strike it
-and add the replacement, so the reasoning trail survives.
+Every decision with the reason behind it. **Check here before reopening an argument.**
+Overturned decisions are not deleted — they move to §3 with what replaced them, so the
+reasoning trail survives.
 
-Precedence when documents disagree: **spec v0.3 > phase-0 plan > build plan v0.2 > archive.**
+**Precedence:** [`../requirements.md`](../requirements.md) > [`../ROADMAP.md`](../ROADMAP.md)
+> `spec/bearing-spec-v0.3.html` > `plans/` > `archive/`.
 
----
-
-## Locked
-
-| # | Decision | Why | Source |
-|---|---|---|---|
-| 1 | **Bearing is strictly read-only.** It never writes to a tracked repo — no branch, no stash, no ref, nothing. | Removes the entire class of "the tool broke my work" risk. It is an invariant with an acceptance test, not an aspiration. | spec §3, phase-0 plan §1 |
-| 2 | **Stack: Python 3.11+, stdlib only.** `tomllib`, `argparse`, `subprocess`. No GitPython, no pygit2, no requests, no framework. | Zero install friction, nothing to keep current, trivially portable to Windows. | build plan §11.1, phase-0 plan §2 |
-| 3 | **All git access via `git` subprocess** with porcelain/machine formats. Never parse human-readable output. | Machine formats are stable contracts; human output is not. | phase-0 plan §2 |
-| 4 | **The Brief JSON is the product.** Terminal, HTML, and dashboard are interchangeable renderers over it. | Lets surfaces change without touching the engine — the Phase 2 dashboard should need zero engine changes. | spec §8, build plan §2 |
-| 5 | **The advisor is built last (Phase 4).** v1 is fully deterministic. | It draws on *all* Bearing data, so building it early means building it half-finished. | spec v0.2 decision 1 & 4 |
-| 6 | ~~v1 = M0–M4 including Heading; advisor on by default with strict caps.~~ **Overturned** by #5. | Build plan v0.2 locked this on 13 Sep; spec v0.3 reversed it the same day. The spec wins. | build plan §11.3–4, overturned by spec v0.3 |
-| 7 | **Literal git branch names, always.** Bearing never invents display names. | You search for and check out the real name; a pretty alias adds a translation step exactly when you have no context to spare. Note the prototypes violate this — see `design/README.md`. | spec v0.2 decision 2, §4.5 |
-| 8 | **Parking notes are scratchpad one-liners, not a journal.** | A journal is a second thing to maintain; a one-liner is something you actually write on the way out the door. | spec v0.2 decision 3 |
-| 9 | **The owner's daily surface is visual, not the terminal.** The HTML snapshot ships in Phase 0; the interactive dashboard is a committed Phase 2 deliverable in three views. | The owner does not work in the terminal. A tool you have to read logs to use would not get used. | spec v0.3 §14.2, phase-0 plan §0 |
-| 10 | **Dashboard views: The Bridge (default) · The Map · The Logbook.** | Three genuinely different paradigms rather than three screens; all render the same Brief. | spec §14.2 |
-| 11 | **Multiple machines**, reconciled by one append-only `.jsonl` journal per machine in a synced folder, merged in memory. Bearing does no networking itself. | Each machine writes only its own file, so there are no write conflicts by construction. Sync is whatever you already use. | build plan §2.1, §11.2 |
-| 12 | **Journal scope is metadata-only by default**; WIP patches are opt-in. | Branch names and SHAs leaving the machine is a different risk from source content leaving it. | build plan §2.1, §8 |
-| 13 | **GitHub via `gh` CLI passthrough.** No token management; if `gh` is not authenticated, GitHub features silently no-op. | Not owning credentials is cheaper and safer than owning them well. | spec v0.2 decision 5, §17 |
-| 14 | **`safe-to-delete` is list-only, permanently.** Bearing flags; you delete. | Follows from #1. | spec §17 |
-| 15 | **Default branch exclusions:** `dependabot/*`, `renovate/*`; configurable. | Bot branches are noise in a fleet view. | spec §17, phase-0 plan §4 |
-| 16 | **Brief cadence: on-demand + an opt-in shell-startup one-liner.** Scheduled digests cut. | A digest you did not ask for becomes another thing to ignore. | spec §17 |
-| 17 | **Purity rule:** `collect_*`/`config`/`cli` do I/O; everything below them is pure and testable without a real repo. | This is where correctness is guaranteed and where the tests live. | spec §8, build plan §5, phase-0 plan §3 |
-| 18 | **Working tree and stashes are repo-level**, attached only to the checked-out branch's state; every other branch gets `null`/`0`. | Uncommitted files belong to the checkout, not to a branch. Listing them per branch would be a lie. | spec §7, phase-0 plan §5 |
-| 19 | **`diverged` = behind base by > 20 commits.** v0.1's "> 3× ahead" rule removed. | A branch far *ahead* is finished work waiting to merge, not a risk. | spec §18 |
-| 20 | **Advisor output is artifacts, never repo operations** ("generate, don't operate"). `promote` is the only write path and is human-triggered. | Its failure mode becomes *wrong prose or a bad demo*, never a corrupted repo. | build plan §1, §8 |
-| 21 | **Performance budget: < 5 s warm across 4 repos / ~40 branches.** ≤ 3 git calls per branch, ≤ 6 per repo. | A tool for saving seconds cannot cost seconds. Also a design forcing-function: needing more calls means the design is wrong. | phase-0 plan §2 |
-| 22 | **This repository (`repo_tracker`) is Bearing's home.** Source at the root, documents under `docs/`. | Supersedes phase-0 plan §3, which predates this repo and says to create a fresh one at `C:\Users\alexa\Documents\github\bearing\`. That instruction is now satisfied here. | 15 Sep 2026, this repo |
+Restructured 15 Sep 2026, when the owner's answers changed the product. Questions still
+open: [`open-questions.md`](open-questions.md).
 
 ---
 
-## Still open — none of these block Phase 0
+## 1. Current decisions — from the owner, 15 Sep 2026
 
-| # | Question | Notes |
+| # | Decision | Why |
 |---|---|---|
-| A | Windows `shell-init` details — PowerShell profile hook, path handling in config | Phase 2. Phase 0 only needs paths with spaces and backslashes to work. |
-| B | Sync root location and default scope for the journal | Phase 1. Metadata-only is already decided; the *path* is not. |
-| C | Sandbox location + auto-clean policy | Phase 4. |
-| D | LLM model names for the cheap / mid / strong tiers | Phase 4. Provider is OpenCode **Zen** (pay-as-you-go, OpenAI-compatible) — *not* the Go subscription, which targets coding-agent traffic. |
-| E | Repo and branch include/exclude patterns beyond the bot defaults | Phase 0 ships the hardcoded default list; config comes later. |
-| F | Name availability for "Bearing" | Worth a check before anything is published. |
+| D1 | **Two data planes.** Plane A (your repos) is strictly read-only forever — no push, merge, branch, stash, or config change. Plane B (milestones, goals, tags, notes, comments, settings) is the tool's own database, written freely. | Resolves the apparent conflict between "read-only" and wanting to store notes. Keeps the invariant that matters: the tool can never damage your work. |
+| D2 | **GitHub is the primary data source.** Not local git. | Branches are created by agent sessions and pushed to origin; they are never checked out locally, so local reflog, working tree and stashes are all empty for them. |
+| D3 | **GUI only.** No terminal, no markdown output, no CLI as a product surface. | The owner does not use a terminal except to debug. A CLI entry point may exist as plumbing, but nothing about the design is shaped by it. |
+| D4 | **Plain English is the headline.** Commit messages, PR titles, and LLM summaries are the content; SHAs, ahead/behind and timestamps are supporting metadata. | *"The raw git bullcrap is not what I need — I care what was committed, in plain English."* |
+| D5 | **Milestone → Goal → Task → Branch.** Milestones are release-level; goals hold many tasks; one task per branch. | The owner's structure. Owner authors milestones and goals; the LLM does the filing and progress upkeep. |
+| D6 | **Tags are separate from the hierarchy** — free-form, many-to-many, cross-cutting. | Lets a branch belong to a theme without complicating the goal tree. |
+| D7 | **More branches is the goal, not fewer.** | *"The goal isn't less branches, it's more — the whole point is to reduce mental load so I can keep up with more things at once."* This voids the old branch-reduction success metric and deprioritizes all hygiene features. |
+| D8 | **`main` is the base branch, everywhere, always.** No `develop`, no per-repo overrides. | Stated directly. Removes the entire base-resolution fallback chain. |
+| D9 | **Dependencies are allowed.** | *"If installing a dependency makes things easier then great, do that."* Overturns the old stdlib-only rule. |
+| D10 | **Network-first.** GitHub for data, a cloud backend for sync. The local cache gives a degraded offline view; offline is not the default mode. | Follows from D2 and the two-machine requirement. |
+| D11 | **Nothing hardcoded.** Thresholds and display caps are exposed in settings. | Stated directly. |
+| D12 | **Personal tool, one owner, two machines.** | No multi-user, no sharing, no onboarding flow to build. |
+| D13 | **GitHub is already the sync layer** for commits, branches, PRs and CI. Only Plane B needs a sync backend. | Both machines read the same origin, so that data matches by construction. Shrinks the sync problem to a few kilobytes of text. |
+| D14 | **`sync-branches.yml` stays as it is** and is not part of the product. | It is a bulk merge-to-main time-saver for when several branches finish together. The tool may report drift; it never merges. |
 
 ---
 
-## How to add a decision
+## 2. Carried over from the old documents
 
-One row, past tense, with the *reason* — not just the choice. The reason is what makes it
-possible to tell later whether the decision still holds. If it came from a document, cite
-the section so the full argument stays findable.
+Still true, and still good reasons.
+
+| # | Decision | Why |
+|---|---|---|
+| D15 | **One canonical data structure; every surface renders it.** If a view needs a fact, the fact goes into the structure — never computed in the view. | The old "Brief JSON is the product" rule. It is what lets surfaces change without touching the engine. |
+| D16 | **I/O at the edges, pure logic in the middle.** Fetching and storage at the boundary; pure, testable functions between. | Where correctness is guaranteed and where the tests live. |
+| D17 | **The literal git branch name is always shown and always searchable.** | You act on the real name; an alias adds a translation step exactly when you have no context to spare. *(Whether an LLM title may appear alongside it: Q37.)* |
+| D18 | **Notes are one-liner scratchpads, not a journal** — now entered in the GUI. | A journal is a second thing to maintain; a one-liner is something you actually write. |
+| D19 | **Show a capped, prioritized set** rather than everything. | Stated again in Q18. Paging through the remainder is wanted but deferred. |
+
+---
+
+## 3. Overturned
+
+Kept because the arguments still explain how the current design was reached.
+
+| Old decision | Replaced by | Why it fell |
+|---|---|---|
+| ~~Python 3.11+, stdlib only, no dependencies~~ | D9 | Owner: dependencies are fine if they help. The constraint existed to keep a CLI portable; the product is not a CLI. |
+| ~~All git access via `git` subprocess with porcelain formats~~ | D2 | The data comes from the GitHub API now. Local git may still be read for repos that are cloned, but it is not the source of truth. |
+| ~~Offline-first; the tool does no networking~~ | D10 | GitHub is the data source and sync is cloud-based. |
+| ~~Multi-machine sync via one append-only journal file per machine in a replicated folder~~ | D13 + Stage 4 | Owner wants a real backend (Supabase/Firebase). Also unnecessary: GitHub already syncs everything except annotations. |
+| ~~Journal scope is metadata-only by default~~ | — | Obsolete with the journal design. Privacy question re-asked as part of Q33. |
+| ~~GitHub via `gh` CLI passthrough, no token management~~ | Q34 (open) | "Built from the ground up"; `gh` on both machines complicates packaging. |
+| ~~The advisor is built last; v1 is fully deterministic~~ | **Under review — C1** | Owner said defer, but ranked LLM insight as priority #2 and made the LLM responsible for goal/milestone upkeep. Currently placed at Stage 2. |
+| ~~Brief cadence: on-demand plus a shell-startup one-liner~~ | Q39 (open) | No terminal, so no shell hook. |
+| ~~`diverged` = behind base by > 20 commits~~ (and every other fixed threshold) | D11 | All thresholds move to settings. |
+| ~~Success metric: branch reduction~~ | D7 | The goal is the opposite. |
+| ~~Performance budget: < 5 s across 4 repos, ≤ 3 git calls per branch~~ | — | Written for local subprocess calls. A network-bound budget needs rewriting once the stack is chosen. |
+| ~~`safe-to-delete` is list-only, permanently~~ | Still true, but deprioritized | Follows from D1. Just no longer a feature anyone is waiting for. |
+
+---
+
+## 4. Still open
+
+See [`open-questions.md`](open-questions.md) §2 (conflicts C1–C6) and §3 (decisions Q30–Q40).
+
+**Blocking:** Q30 (the stack) and C1 (where the LLM goes).
