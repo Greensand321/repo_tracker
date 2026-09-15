@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bearing — Mockup 01 · Terminal-first</title>
+<link rel="stylesheet" href="theme.css" />
+<style>
+  body { background: #eceef2; }
+  .stage { max-width: 1080px; margin: 0 auto; padding: 26px 20px 60px; }
+  .concept {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 18px; box-shadow: var(--shadow);
+  }
+  .concept .k { font-weight: 700; font-size: 13px; color: var(--accent-ink); background: var(--accent-soft); padding: 4px 10px; border-radius: 8px; white-space: nowrap; }
+  .concept p { margin: 0; color: var(--muted); font-size: 13px; }
+  .concept b { color: var(--ink); }
+
+  .term {
+    background: var(--term-bg); border-radius: 14px; overflow: hidden;
+    box-shadow: var(--shadow-lg); border: 1px solid #1b2436;
+    display: flex; flex-direction: column; height: 640px;
+  }
+  .term .bar { display: flex; align-items: center; gap: 8px; padding: 11px 15px; background: var(--term-bg-2); border-bottom: 1px solid var(--term-line); }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
+  .term .title { margin-left: 8px; color: #7c8798; font-size: 12px; font-family: var(--mono); }
+  .term .title b { color: #a5b4fc; }
+
+  .out { flex: 1; overflow-y: auto; padding: 16px 18px 6px; font-family: var(--mono); font-size: 12.8px; line-height: 1.62; color: var(--term-ink); white-space: pre-wrap; }
+  .out .line { margin: 0 0 1px; }
+  .c-accent { color: #a5b4fc; font-weight: 700; }
+  .c-dim { color: #6b7280; }
+  .c-green { color: #6ee7b7; }
+  .c-amber { color: #fcd34d; }
+  .c-red { color: #fca5a5; }
+  .c-cyan { color: #67e8f9; }
+  .c-pink { color: #f9a8d4; }
+  .c-white { color: #eef2f8; }
+  .u { color: #a5b4fc; font-weight: 700; }
+
+  .inputrow { display: flex; align-items: center; gap: 9px; padding: 10px 18px 14px; border-top: 1px solid var(--term-line); background: var(--term-bg-2); }
+  .inputrow .ps1 { color: #6ee7b7; font-family: var(--mono); font-size: 12.8px; }
+  .inputrow input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--term-ink); font-family: var(--mono); font-size: 12.8px; caret-color: #a5b4fc;
+  }
+  .caret { display: inline-block; width: 8px; height: 15px; background: #a5b4fc; vertical-align: -2px; animation: blink 1.05s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+  .chips .lbl { font-size: 12px; color: var(--muted); align-self: center; margin-right: 2px; }
+  .cmd-chip {
+    font-family: var(--mono); font-size: 12px; padding: 6px 11px; border-radius: 8px;
+    background: var(--panel); border: 1px solid var(--line); color: #374151;
+  }
+  .cmd-chip:hover { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-soft); }
+  .hint { margin-top: 12px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="wf-bar">
+  <div class="wf-brand"><span class="dotmark"></span>Bearing <small>workflow mockups</small></div>
+  <nav class="wf-nav">
+    <a href="index.html">Overview</a>
+    <a href="terminal.html" class="active">01 · Terminal</a>
+    <a href="dashboard.html">02 · Dashboard</a>
+    <a href="advisor.html">03 · Heading</a>
+    <a href="ideas.html">8 · Ideas</a>
+    <a href="prototype.html">▶ Main prototype</a>
+  </nav>
+  <div class="wf-spacer"></div>
+  <span class="wf-badge">mockup</span>
+</div>
+
+<div class="stage">
+  <div class="concept">
+    <span class="k">Workflow A</span>
+    <p><b>Terminal-first.</b> You live where you already work. Context is pulled <b>on demand</b>, piped, scriptable, keyboard-driven. Nothing is always-on; the brief is one command away. A shell hook can drop a one-liner at terminal open.</p>
+  </div>
+
+  <div class="term">
+    <div class="bar">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="title">bearing — <b>~</b></span>
+    </div>
+    <div class="out scroll" id="out"></div>
+    <div class="inputrow" onclick="focusInput()">
+      <span class="ps1">you@dev ~ ▸</span>
+      <input id="cmd" autocomplete="off" spellcheck="false" placeholder="type a command — try 'bearing brief' or 'help'" />
+    </div>
+  </div>
+
+  <div class="chips">
+    <span class="lbl">Try:</span>
+    <button class="cmd-chip" data-cmd="bearing brief">bearing brief</button>
+    <button class="cmd-chip" data-cmd="bearing brief --json">bearing brief --json</button>
+    <button class="cmd-chip" data-cmd="bearing sessions">bearing sessions</button>
+    <button class="cmd-chip" data-cmd="bearing plan feat/webhooks">bearing plan feat/webhooks</button>
+    <button class="cmd-chip" data-cmd="bearing heading">bearing heading</button>
+    <button class="cmd-chip" data-cmd='bearing park "idempotency key edge case"'>bearing park "…"</button>
+    <button class="cmd-chip" data-cmd="bearing prune --dry-run">bearing prune --dry-run</button>
+    <button class="cmd-chip" data-cmd="help">help</button>
+    <button class="cmd-chip" data-cmd="clear">clear</button>
+  </div>
+  <p class="hint">Tip: ↑ / ↓ recalls history. Commands are simulated against the mock dataset.</p>
+</div>
+
+<script src="data.js"></script>
+<script>
+const D = window.BEARING;
+const out = document.getElementById('out');
+const input = document.getElementById('cmd');
+const history = [];
+let histIdx = -1;
+
+function print(html) {
+  const div = document.createElement('div');
+  div.className = 'line fade-in';
+  div.innerHTML = html;
+  out.appendChild(div);
+  out.scrollTop = out.scrollHeight;
+}
+function blank() { print('&nbsp;'); }
+function focusInput() { input.focus(); }
+
+function echo(cmd) {
+  print('<span class="u">you@dev ~ ▸</span> <span class="c-white">' + escapeHtml(cmd) + '</span>');
+}
+function escapeHtml(s) { return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function flag(key, label) {
+  const map = { red: 'c-red', amber: 'c-amber', green: 'c-green', cyan: 'c-cyan' };
+  return '<span class="' + (map[key] || 'c-dim') + '">[' + label + ']</span>';
+}
+
+/* ---------- commands ---------- */
+function cmdBrief() {
+  const b = D.brief;
+  print('<span class="c-accent">BEARING</span>  <span class="c-dim">·</span> generated ' + b.generatedAt + '  <span class="c-dim">·</span> ' + b.repos + ' repos  <span class="c-dim">·</span> ' + b.branches + ' branches');
+  blank();
+  print('<span class="c-dim">You were last working ' + b.lastWhen + ' on</span> <span class="c-cyan">' + b.lastBranch + '</span>');
+  print('<span class="c-dim">before that:</span> ' + b.before.join('  ·  '));
+  blank();
+  print('<span class="c-accent">── PICK UP WHERE YOU LEFT OFF ─────────────────────────────</span>');
+  b.pickUp.forEach(x => {
+    print('<span class="c-cyan">▸ ' + x.id + '</span>   <span class="c-dim">(' + x.when + ')</span>');
+    print('    ' + escapeHtml(x.wip));
+    print('    <span class="c-green">Next:</span> ' + escapeHtml(x.next));
+    print('    ' + x.flags.map(f => flag(f.k, f.t)).join('  ') + '   <span class="c-dim">' + x.meta + '</span>');
+    blank();
+  });
+  print('<span class="c-accent">── NEEDS A DECISION ───────────────────────────────────────</span>');
+  b.decisions.forEach(x => {
+    print('<span class="c-cyan">▸ ' + x.id + '</span>   <span class="c-dim">(' + x.when + ')</span>');
+    print('    ' + escapeHtml(x.wip));
+    print('    ' + x.flags.map(f => flag(f.k, f.t)).join('  ') + '   <span class="c-dim">' + x.meta + '</span>');
+    blank();
+  });
+  print('<span class="c-accent">── PARKING NOTES ──────────────────────────────────────────</span>');
+  b.notes.forEach(n => print('    "' + escapeHtml(n.text) + '"   <span class="c-dim">(' + n.when + ')</span>'));
+  blank();
+  print('<span class="c-dim">tip: bearing park "..." before you step away.</span>');
+}
+
+function cmdBriefJson() {
+  const payload = {
+    generatedAt: D.brief.generatedAt,
+    branches: D.repos.flatMap(r => r.branches.map(b => ({
+      repo: r.name, name: b.name, ahead: b.ahead, behind: b.behind,
+      workingTree: b.wt, pr: b.pr, flags: b.flags
+    }))).slice(0, 5),
+    "…": "truncated for mockup"
+  };
+  print('<span class="c-dim">// the Brief JSON is the product — any surface can render it</span>');
+  print(escapeHtml(JSON.stringify(payload, null, 2)).replace(/&quot;/g, '"'));
+}
+
+function cmdSessions() {
+  print('<span class="c-accent">SESSIONS</span>  <span class="c-dim">· today · reconstructed from the git reflog</span>');
+  blank();
+  D.sessions.forEach(s => {
+    if (s.gap) { print('  <span class="c-dim">· · · ' + s.label + ' · · ·</span>'); return; }
+    print('  <span class="c-dim">' + s.start + '–' + s.end + '</span>  <span class="c-cyan">' + s.repo + '/' + s.branch + '</span>  <span class="c-dim">' + s.detail + '</span>');
+  });
+  blank();
+  print('<span class="c-dim">gaps > 30 min start a new session. reflog is local — never leaves the machine.</span>');
+}
+
+function cmdPark(note) {
+  if (!note) { print('<span class="c-red">usage:</span> bearing park "one line"'); return; }
+  print('<span class="c-green">✓ parked</span> against <span class="c-cyan">api-service/feat/webhooks</span>');
+  print('<span class="c-dim">"' + escapeHtml(note) + '" — will resurface in your next brief.</span>');
+}
+
+function cmdPlan(branch) {
+  branch = branch || 'feat/webhooks';
+  print('<span class="c-dim">advisor (mid model) · generating plan for</span> <span class="c-cyan">' + escapeHtml(branch) + '</span> <span class="pulse">…</span>');
+  setTimeout(() => {
+    const p = D.heading.plan;
+    print('<span class="c-accent">PLAN</span>  ' + p.title + '   <span class="c-dim">(proposal prp_2 · cost $0.006 · not applied)</span>');
+    blank();
+    print('<span class="c-white">Objective:</span> ' + p.objective);
+    blank();
+    p.steps.forEach((s, i) => {
+      print('  <span class="c-accent">' + (i + 1) + '.</span> <span class="c-white">' + s.t + '</span> — ' + escapeHtml(s.d));
+      print('     <span class="c-dim">' + s.f + '</span>');
+    });
+    blank();
+    print('<span class="c-dim">Verify:</span> ' + p.verify.join('  ·  '));
+    blank();
+    print('<span class="c-amber">This is an artifact.</span> nothing was written to the repo. run <span class="c-cyan">bearing promote prp_2</span> to apply.');
+  }, 550);
+}
+
+function cmdHeading() {
+  const h = D.heading;
+  print('<span class="c-dim">reading direction of</span> <span class="c-cyan">' + h.repo + '</span> <span class="pulse">…</span>');
+  setTimeout(() => {
+    print('<span class="c-accent">DIRECTION</span>');
+    h.direction.forEach(d => print('  <span class="c-dim">·</span> ' + escapeHtml(d)));
+    blank();
+    print('<span class="c-accent">OPPORTUNITIES</span>  <span class="c-dim">(fits the project\'s grain)</span>');
+    h.opportunities.forEach((o, i) => {
+      print('  <span class="c-accent">' + (i + 1) + '.</span> <span class="c-white">' + o.name + '</span>  <span class="c-dim">[' + o.size + ' · ' + o.risk + ' risk]</span>');
+      print('     ' + escapeHtml(o.pitch));
+    });
+    blank();
+    print('<span class="c-dim">full interactive flow → open</span> <span class="c-cyan">03 · Heading</span> <span class="c-dim">in the top nav.</span>');
+  }, 550);
+}
+
+function cmdPrune() {
+  print('<span class="c-accent">PRUNE (dry-run)</span>  <span class="c-dim">· nothing is ever deleted by default</span>');
+  blank();
+  print('  <span class="c-green">safe-to-delete</span>  api-service/chore/deps-bump   <span class="c-dim">superseded by #503</span>');
+  print('  <span class="c-green">safe-to-delete</span>  web-app/old/logo-experiment  <span class="c-dim">merged 12d ago</span>');
+  print('  <span class="c-amber">decide</span>          mobile/exp/new-nav          <span class="c-dim">23 ahead / 41 behind</span>');
+  blank();
+  print('<span class="c-dim">2 safe · 1 needs a decision. run without --dry-run to list actions (still never destructive).</span>');
+}
+
+function cmdHelp() {
+  print('<span class="c-accent">BEARING — commands</span>');
+  blank();
+  const rows = [
+    ['bearing brief [--json]', 'prioritized context brief'],
+    ['bearing sessions', 'reconstructed work sessions'],
+    ['bearing plan <branch>', 'advisor plan artifact (not applied)'],
+    ['bearing heading', 'idea + demo generator (Heading)'],
+    ['bearing park "note"', 'park a note for your next return'],
+    ['bearing prune --dry-run', 'find stale / safe-to-delete branches'],
+    ['clear', 'clear the screen'],
+  ];
+  rows.forEach(r => print('  <span class="c-cyan">' + r[0].padEnd(26, ' ') + '</span> <span class="c-dim">' + r[1] + '</span>'));
+  blank();
+  print('<span class="c-dim">The engine is deterministic and offline. Advisor commands are clearly marked.</span>');
+}
+
+/* ---------- dispatch ---------- */
+function run(raw) {
+  const cmd = raw.trim();
+  if (!cmd) return;
+  echo(cmd);
+  history.unshift(cmd); histIdx = -1;
+
+  const lower = cmd.toLowerCase().replace(/^bearing\s+/, '');
+  if (lower === 'clear') { out.innerHTML = ''; return; }
+  if (lower === 'help') return cmdHelp();
+  if (lower === 'brief --json') return cmdBriefJson();
+  if (lower.startsWith('brief')) return cmdBrief();
+  if (lower.startsWith('sessions')) return cmdSessions();
+  if (lower.startsWith('park')) {
+    const m = cmd.match(/park\s+"([^"]*)"/);
+    return cmdPark(m ? m[1] : '');
+  }
+  if (lower.startsWith('plan')) {
+    const m = cmd.split(/\s+/); return cmdPlan(m[1]);
+  }
+  if (lower.startsWith('heading')) return cmdHeading();
+  if (lower.startsWith('prune')) return cmdPrune();
+  if (lower === 'ls' || lower === 'dir') { print('<span class="c-dim">this is a simulated shell — try</span> <span class="c-cyan">help</span>'); return; }
+  print('<span class="c-red">unknown command:</span> ' + escapeHtml(cmd) + '  <span class="c-dim">— try</span> <span class="c-cyan">help</span>');
+}
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { run(input.value); input.value = ''; }
+  else if (e.key === 'ArrowUp') { if (history.length) { histIdx = Math.min(histIdx + 1, history.length - 1); input.value = history[histIdx]; } e.preventDefault(); }
+  else if (e.key === 'ArrowDown') { histIdx = Math.max(histIdx - 1, -1); input.value = histIdx === -1 ? '' : history[histIdx]; e.preventDefault(); }
+});
+document.querySelectorAll('.cmd-chip').forEach(c => c.addEventListener('click', () => { run(c.dataset.cmd); focusInput(); }));
+
+/* boot */
+window.addEventListener('load', () => {
+  print('<span class="c-dim">bearing v0.2 · local-first · advisor: on (capped)</span>');
+  print('<span class="c-dim">last login: today 09:02 · machine: laptop-1</span>');
+  blank();
+  run('bearing brief');
+  focusInput();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+Design a mockup for **Bearing** — a personal command center for a solo developer who juggles many branches across several projects and keeps losing their place. The real pain: after any time away, even a lunch break, it can take an hour to rebuild the mental model of what they were doing. Bearing should give that back in seconds.
+
+At the center is a dashboard that shows where every branch stands and what deserves attention, with an advisor built in that understands whatever you're looking at and can answer real questions about your projects, branches, and commits. Branches should feel personal and human — a name you recognise, your own notes — and the tool should let you see how the work has unfolded over time, not just its current state.
+
+It should feel dashboard-first, with strong hierarchy: one clear thing to look at first, and depth that reveals itself as you explore. Beyond that it's wide open — there's no fixed list of screens or features. Show me your most imaginative interpretation of the main interface, using realistic sample data.

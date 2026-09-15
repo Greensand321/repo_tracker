@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bearing — 8 Organizing Ideas</title>
+<link rel="stylesheet" href="theme.css" />
+<style>
+  body { background: var(--bg); }
+  .ideas-hero { padding: 26px 22px 8px; max-width: 1240px; margin: 0 auto; }
+  .ideas-hero h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.03em; }
+  .ideas-hero p { margin: 0; color: var(--muted); max-width: 820px; font-size: 13.5px; }
+
+  .tabs { position: sticky; top: 55px; z-index: 40; display: flex; gap: 6px; flex-wrap: wrap; padding: 12px 22px; max-width: 1240px; margin: 0 auto; background: linear-gradient(var(--bg), var(--bg) 70%, transparent); }
+  .tab { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; padding: 7px 12px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .tab:hover { border-color: #cfd4dd; color: var(--ink); }
+  .tab.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .stage { max-width: 1240px; margin: 0 auto; padding: 6px 22px 70px; }
+  .panel { display: none; }
+  .panel.on { display: block; animation: fadeIn .25s ease both; }
+  .idea-hd { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; margin: 14px 0 14px; }
+  .idea-hd .txt { flex: 1; min-width: 280px; }
+  .idea-hd h2 { margin: 0 0 4px; font-size: 20px; letter-spacing: -0.02em; }
+  .idea-hd p { margin: 0; color: var(--muted); font-size: 13px; }
+  .fit { display: flex; flex-direction: column; gap: 6px; min-width: 250px; }
+  .fit .row { font-size: 12.5px; display: flex; gap: 8px; }
+  .fit .lbl { font-weight: 700; flex: 0 0 74px; }
+  .fit .good { color: var(--green); } .fit .watch { color: var(--amber); }
+  .fit .row span:last-child { color: #4b5563; }
+
+  .mock { background: #eef0f4; border: 1px solid var(--line); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); }
+  .win { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .win-bar { display: flex; align-items: center; gap: 7px; padding: 9px 13px; background: var(--panel-2); border-bottom: 1px solid var(--line-2); }
+  .win-bar .t { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-left: 6px; }
+  .win-bar .r { margin-left: auto; font-size: 11.5px; color: var(--faint); }
+  .pd { padding: 14px; }
+
+  /* ---------- 1 kanban ---------- */
+  .kb { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .kcol { background: #f6f7f9; border-radius: 10px; padding: 9px; min-height: 320px; }
+  .kcol h5 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); display: flex; justify-content: space-between; }
+  .kcol h5 .c { font-family: var(--mono); }
+  .kcol.over h5 .c { color: var(--red); font-weight: 700; }
+  .kcard { background: #fff; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 9px 10px; margin-bottom: 7px; box-shadow: 0 1px 2px rgba(16,24,40,.05); }
+  .kcard .nm { font-family: var(--mono); font-size: 11px; font-weight: 600; }
+  .kcard .mt { font-size: 10.5px; color: var(--muted); font-family: var(--mono); margin-top: 3px; }
+  .kcard.grn { border-left-color: var(--green); } .kcard.amb { border-left-color: var(--amber); } .kcard.red { border-left-color: var(--red); }
+  .repo-dot { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 5px; }
+
+  /* ---------- 2 triage ---------- */
+  .tri { display: grid; grid-template-columns: 300px 1fr 260px; min-height: 380px; }
+  .tri > div { border-right: 1px solid var(--line-2); }
+  .tri > div:last-child { border-right: none; }
+  .tri-list { padding: 10px; }
+  .tri-list h5 { margin: 10px 6px 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); display: flex; justify-content: space-between; }
+  .tri-item { padding: 9px 10px; border-radius: 8px; font-size: 12.5px; cursor: default; }
+  .tri-item.on { background: var(--accent-soft); }
+  .tri-item:hover { background: var(--panel-2); }
+  .tri-item .nm { font-family: var(--mono); font-size: 11.5px; font-weight: 600; }
+  .tri-item .sn { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .tri-detail, .tri-advisor { padding: 18px; }
+  .tri-advisor { background: var(--panel-2); }
+  .act-btn { display: block; width: 100%; text-align: left; border: 1px solid var(--line); background: #fff; border-radius: 9px; padding: 9px 11px; font-size: 12.5px; margin-bottom: 7px; }
+  .act-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+
+  /* ---------- 3 table ---------- */
+  .tbl-layout { display: grid; grid-template-columns: 190px 1fr; }
+  .views-l { border-right: 1px solid var(--line-2); padding: 12px; background: #fbfbfc; }
+  .views-l h5 { margin: 4px 6px 8px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); }
+  .view-item { padding: 7px 9px; border-radius: 8px; font-size: 12.5px; color: #4b5563; }
+  .view-item.on { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+  .tbl-main { overflow-x: auto; }
+  table.dt { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.dt th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.dt td { padding: 9px 10px; border-bottom: 1px solid var(--line-2); font-family: var(--mono); white-space: nowrap; }
+  table.dt tr:hover td { background: #fafbfc; }
+  table.dt tr.picked td { background: var(--accent-soft); }
+  .cbx { width: 13px; height: 13px; border: 1.5px solid #c3c8d1; border-radius: 4px; display: inline-block; }
+  .cbx.on { background: var(--accent); border-color: var(--accent); }
+  .omni { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin: 12px; background: #fff; font-size: 12.5px; color: var(--faint); }
+  .omni .k { margin-left: auto; }
+
+  /* ---------- 4 master-detail ---------- */
+  .md { display: grid; grid-template-columns: 280px 1fr; min-height: 400px; }
+  .tree { border-right: 1px solid var(--line-2); padding: 12px; font-size: 12.5px; font-family: var(--mono); }
+  .tree .n { padding: 5px 7px; border-radius: 6px; display: flex; gap: 7px; align-items: center; }
+  .tree .n:hover { background: var(--panel-2); }
+  .tree .n.on { background: var(--accent-soft); color: var(--accent-ink); }
+  .tree .n.lvl2 { padding-left: 20px; } .tree .n.lvl3 { padding-left: 38px; color: var(--muted); }
+  .tree .n.lvl3.on { color: var(--accent-ink); }
+  .md-detail { padding: 20px 22px; }
+  .commit-hd { border-bottom: 1px solid var(--line-2); padding-bottom: 12px; margin-bottom: 14px; }
+  .commit-hd .sha { font-family: var(--mono); font-size: 12px; color: var(--accent-ink); }
+  .commit-hd h3 { margin: 6px 0 4px; font-size: 16px; }
+  .filechg { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--line-2); font-family: var(--mono); font-size: 12px; }
+  .filechg .p { flex: 1; } .filechg .a { color: var(--green); } .filechg .d { color: var(--red); }
+
+  /* ---------- 5 timeline ---------- */
+  .gantt { padding: 16px; }
+  .grow { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 10px; margin-bottom: 7px; }
+  .grow .lbl { font-family: var(--mono); font-size: 11px; color: #4b5563; text-align: right; }
+  .gtrack { position: relative; height: 26px; background: repeating-linear-gradient(90deg,#f4f5f7,#f4f5f7 1px,transparent 1px,transparent 10%); border-radius: 6px; }
+  .gblk { position: absolute; top: 3px; height: 20px; border-radius: 5px; font-size: 10px; color: #fff; display: flex; align-items: center; padding: 0 6px; font-family: var(--mono); overflow: hidden; white-space: nowrap; }
+  .ga { background: #4f46e5; } .gb { background: #0891b2; } .gc { background: #059669; } .gd { background: #d97706; }
+  .gaxis { display: grid; grid-template-columns: 150px 1fr; gap: 10px; margin-bottom: 10px; }
+  .gaxis .ticks { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
+
+  /* ---------- 6 radar ---------- */
+  .flt { display: grid; grid-template-columns: 1fr 320px; gap: 16px; padding: 16px; }
+  .radar { position: relative; width: 100%; max-width: 460px; aspect-ratio: 1; margin: 0 auto; border-radius: 50%;
+    background: radial-gradient(circle at center, #eef2ff 0%, #f7f8fa 70%);
+    border: 1px solid var(--line); overflow: hidden; }
+  .radar .ring { position: absolute; border: 1px solid #e0e3ea; border-radius: 50%; inset: 0; margin: auto; }
+  .radar .sweep { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, rgba(79,70,229,.28), transparent 55%); animation: sweep 4s linear infinite; }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+  .blip { position: absolute; width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%,-50%); box-shadow: 0 0 0 3px rgba(255,255,255,.7); }
+  .blip .tag { position: absolute; left: 15px; top: -3px; font-size: 10px; font-family: var(--mono); color: #4b5563; white-space: nowrap; background: rgba(255,255,255,.85); border-radius: 4px; padding: 0 4px; }
+  .axis-l { position: absolute; font-size: 10px; color: var(--faint); font-family: var(--mono); }
+  .flt-side .alert { display: flex; gap: 9px; padding: 10px 0; border-bottom: 1px solid var(--line-2); font-size: 12.5px; }
+
+  /* ---------- 7 runbook ---------- */
+  .rb { display: grid; grid-template-columns: 230px 1fr; min-height: 400px; }
+  .rb-list { border-right: 1px solid var(--line-2); padding: 12px; background: #fbfbfc; }
+  .rb-list h5 { margin: 4px 6px 8px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); }
+  .rb-routine { padding: 9px 11px; border-radius: 9px; font-size: 12.5px; margin-bottom: 5px; }
+  .rb-routine.on { background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow); font-weight: 600; }
+  .rb-step { display: flex; gap: 13px; padding: 13px 0; border-bottom: 1px solid var(--line-2); }
+  .rb-step .mark { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; flex: 0 0 auto; border: 1.5px solid var(--line); }
+  .rb-step.done .mark { background: var(--green-soft); border-color: #a7f3d0; color: var(--green); }
+  .rb-step.now .mark { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .rb-step .tt { font-weight: 600; font-size: 13.5px; }
+  .rb-step .dd { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .rb-step .adv { font-size: 12.5px; background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: 0 7px 7px 0; padding: 7px 10px; margin-top: 8px; color: #312e81; }
+  .progress { height: 7px; background: #e9ebef; border-radius: 6px; overflow: hidden; margin: 4px 0 16px; }
+  .progress > i { display: block; height: 100%; width: 40%; background: var(--accent); }
+
+  /* ---------- 8 graph ---------- */
+  .graph-wrap { padding: 12px; }
+  svg .edge { stroke: #c7ccd8; stroke-width: 1.5; }
+  svg .edge.strong { stroke: #8b93ff; stroke-width: 3; }
+  svg .node { stroke: #fff; stroke-width: 2; }
+  svg text { font-family: var(--mono); font-size: 9.5px; fill: #4b5563; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; padding: 4px 16px 16px; font-size: 12px; color: var(--muted); }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+
+<div class="wf-bar">
+  <div class="wf-brand"><span class="dotmark"></span>Bearing <small>workflow mockups</small></div>
+  <nav class="wf-nav">
+    <a href="index.html">Overview</a>
+    <a href="terminal.html">01 · Terminal</a>
+    <a href="dashboard.html">02 · Dashboard</a>
+    <a href="advisor.html">03 · Heading</a>
+    <a href="ideas.html" class="active">8 · Ideas</a>
+    <a href="prototype.html">▶ Main prototype</a>
+  </nav>
+  <div class="wf-spacer"></div>
+  <span class="wf-badge">static mocks</span>
+</div>
+
+<div class="ideas-hero">
+  <h1>Eight ways to organize the same branches</h1>
+  <p>Same deterministic engine, same branch data — eight different organ­izing metaphors. Each is a <b>static</b> visual (no data wiring), so you can judge the shape of the workflow before we commit. The advisor rail can attach to any of them; it is omitted here to keep each idea pure.</p>
+</div>
+
+<div class="tabs" id="tabs">
+  <button class="tab on" data-p="p1">01 · Kanban</button>
+  <button class="tab" data-p="p2">02 · Triage inbox</button>
+  <button class="tab" data-p="p3">03 · Table + views</button>
+  <button class="tab" data-p="p4">04 · Master-detail</button>
+  <button class="tab" data-p="p5">05 · Session timeline</button>
+  <button class="tab" data-p="p6">06 · Flight deck</button>
+  <button class="tab" data-p="p7">07 · Runbook</button>
+  <button class="tab" data-p="p8">08 · Coupling graph</button>
+</div>
+
+<div class="stage">
+
+  <!-- ============ 1 KANBAN ============ -->
+  <section class="panel on" id="p1">
+    <div class="idea-hd">
+      <div class="txt"><h2>01 · Kanban with WIP limits</h2>
+        <p>Columns are states you act on. Swimlane color = repo. The point is the WIP limit: too many branches in flight is the actual disease, so the board makes over-commitment visible and forces closure.</p></div>
+      <div class="fit">
+        <div class="row"><span class="lbl good">Strong</span><span>Answers “what’s next?” instantly; WIP limits directly shrink branch count.</span></div>
+        <div class="row"><span class="lbl watch">Watch</span><span>A branch can be both “in review” and “stale” — columns must be single-valued.</span></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="t">bearing — board</span><span class="r">group: repo · updated 13:04</span></div>
+        <div class="pd">
+          <div class="kb">
+            <div class="kcol over">
+              <h5>In progress <span class="c">4 / 3</span></h5>
+              <div class="kcard"><div class="nm"><span class="repo-dot" style="background:#4f46e5"></span>api-service/feat/webhooks</div><div class="mt">47m · ahead 6 · 3 uncommitted</div></div>
+              <div class="kcard amb"><div class="nm"><span class="repo-dot" style="background:#4f46e5"></span>api-service/fix/rate-limit</div><div class="mt">2h · CI green · PR #509</div></div>
+              <div class="kcard"><div class="nm"><span class="repo-dot" style="background:#0891b2"></span>web-app/feat/billing-portal</div><div class="mt">1d · draft PR #487</div></div>
+              <div class="kcard"><div class="nm"><span class="repo-dot" style="background:#db2777"></span>docs-site/site-revamp</div><div class="mt">3h · 4 modified</div></div>
+            </div>
+            <div class="kcol"><h5>In review <span class="c">1</span></h5>
+              <div class="kcard"><div class="nm"><span class="repo-dot" style="background:#0891b2"></span>web-app/fix/auth-refresh</div><div class="mt">3h · PR #482 · changes requested</div></div>
+            </div>
+            <div class="kcol"><h5>Merge-ready <span class="c">2</span></h5>
+              <div class="kcard grn"><div class="nm"><span class="repo-dot" style="background:#059669"></span>mobile/fix/crash-on-start</div><div class="mt">5h · 1 approval · CI green</div></div>
+              <div class="kcard grn"><div class="nm"><span class="repo-dot" style="background:#4f46e5"></span>api-service/fix/rate-limit</div><div class="mt">2h · 2 approvals</div></div>
+            </div>
+            <div class="kcol"><h5>Stale · decide <span class="c">2</span></h5>
+              <div class="kcard amb"><div class="nm"><span class="repo-dot" style="background:#4f46e5"></span>api-service/chore/deps-bump</div><div class="mt">6d · 12 behind · superseded</div></div>
+              <div class="kcard red"><div class="nm"><span class="repo-dot" style="background:#059669"></span>mobile/exp/new-nav</div><div class="mt">9d · 23↑ / 41↓ · diverged</div></div>
+            </div>
+            <div class="kcol"><h5>Done <span class="c">3</span></h5>
+              <div class="kcard" style="opacity:.55"><div class="nm">web-app/feat/search</div><div class="mt">merged 2d ago</div></div>
+              <div class="kcard" style="opacity:.55"><div class="nm">api-service/fix/timeout</div><div class="mt">merged 4d ago</div></div>
+              <div class="kcard" style="opacity:.55"><div class="nm">docs-site/typos</div><div class="mt">merged 5d ago</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2 TRIAGE ============ -->
+  <section class="panel" id="p2">
+    <div class="idea-hd">
+      <div class="txt"><h2>02 · Triage inbox (process to zero)</h2>
+        <p>Every branch is a conversation you haven’t finished. You drain the queue to zero. The advisor drafts the action for the selected item; you approve or edit. Best when the pain is backlog dread rather than “where was I?”.</p></div>
+      <div class="fit">
+        <div class="row"><span class="lbl good">Strong</span><span>Makes “dozens of branches” feel finite and closable; great for stale cleanup.</span></div>
+        <div class="row"><span class="lbl watch">Watch</span><span>Can feel like admin work; needs a clear “skip/archive” affordance.</span></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="t">bearing — triage</span><span class="r">8 items · 3 need a decision</span></div>
+        <div class="tri">
+          <div class="tri-list">
+            <h5>Needs a decision <span>2</span></h5>
+            <div class="tri-item on"><div class="nm">mobile/exp/new-nav</div><div class="sn">9d stale · diverged 23↑/41↓</div></div>
+            <div class="tri-item"><div class="nm">api-service/chore/deps-bump</div><div class="sn">6d · superseded by #503</div></div>
+            <h5>Waiting on CI <span>1</span></h5>
+            <div class="tri-item"><div class="nm">api-service/feat/webhooks</div><div class="sn">2 tests failing</div></div>
+            <h5>New activity <span>3</span></h5>
+            <div class="tri-item"><div class="nm">docs-site/site-revamp</div><div class="sn">3h · 1 commit</div></div>
+            <div class="tri-item"><div class="nm">web-app/feat/billing-portal</div><div class="sn">1d · draft PR</div></div>
+            <div class="tri-item"><div class="nm">web-app/fix/auth-refresh</div><div class="sn">3h · review comment</div></div>
+            <h5>Ready to merge <span>2</span></h5>
+            <div class="tri-item"><div class="nm">mobile/fix/crash-on-start</div><div class="sn">verified on device</div></div>
+            <div class="tri-item"><div class="nm">api-service/fix/rate-limit</div><div class="sn">2 approvals</div></div>
+          </div>
+          <div class="tri-detail">
+            <div style="display:flex;gap:6px;margin-bottom:8px"><span class="badge b-amber">stale</span><span class="badge b-red">diverged</span><span class="badge b-grey">no PR</span></div>
+            <h3 style="margin:0 0 4px;font-family:var(--mono);font-size:14px">mobile/exp/new-nav</h3>
+            <p class="small muted" style="margin:0 0 16px">Last touched 9 days ago · 23 ahead / 41 behind main · 26 files, +980 −120</p>
+            <h4 style="font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)">Work in progress</h4>
+            <p style="font-size:13px;margin:4px 0 16px">Prototype navigation rewrite using a predictive-back model. Diverged hard from main; low confidence it is still wanted.</p>
+            <h4 style="font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)">Recent commits</h4>
+            <div class="commit">exp(nav): predictive back prototype</div>
+            <div class="commit">exp(nav): gesture scaffold</div>
+          </div>
+          <div class="tri-advisor">
+            <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent-ink);font-weight:700;margin-bottom:10px">✦ Advisor suggests</div>
+            <button class="act-btn"><b>Close as superseded</b><br><span class="muted">Superseded by the new nav work on main (#118).</span></button>
+            <button class="act-btn"><b>Rebase onto main</b><br><span class="muted">41 behind; 3 files conflict (Graph.kt, Routes.kt).</span></button>
+            <button class="act-btn"><b>Keep, park with a note</b><br><span class="muted">Resurface in 7 days if untouched.</span></button>
+            <div class="tiny muted" style="margin-top:10px">All actions are proposals. Nothing runs until you pick one.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3 TABLE ============ -->
+  <section class="panel" id="p3">
+    <div class="idea-hd">
+      <div class="txt"><h2>03 · Table + saved views</h2>
+        <p>The interrogation surface. Dense, sortable, groupable, multi-select, with saved filters (“my stale”, “CI failing”). Weakest as a “what next?” cue, strongest when you already know what you’re hunting for.</p></div>
+      <div class="fit">
+        <div class="row"><span class="lbl good">Strong</span><span>Best partner for the omnibar; scales to hundreds of branches.</span></div>
+        <div class="row"><span class="lbl watch">Watch</span><span>Requires discipline to maintain; less glanceable than a board.</span></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="t">bearing — branches</span><span class="r">8 rows · saved view: my stale</span></div>
+        <div class="omni">⌕ Ask or filter… <span class="muted">“branches touching webhooks.py that are behind main”</span><span class="k kbd">⌘K</span></div>
+        <div class="tbl-layout">
+          <div class="views-l">
+            <h5>Saved views</h5>
+            <div class="view-item on">● My stale</div>
+            <div class="view-item">CI failing</div>
+            <div class="view-item">Ready to merge</div>
+            <div class="view-item">Touches webhooks/*</div>
+            <div class="view-item">Mine this week</div>
+            <div class="view-item" style="color:var(--faint)">+ New view</div>
+          </div>
+          <div class="tbl-main">
+            <table class="dt">
+              <thead><tr><th><span class="cbx"></span></th><th>Branch</th><th>Repo</th><th>State</th><th>Ahead</th><th>Behind</th><th>CI</th><th>PR</th><th>Last ▾</th><th>Risk</th></tr></thead>
+              <tbody>
+                <tr class="picked"><td><span class="cbx on"></span></td><td>exp/new-nav</td><td>mobile</td><td><span class="badge b-amber">stale</span></td><td>23</td><td>41</td><td>—</td><td>—</td><td>9d</td><td><span class="badge b-red">high</span></td></tr>
+                <tr class="picked"><td><span class="cbx on"></span></td><td>chore/deps-bump</td><td>api-service</td><td><span class="badge b-amber">stale</span></td><td>1</td><td>12</td><td>—</td><td>—</td><td>6d</td><td><span class="badge b-amber">med</span></td></tr>
+                <tr><td><span class="cbx"></span></td><td>feat/webhooks</td><td>api-service</td><td><span class="badge b-red">ci failing</span></td><td>6</td><td>0</td><td>✗</td><td>#512</td><td>47m</td><td><span class="badge b-red">high</span></td></tr>
+                <tr><td><span class="cbx"></span></td><td>fix/auth-refresh</td><td>web-app</td><td><span class="badge b-cyan">in review</span></td><td>2</td><td>4</td><td>✓</td><td>#482</td><td>3h</td><td><span class="badge b-amber">med</span></td></tr>
+                <tr><td><span class="cbx"></span></td><td>feat/billing-portal</td><td>web-app</td><td><span class="badge b-accent">draft</span></td><td>11</td><td>2</td><td>✓</td><td>#487</td><td>1d</td><td><span class="badge b-green">low</span></td></tr>
+                <tr><td><span class="cbx"></span></td><td>fix/crash-on-start</td><td>mobile</td><td><span class="badge b-green">merge-ready</span></td><td>1</td><td>0</td><td>✓</td><td>#133</td><td>5h</td><td><span class="badge b-green">low</span></td></tr>
+                <tr><td><span class="cbx"></span></td><td>fix/rate-limit</td><td>api-service</td><td><span class="badge b-green">merge-ready</span></td><td>3</td><td>0</td><td>✓</td><td>#509</td><td>2h</td><td><span class="badge b-green">low</span></td></tr>
+                <tr><td><span class="cbx"></span></td><td>site-revamp</td><td>docs-site</td><td><span class="badge b-accent">active</span></td><td>5</td><td>0</td><td>✓</td><td>#44</td><td>3h</td><td><span class="badge b-green">low</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4 MASTER-DETAIL ============ -->
+  <section class="panel" id="p4">
+    <div class="idea-hd">
+      <div class="txt"><h2>04 · Master-detail drill-down</h2>
+        <p>The most literal answer to “questions about projects and branches <em>within those commits</em>.” A repo → branch → commit tree on the left; the selected node’s detail on the right. The advisor’s context binds to whatever is highlighted.</p></div>
+      <div class="fit">
+        <div class="row"><span class="lbl good">Strong</span><span>Natural hierarchy; makes the agent’s context obvious and precise.</span></div>
+        <div class="row"><span class="lbl watch">Watch</span><span>Poor at cross-repo overview; you can’t see the whole fleet at once.</span></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="t">bearing — explorer · agent scope: api-service/feat/webhooks</span></div>
+        <div class="md">
+          <div class="tree">
+            <div class="n">▾ ▣ api-service <span class="muted" style="margin-left:auto">3</span></div>
+            <div class="n lvl2 on">▾ ⑂ feat/webhooks</div>
+            <div class="n lvl3 on">● a1b2c3d verify HMAC signature</div>
+            <div class="n lvl3">● 9f8e7d6 add delivery log model</div>
+            <div class="n lvl3">● 4c3b2a1 wip: stub retry queue</div>
+            <div class="n lvl3">● 1a0b9c8 test: signature happy-path</div>
+            <div class="n lvl2">▸ ⑂ fix/rate-limit</div>
+            <div class="n lvl2">▸ ⑂ chore/deps-bump</div>
+            <div class="n">▸ ▣ web-app <span class="muted" style="margin-left:auto">2</span></div>
+            <div class="n">▸ ▣ mobile <span class="muted" style="margin-left:auto">2</span></div>
+            <div class="n">▸ ▣ docs-site <span class="muted" style="margin-left:auto">1</span></div>
+          </div>
+          <div class="md-detail">
+            <div class="commit-hd">
+              <span class="sha">commit a1b2c3d</span>
+              <h3>feat(webhooks): verify HMAC signature on ingest</h3>
+              <div class="small muted">Ada · today 12:17 · 3 files changed · <span style="color:var(--green)">+186</span> <span style="color:var(--red)">−24</span></div>
+            </div>
+            <div class="filechg"><span class="p">src/webhooks/verify.py</span><span class="a">+142</span><span class="d">−8</span></div>
+            <div class="filechg"><span class="p">src/webhooks/delivery.py</span><span class="a">+31</span><span class="d">−4</span></div>
+            <div class="filechg"><span class="p">tests/webhooks_test.py</span><span class="a">+13</span><span class="d">−12</span></div>
+            <div style="margin-top:16px" class="card">
+              <div style="padding:12px 14px">
+                <div class="tiny" style="text-transform:uppercase;letter-spacing:.06em;color:var(--accent-ink);font-weight:700">✦ Ask about this commit</div>
+                <p class="small" style="margin:6px 0 0">“Why was HMAC verification added before the delivery log?” — the agent scopes to a1b2c3d and can walk back through history to answer.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5 TIMELINE ============ -->
+  <section class="panel" id="p5">
+    <div class="idea-hd">
+      <div class="txt"><h2>05 · Session timeline</h2>
+        <p>The reflog’s natural visualization — and the one signal no other tool has. Time on the x-axis, branches as rows, real work sessions as blocks. Shows where you <em>actually</em> spent time and which threads went cold.</p></div>
+      <div class="fit">
+        <div class="row"><span class="lbl good">Strong</span><span>Perfect for re-entry after absence; exposes abandoned threads.</span></div>
+        <div class="row"><span class="lbl watch">Watch</span><span>Historical, not actionable — pair with a board or table.</span></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="t">bearing — timeline · last 7 days</span><span class="r">reconstructed from local reflog</span></div>
+        <div class="gantt">
+          <div class="gaxis"><div></div><div class="ticks"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div></div>
+          <div class="grow"><div class="lbl">feat/webhooks</div><div class="gtrack">
+            <div class="gblk ga" style="left:9%;width:26%">webhooks</div>
+            <div class="gblk ga" style="left:52%;width:30%">webhooks</div></div></div>
+          <div class="grow"><div class="lbl">fix/auth-refresh</div><div class="gtrack">
+            <div class="gblk gb" style="left:30%;width:18%">auth</div>
+            <div class="gblk gb" style="left:78%;width:12%">auth</div></div></div>
+          <div class="grow"><div class="lbl">feat/billing-portal</div><div class="gtrack">
+            <div class="gblk gd" style="left:44%;width:22%">billing</div></div></div>
+          <div class="grow"><div class="lbl">site-revamp</div><div class="gtrack">
+            <div class="gblk gc" style="left:66%;width:10%">docs</div></div></div>
+          <div class="grow"><div class="lbl">exp/new-nav</div><div class="gtrack">
+            <div class="gblk gd" style="left:2%;width:6%">nav</div>
+            <div class="muted small" style="position:absolute;left:12%;top:5px;font-size:10.5px">…cold for 9 days</div></div></div>
+        </div>
+        <div style="padding:0 16px 16px">
+          <div class="card" style="padding:12px 14px;background:var(--panel-2)">
+            <b class="small">What this tells you</b>
+            <p class="small muted" style="margin:5px 0 0">You spent most of the week in <b>feat/webhooks</b>, briefly touched <b>auth-refresh</b> twice, and <b>exp/new-nav</b> has been cold since Monday — probably a decision waiting to happen.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6 FLIGHT DECK ============ -->
+  <section class="panel" id="p6">
+    <div class="idea-hd">
+      <div class="txt"><h2>06 · Flight deck / radar</h2>
+        <p>Ambient awareness. Branches are blips placed by <em>risk × staleness</em>; distance from center = how long neglected, angle = merge risk. For glancing, not acting — an always-open second monitor view.</p></div>
+      <div class="fit">
+        <div class="row"><span class="lbl good">Strong</span><span>Instant “is anything on fire?” with zero reading.</span></div>
+        <div class="row"><span class="lbl watch">Watch</span><span>Imprecise — you can’t select or act easily; can be gimmicky.</span></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="t">bearing — flight deck</span><span class="r">4 repos · ambient</span></div>
+        <div class="flt">
+          <div>
+            <div class="radar">
+              <div class="sweep"></div>
+              <div class="ring" style="inset:12%"></div>
+              <div class="ring" style="inset:30%"></div>
+              <div class="ring" style="inset:50%"></div>
+              <div class="axis-l" style="left:8px;top:50%">low risk</div>
+              <div class="axis-l" style="right:8px;top:50%">high risk</div>
+              <div class="axis-l" style="left:50%;bottom:6px;transform:translateX(-50%)">recent</div>
+              <div class="axis-l" style="left:50%;top:6px;transform:translateX(-50%)">stale</div>
+              <div class="blip" style="left:38%;top:74%;background:#4f46e5"><span class="tag">webhooks</span></div>
+              <div class="blip" style="left:64%;top:70%;background:#4f46e5"><span class="tag">rate-limit</span></div>
+              <div class="blip" style="left:46%;top:40%;background:#0891b2"><span class="tag">auth-refresh</span></div>
+              <div class="blip" style="left:30%;top:30%;background:#0891b2"><span class="tag">billing</span></div>
+              <div class="blip" style="left:22%;top:22%;background:#059669"></div>
+              <div class="blip" style="left:74%;top:34%;background:#db2777"></div>
+              <div class="blip" style="left:82%;top:18%;background:#059669;width:16px;height:16px"><span class="tag">exp/new-nav</span></div>
+              <div class="blip" style="left:58%;top:24%;background:#4f46e5"></div>
+            </div>
+          </div>
+          <div class="flt-side">
+            <div class="badge b-red" style="margin-bottom:10px">3 need attention</div>
+            <div class="alert"><span>🔴</span><div><b>mobile/exp/new-nav</b><div class="muted tiny">far & right — stale + high merge risk</div></div></div>
+            <div class="alert"><span>🟠</span><div><b>api-service/feat/webhooks</b><div class="muted tiny">CI failing, 47m ago</div></div></div>
+            <div class="alert"><span>🟠</span><div><b>api-service/chore/deps-bump</b><div class="muted tiny">drifting, superseded</div></div></div>
+            <div class="alert" style="border:none"><span>🟢</span><div><b>2 merge-ready</b><div class="muted tiny">rate-limit · crash-on-start</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 7 RUNBOOK ============ -->
+  <section class="panel" id="p7">
+    <div class="idea-hd">
+      <div class="txt"><h2>07 · Runbook / conductor</h2>
+        <p>Instead of browsing state, you run <em>routines</em>: Morning re-entry, Weekly hygiene, Pre-merge check. The advisor walks you through each with tools. Process-first — this is the one that literally installs a workflow rather than showing data.</p></div>
+      <div class="fit">
+        <div class="row"><span class="lbl good">Strong</span><span>Best match for “a workflow I want to adopt”; hard to skip steps.</span></div>
+        <div class="row"><span class="lbl watch">Watch</span><span>Less flexible for ad-hoc questions; routine design is the work.</span></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="t">bearing — runbook</span><span class="r">routine: morning re-entry</span></div>
+        <div class="rb">
+          <div class="rb-list">
+            <h5>Routines</h5>
+            <div class="rb-routine on">Morning re-entry<br><span class="tiny muted">4 steps · 40%</span></div>
+            <div class="rb-routine">Weekly hygiene<br><span class="tiny muted">6 steps</span></div>
+            <div class="rb-routine">Pre-merge check<br><span class="tiny muted">3 steps</span></div>
+            <div class="rb-routine">End-of-day park<br><span class="tiny muted">2 steps</span></div>
+          </div>
+          <div style="padding:18px 22px">
+            <h3 style="margin:0 0 2px;font-size:16px">Morning re-entry</h3>
+            <p class="small muted" style="margin:0 0 10px">Get from cold to first productive action in under a minute.</p>
+            <div class="progress"><i></i></div>
+            <div class="rb-step done"><div class="mark">✓</div><div><div class="tt">Reconstruct last session</div><div class="dd">feat/webhooks, 47m ago — signatures done, retry stubbed.</div></div></div>
+            <div class="rb-step done"><div class="mark">✓</div><div><div class="tt">Check what’s merge-ready</div><div class="dd">2 branches are green — rate-limit has 2 approvals.</div></div></div>
+            <div class="rb-step now"><div class="mark">→</div><div><div class="tt">Resolve the blocking item</div><div class="dd">feat/webhooks CI is failing (2 tests).</div>
+              <div class="adv">✦ Suggestions: the failing tests are <span class="mono">test_retry_410</span> and <span class="mono">test_replay_guard</span> — both added by your last WIP commit. Want the diffs?</div></div></div>
+            <div class="rb-step"><div class="mark">4</div><div><div class="tt">Park today’s intent</div><div class="dd">Write one line so tomorrow’s re-entry is instant.</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 8 GRAPH ============ -->
+  <section class="panel" id="p8">
+    <div class="idea-hd">
+      <div class="txt"><h2>08 · Coupling graph</h2>
+        <p>Files (or branches) as nodes; an edge wherever two change together. Reveals hidden clusters and predicts merge pain — the “webhooks cluster” below is exactly where you keep getting conflicts.</p></div>
+      <div class="fit">
+        <div class="row"><span class="lbl good">Strong</span><span>Genuinely novel insight; predicts conflict before you merge.</span></div>
+        <div class="row"><span class="lbl watch">Watch</span><span>Layout is hard to get right; hard to act on directly — a secondary view.</span></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="win"><div class="win-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="t">bearing — coupling · api-service · 90d</span><span class="r">co-change frequency</span></div>
+        <div class="graph-wrap">
+          <svg viewBox="0 0 760 360" width="100%" height="auto">
+            <!-- edges -->
+            <line class="edge strong" x1="170" y1="150" x2="300" y2="110"/>
+            <line class="edge strong" x1="300" y1="110" x2="400" y2="160"/>
+            <line class="edge strong" x1="170" y1="150" x2="400" y2="160"/>
+            <line class="edge" x1="290" y1="60" x2="170" y2="150"/>
+            <line class="edge" x1="290" y1="60" x2="400" y2="160"/>
+            <line class="edge" x1="400" y1="160" x2="500" y2="235"/>
+            <line class="edge" x1="520" y1="250" x2="400" y2="160"/>
+            <line class="edge" x1="400" y1="160" x2="560" y2="110"/>
+            <line class="edge" x1="560" y1="110" x2="690" y2="95"/>
+            <line class="edge" x1="300" y1="110" x2="120" y2="300"/>
+            <line class="edge" x1="690" y1="95" x2="680" y2="290"/>
+            <line class="edge" x1="640" y1="270" x2="680" y2="290"/>
+            <!-- cluster highlight -->
+            <ellipse cx="300" cy="140" rx="185" ry="95" fill="none" stroke="#8b93ff" stroke-dasharray="5 5" stroke-width="1.3"/>
+            <text x="150" y="42" fill="#6366f1" style="font-size:12px;font-weight:700">webhooks cluster — high co-change</text>
+            <!-- nodes -->
+            <circle class="node" cx="290" cy="60" r="11" fill="#4f46e5"/>
+            <text x="306" y="60">verify.py</text>
+            <circle class="node" cx="170" cy="150" r="14" fill="#4f46e5"/>
+            <text x="120" y="176" >delivery.py</text>
+            <circle class="node" cx="300" cy="110" r="12" fill="#4f46e5"/>
+            <text x="316" y="112">retry.py</text>
+            <circle class="node" cx="400" cy="160" r="10" fill="#4f46e5"/>
+            <text x="414" y="164">models.py</text>
+            <circle class="node" cx="120" cy="300" r="9" fill="#4f46e5"/>
+            <text x="80" y="322">migrations.py</text>
+            <circle class="node" cx="500" cy="235" r="10" fill="#0891b2"/>
+            <text x="514" y="239">routes.py</text>
+            <circle class="node" cx="560" cy="110" r="11" fill="#0891b2"/>
+            <text x="575" y="114">ratelimit.py</text>
+            <circle class="node" cx="690" cy="95" r="9" fill="#059669"/>
+            <text x="704" y="99">tokens.py</text>
+            <circle class="node" cx="680" cy="290" r="12" fill="#d97706"/>
+            <text x="695" y="294">webhooks_test.py</text>
+            <circle class="node" cx="640" cy="270" r="9" fill="#d97706"/>
+            <text x="590" y="266" >test_util.py</text>
+          </svg>
+        </div>
+        <div class="legend">
+          <span><span class="sw" style="background:#4f46e5"></span>api-service core</span>
+          <span><span class="sw" style="background:#0891b2"></span>api layer</span>
+          <span><span class="sw" style="background:#059669"></span>auth</span>
+          <span><span class="sw" style="background:#d97706"></span>tests</span>
+          <span><span class="sw" style="background:#8b93ff;height:3px;border-radius:2px"></span>strong co-change</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('on', p.id === t.dataset.p));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}));
+if (location.hash) {
+  const t = document.querySelector('.tab[data-p="' + location.hash.slice(1) + '"]');
+  if (t) t.click();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bearing — Mockup 02 · Dashboard-first</title>
+<link rel="stylesheet" href="theme.css" />
+<style>
+  body { background: var(--bg); }
+  .concept {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; margin: 18px 20px 0; box-shadow: var(--shadow);
+  }
+  .concept .k { font-weight: 700; font-size: 13px; color: var(--accent-ink); background: var(--accent-soft); padding: 4px 10px; border-radius: 8px; white-space: nowrap; }
+  .concept p { margin: 0; color: var(--muted); font-size: 13px; }
+  .concept b { color: var(--ink); }
+
+  .app { display: flex; gap: 0; padding: 18px 20px 40px; align-items: stretch; min-height: 620px; }
+
+  /* sidebar */
+  .side {
+    width: 220px; flex: 0 0 auto; background: var(--panel);
+    border: 1px solid var(--line); border-right: none; border-radius: 14px 0 0 14px;
+    padding: 14px 12px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .side .grp { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); font-weight: 700; margin: 14px 6px 5px; }
+  .repo {
+    display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px;
+    font-size: 13px; color: #374151; cursor: pointer;
+  }
+  .repo:hover { background: var(--panel-2); }
+  .repo.on { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+  .repo .swatch { width: 9px; height: 9px; border-radius: 3px; background: var(--accent); }
+  .repo .n { margin-left: auto; font-size: 11px; color: var(--faint); font-family: var(--mono); }
+  .repo.on .n { color: var(--accent); }
+  .side .foot { margin-top: auto; padding: 10px; border-top: 1px solid var(--line-2); font-size: 11.5px; color: var(--muted); }
+  .side .foot .m { font-family: var(--mono); color: var(--ink); }
+
+  /* main */
+  .main {
+    flex: 1; min-width: 0; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 0 14px 14px 0;
+    display: flex; flex-direction: column;
+  }
+  .main-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--line-2); }
+  .mh-top { display: flex; align-items: center; gap: 12px; }
+  .mh-top h2 { margin: 0; font-size: 19px; letter-spacing: -0.02em; }
+  .mh-top .sub { color: var(--muted); font-size: 12.5px; }
+  .search { margin-left: auto; display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 9px; padding: 6px 10px; color: var(--faint); font-size: 12.5px; min-width: 190px; }
+  .search input { border: none; outline: none; font-size: 12.5px; width: 100%; font-family: inherit; background: transparent; }
+  .filters { display: flex; gap: 7px; margin-top: 13px; flex-wrap: wrap; align-items: center; }
+  .views { margin-left: auto; display: flex; background: #eef0f3; border-radius: 9px; padding: 3px; }
+  .views button { border: none; background: transparent; padding: 5px 12px; border-radius: 7px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .views button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+  .body { padding: 16px 20px 24px; overflow-y: auto; flex: 1; }
+
+  /* morning brief */
+  .morning {
+    display: flex; gap: 12px; align-items: center;
+    background: linear-gradient(90deg, #eef2ff, #f5f3ff); border: 1px solid #dfe3ff;
+    border-radius: 12px; padding: 12px 15px; margin-bottom: 16px;
+  }
+  .morning .ic { font-size: 18px; }
+  .morning .tx { font-size: 13px; color: #312e81; }
+  .morning b { color: var(--accent-ink); }
+  .morning button { margin-left: auto; }
+
+  /* stats */
+  .stats { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px; padding: 10px 14px; min-width: 92px; }
+  .stat b { display: block; font-size: 21px; letter-spacing: -0.02em; }
+  .stat span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+  /* branch cards */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 1080px) { .grid { grid-template-columns: 1fr; } .side { display: none; } .main { border-radius: 14px; } }
+  .bcard {
+    border: 1px solid var(--line); border-left: 4px solid var(--accent);
+    border-radius: 12px; padding: 13px 15px; background: #fff; cursor: pointer;
+    transition: box-shadow .12s ease, transform .12s ease;
+  }
+  .bcard:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+  .bcard.sel { box-shadow: 0 0 0 2px var(--accent); }
+  .bcard.stale { border-left-color: var(--amber); }
+  .bcard.risk { border-left-color: var(--red); }
+  .bcard.ready { border-left-color: var(--green); }
+  .bcard .top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+  .bcard .name { font-family: var(--mono); font-size: 12.5px; font-weight: 600; word-break: break-word; }
+  .bcard .name .r { color: var(--faint); font-weight: 400; }
+  .bcard .meta { font-size: 11.5px; color: var(--muted); font-family: var(--mono); margin-top: 4px; }
+  .bcard .desc { font-size: 12.5px; margin: 8px 0 0; color: #374151; }
+  .bcard .next { font-size: 12.5px; margin: 5px 0 0; color: #374151; }
+  .bcard .next b { color: var(--accent); }
+  .bcard .badges { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+  .empty { padding: 40px; text-align: center; color: var(--faint); }
+
+  /* timeline */
+  .tl { display: flex; gap: 4px; margin: 8px 0 6px; }
+  .tl .blk { height: 40px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 10.5px; color: #fff; font-family: var(--mono); overflow: hidden; white-space: nowrap; padding: 0 6px; }
+  .tl .a { background: #4f46e5; } .tl .b { background: #0891b2; } .tl .c { background: #059669; }
+  .tl .gap { background: #e9ebef; color: #9aa1ad; }
+  .tl-axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--faint); font-family: var(--mono); }
+  .sess-row { display: grid; grid-template-columns: 120px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line-2); font-size: 13px; }
+  .sess-row .t { font-family: var(--mono); color: var(--muted); font-size: 12px; }
+  .sess-row .b { font-family: var(--mono); color: var(--cyan); }
+
+  /* hygiene */
+  .hyg-group { margin-bottom: 20px; }
+  .hyg-group h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .hyg-row { display: flex; align-items: center; gap: 12px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 7px; background: #fff; }
+  .hyg-row .nm { font-family: var(--mono); font-size: 12.5px; }
+  .hyg-row .why { color: var(--muted); font-size: 12px; }
+  .hyg-row .act { margin-left: auto; }
+
+  /* detail drawer */
+  .drawer {
+    width: 360px; flex: 0 0 auto; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 14px; margin-left: 14px;
+    display: none; flex-direction: column; overflow: hidden;
+  }
+  .drawer.open { display: flex; }
+  .dr-head { padding: 15px 16px; border-bottom: 1px solid var(--line-2); }
+  .dr-head .x { float: right; cursor: pointer; color: var(--faint); }
+  .dr-head h3 { margin: 0 0 3px; font-family: var(--mono); font-size: 13px; word-break: break-word; }
+  .dr-head .sub { font-size: 11.5px; color: var(--muted); }
+  .dr-body { padding: 15px 16px; overflow-y: auto; flex: 1; }
+  .dr-sec { margin-bottom: 16px; }
+  .dr-sec h4 { margin: 0 0 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); }
+  .dr-sec p { margin: 0; font-size: 12.8px; }
+  .commit { font-size: 12px; font-family: var(--mono); color: #374151; padding: 3px 0; border-bottom: 1px dashed var(--line-2); }
+  .file { display: inline-block; font-family: var(--mono); font-size: 11px; background: #eef0f3; border-radius: 5px; padding: 2px 7px; margin: 2px 3px 0 0; color: #4b5563; }
+  .dr-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .plan-artifact { background: var(--accent-soft); border: 1px solid #dfe3ff; border-radius: 10px; padding: 11px 13px; font-size: 12.5px; margin-top: 10px; }
+  .plan-artifact .tagline { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent-ink); font-weight: 700; margin-bottom: 6px; }
+  .plan-artifact ol { margin: 6px 0 0; padding-left: 18px; }
+  .plan-artifact li { margin: 3px 0; }
+  @media (max-width: 1280px) { .drawer { display: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wf-bar">
+  <div class="wf-brand"><span class="dotmark"></span>Bearing <small>workflow mockups</small></div>
+  <nav class="wf-nav">
+    <a href="index.html">Overview</a>
+    <a href="terminal.html">01 · Terminal</a>
+    <a href="dashboard.html" class="active">02 · Dashboard</a>
+    <a href="advisor.html">03 · Heading</a>
+    <a href="ideas.html">8 · Ideas</a>
+    <a href="prototype.html">▶ Main prototype</a>
+  </nav>
+  <div class="wf-spacer"></div>
+  <span class="wf-badge">mockup</span>
+</div>
+
+<div class="concept">
+  <span class="k">Workflow B</span>
+  <p><b>Dashboard-first.</b> An always-open local control panel. The whole fleet is visible at a glance — you pick the next task from evidence, not memory. Click any branch for the full picture; drift into a detail view only when you need it.</p>
+</div>
+
+<div class="app">
+  <aside class="side">
+    <div class="grp">Repos</div>
+    <div class="repo on" data-repo="all"><span class="swatch" style="background:#4f46e5"></span>All repos<span class="n" id="cnt-all">0</span></div>
+    <div id="repo-list"></div>
+    <div class="grp">Today</div>
+    <div class="repo" onclick="setView('timeline')"><span>🕑</span>Session timeline</div>
+    <div class="repo" onclick="setView('hygiene')"><span>🧹</span>Hygiene radar</div>
+    <div class="foot">machine <span class="m">laptop-1</span><br>journal synced 4m ago · 2 machines</div>
+  </aside>
+
+  <section class="main">
+    <div class="main-head">
+      <div class="mh-top">
+        <h2 id="title">Fleet overview</h2>
+        <span class="sub" id="subtitle">4 repos · 10 branches</span>
+        <div class="search"><span>⌕</span><input id="q" placeholder="filter branches…" /></div>
+      </div>
+      <div class="filters" id="filters">
+        <button class="chip on" data-f="all">All <span class="n" id="n-all"></span></button>
+        <button class="chip" data-f="active">Active <span class="n" id="n-active"></span></button>
+        <button class="chip" data-f="merge_ready">Merge-ready <span class="n" id="n-ready"></span></button>
+        <button class="chip" data-f="stale">Stale <span class="n" id="n-stale"></span></button>
+        <button class="chip" data-f="ci_failing">CI failing <span class="n" id="n-ci"></span></button>
+        <div class="views" id="views">
+          <button class="on" data-v="fleet">Fleet</button>
+          <button data-v="timeline">Timeline</button>
+          <button data-v="hygiene">Hygiene</button>
+        </div>
+      </div>
+    </div>
+    <div class="body scroll" id="body"></div>
+  </section>
+
+  <aside class="drawer" id="drawer"></aside>
+</div>
+
+<script src="data.js"></script>
+<script>
+const D = window.BEARING;
+const state = { repo: 'all', filter: 'all', view: 'fleet', selected: null, morning: true };
+
+const branches = [];
+D.repos.forEach(r => r.branches.forEach(b => branches.push({ ...b, repo: r.name, lang: r.lang })));
+
+const flagMap = { active: ['Active','b-accent'], merge_ready: ['Merge-ready','b-green'], stale: ['Stale','b-amber'], diverged: ['Diverged','b-red'], ci_failing: ['CI failing','b-red'], in_review: ['In review','b-cyan'] };
+const borderFor = b => b.flags.includes('ci_failing') || b.flags.includes('diverged') ? 'risk' : b.flags.includes('merge_ready') ? 'ready' : b.flags.includes('stale') ? 'stale' : '';
+
+function matches(b, f) {
+  if (f === 'all') return true;
+  if (f === 'ci_failing') return b.flags.includes('ci_failing');
+  return b.flags.includes(f);
+}
+function visible() {
+  const q = (document.getElementById('q').value || '').toLowerCase();
+  return branches.filter(b =>
+    (state.repo === 'all' || b.repo === state.repo) &&
+    matches(b, state.filter) &&
+    (!q || (b.repo + '/' + b.name + ' ' + b.wip).toLowerCase().includes(q))
+  );
+}
+function badge(f) { const m = flagMap[f]; return m ? '<span class="badge ' + m[1] + '">' + m[0] + '</span>' : ''; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* counters */
+function renderCounters() {
+  const inRepo = state.repo === 'all' ? branches : branches.filter(b => b.repo === state.repo);
+  document.getElementById('cnt-all').textContent = branches.length;
+  document.getElementById('n-all').textContent = inRepo.length;
+  document.getElementById('n-active').textContent = inRepo.filter(b => b.flags.includes('active')).length;
+  document.getElementById('n-ready').textContent = inRepo.filter(b => b.flags.includes('merge_ready')).length;
+  document.getElementById('n-stale').textContent = inRepo.filter(b => b.flags.includes('stale')).length;
+  document.getElementById('n-ci').textContent = inRepo.filter(b => b.flags.includes('ci_failing')).length;
+}
+
+function repoList() {
+  const el = document.getElementById('repo-list');
+  el.innerHTML = D.repos.map(r =>
+    '<div class="repo' + (state.repo === r.id ? ' on' : '') + '" data-repo="' + r.id + '">' +
+    '<span class="swatch" style="background:' + colorFor(r.id) + '"></span>' + r.name +
+    '<span class="n">' + r.branches.length + '</span></div>'
+  ).join('');
+  el.querySelectorAll('.repo').forEach(n => n.addEventListener('click', () => { state.repo = n.dataset.repo; state.selected = null; render(); }));
+  document.querySelector('.repo[data-repo="all"]').classList.toggle('on', state.repo === 'all');
+}
+function colorFor(id) {
+  return { 'api-service': '#4f46e5', 'web-app': '#0891b2', 'mobile': '#059669', 'docs-site': '#db2777' }[id] || '#4f46e5';
+}
+
+function renderFleet() {
+  const list = visible();
+  const morning = state.morning ? `
+    <div class="morning">
+      <span class="ic">🌅</span>
+      <div class="tx">Good morning. You were in <b>api-service/feat/webhooks</b> last, 47m ago.
+        <b>2 branches are merge-ready</b> and 1 has failing CI.</div>
+      <button class="btn ghost sm" onclick="state.morning=false;render()">dismiss</button>
+    </div>` : '';
+  if (!list.length) { document.getElementById('body').innerHTML = morning + '<div class="empty">No branches match this filter.</div>'; return; }
+  document.getElementById('body').innerHTML = morning +
+    '<div class="stats">' +
+      stat(D.stats.branches, 'branches') + stat(D.stats.active, 'active') +
+      stat(D.stats.mergeReady, 'merge-ready') + stat(D.stats.stale, 'stale') +
+      stat(D.stats.ciFailing, 'CI failing') +
+    '</div>' +
+    '<div class="grid">' + list.map(card).join('') + '</div>';
+  wireCards();
+}
+const stat = (n, l) => '<div class="stat"><b>' + n + '</b><span>' + l + '</span></div>';
+
+function card(b) {
+  const sel = state.selected === b.repo + '/' + b.name ? ' sel' : '';
+  return `<div class="bcard ${borderFor(b)}${sel}" data-id="${b.repo}/${b.name}">
+    <div class="top">
+      <div>
+        <div class="name"><span class="r">${b.repo}/</span>${b.name}</div>
+        <div class="meta">${b.last} ago · ahead ${b.ahead} · behind ${b.behind}${b.pr ? ' · PR #' + b.pr.number : ' · no PR'}</div>
+      </div>
+      <div class="badges">${b.flags.map(badge).join('')}</div>
+    </div>
+    <p class="desc">${esc(b.wip).slice(0, 120)}${b.wip.length > 120 ? '…' : ''}</p>
+    <p class="next"><b>Next:</b> ${esc(b.next)}</p>
+  </div>`;
+}
+function wireCards() {
+  document.querySelectorAll('.bcard').forEach(c => c.addEventListener('click', () => {
+    state.selected = state.selected === c.dataset.id ? null : c.dataset.id;
+    render();
+  }));
+}
+
+function renderTimeline() {
+  document.getElementById('body').innerHTML = `
+    <p class="small muted" style="margin-top:0">Each block is a contiguous span reconstructed from the local git reflog. Gaps &gt; 30 min start a new session.</p>
+    <div class="tl">${D.sessions.map(s => s.gap
+      ? '<div class="blk gap" style="flex:' + s.span + '">' + s.label + '</div>'
+      : '<div class="blk ' + s.kind + '" style="flex:' + s.span + '">' + s.branch + '</div>').join('')}</div>
+    <div class="tl-axis"><span>09:00</span><span>10:30</span><span>12:00</span><span>13:30</span><span>15:00</span><span>16:30</span></div>
+    <div style="margin-top:18px">${D.sessions.filter(s => !s.gap).map(s => `
+      <div class="sess-row"><div class="t">${s.start} – ${s.end}</div>
+      <div><span class="b">${s.repo}/${s.branch}</span> — <span class="muted">${s.detail}</span></div></div>`).join('')}</div>
+    <div class="card" style="padding:14px 16px;margin-top:16px;background:var(--panel-2)">
+      <b class="small">Why this matters</b>
+      <p class="small muted" style="margin:6px 0 0">This is the mechanism that answers “where was I?” without you maintaining any state — and it re-emerges on machine B via the synced journal.</p>
+    </div>`;
+}
+
+function renderHygiene() {
+  const groups = [
+    { t: 'Merge-ready', cls: 'b-green', items: branches.filter(b => b.flags.includes('merge_ready')).map(b => ({ b, why: 'green CI · approvals present · no conflicts', act: 'Merge' })) },
+    { t: 'Stale', cls: 'b-amber', items: branches.filter(b => b.flags.includes('stale') && !b.flags.includes('diverged')).map(b => ({ b, why: 'no activity ≥ 7 days', act: 'Rebase' })) },
+    { t: 'Diverged — needs a decision', cls: 'b-red', items: branches.filter(b => b.flags.includes('diverged')).map(b => ({ b, why: b.ahead + ' ahead / ' + b.behind + ' behind', act: 'Decide' })) },
+    { t: 'Probably safe to delete', cls: 'b-grey', items: branches.filter(b => b.flags.includes('stale') && b.pr === null).map(b => ({ b, why: 'no PR · superseded or no unique value', act: 'Prune' })) },
+  ];
+  document.getElementById('body').innerHTML = groups.map(g => `
+    <div class="hyg-group">
+      <h4><span class="badge ${g.cls}">${g.t}</span> <span class="muted">${g.items.length}</span></h4>
+      ${g.items.length ? g.items.map(({ b, why, act }) => `
+        <div class="hyg-row">
+          <span class="nm">${b.repo}/${b.name}</span>
+          <span class="why">${why}</span>
+          <span class="act"><button class="btn sm">${act}</button></span>
+        </div>`).join('') : '<p class="small muted" style="margin:0 0 4px">Nothing here — nice.</p>'}
+    </div>`).join('') + '<p class="tiny muted">Deletion is always list-only by default; actions here are illustrative.</p>';
+  document.querySelectorAll('.hyg-row button').forEach(btn => btn.addEventListener('click', () => alert('Mockup: this would never delete by default — it would open a confirm/PR flow.')));
+}
+
+/* drawer */
+function renderDrawer() {
+  const dr = document.getElementById('drawer');
+  if (state.view !== 'fleet' || !state.selected) { dr.classList.remove('open'); dr.innerHTML = ''; return; }
+  const b = branches.find(x => x.repo + '/' + x.name === state.selected);
+  if (!b) { dr.classList.remove('open'); return; }
+  dr.classList.add('open');
+  dr.innerHTML = `
+    <div class="dr-head">
+      <span class="x" onclick="state.selected=null;render()">✕</span>
+      <h3>${b.repo}/${b.name}</h3>
+      <div class="sub">${b.lang} · base ${b.base} · last ${b.last} ago</div>
+      <div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap">${b.flags.map(badge).join('')}</div>
+    </div>
+    <div class="dr-body">
+      <div class="dr-sec"><h4>Work in progress <span class="badge b-accent" style="margin-left:4px">advisor</span></h4>
+        <p>${esc(b.wip)}</p></div>
+      <div class="dr-sec"><h4>Next step</h4><p style="color:var(--accent)">${esc(b.next)}</p></div>
+      <div class="dr-sec"><h4>Position</h4>
+        <p class="small">ahead <b>${b.ahead}</b> · behind <b>${b.behind}</b> · diff <b>+${b.diff.add} −${b.diff.del}</b> in ${b.diff.files} files
+        <br>working tree: <b>${b.wt.modified}</b> modified, <b>${b.wt.staged}</b> staged, <b>${b.wt.untracked}</b> untracked · <b>${b.stashes}</b> stashes</p></div>
+      ${b.pr ? `<div class="dr-sec"><h4>Pull request</h4>
+        <p class="small">#${b.pr.number} · ${b.pr.state} · CI <b>${b.pr.ci}</b> · review <b>${b.pr.review.replace('_',' ')}</b> · ${b.pr.approvals} approval(s)</p></div>` : ''}
+      <div class="dr-sec"><h4>Recent commits</h4>${b.commits.map(c => '<div class="commit">' + esc(c) + '</div>').join('')}</div>
+      <div class="dr-sec"><h4>Files touched</h4>${b.files.map(f => '<span class="file">' + esc(f) + '</span>').join('')}</div>
+      ${b.note ? `<div class="dr-sec"><h4>Parking note</h4><p class="small">“${esc(b.note)}”</p></div>` : ''}
+      <div class="dr-actions">
+        <button class="btn primary sm" onclick="draftPlan('${b.repo}/${b.name}')">✦ Draft a plan</button>
+        <button class="btn sm" onclick="parkNote()">Park a note</button>
+        ${b.pr ? '<button class="btn sm">Open PR</button>' : '<button class="btn sm">Open PR…</button>'}
+      </div>
+      <div id="plan-slot"></div>
+      <p class="tiny muted" style="margin-top:14px">Advisor actions produce <b>proposals</b> — nothing is written to the repo until you promote one.</p>
+    </div>`;
+}
+function draftPlan(id) {
+  const slot = document.getElementById('plan-slot');
+  slot.innerHTML = '<div class="plan-artifact pulse">generating plan … (mid model)</div>';
+  setTimeout(() => {
+    slot.innerHTML = `<div class="plan-artifact fade-in">
+      <div class="tagline">Proposal prp_2 · plan · not applied</div>
+      <b>${D.heading.plan.title}</b>
+      <ol>${D.heading.plan.steps.map(s => '<li>' + esc(s.t) + '</li>').join('')}</ol>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button class="btn primary sm">Promote to branch</button>
+        <button class="btn sm">Keep</button>
+        <button class="btn ghost sm">Discard</button></div>
+    </div>`;
+  }, 600);
+}
+function parkNote() {
+  const slot = document.getElementById('plan-slot');
+  slot.innerHTML = '<div class="plan-artifact fade-in">✓ parked. will resurface in your next brief on any machine.</div>';
+}
+
+/* view + wiring */
+function setView(v) { state.view = v; state.selected = null; document.querySelectorAll('#views button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); render(); }
+function render() {
+  renderCounters(); repoList();
+  const titles = { fleet: 'Fleet overview', timeline: 'Session timeline', hygiene: 'Hygiene radar' };
+  document.getElementById('title').textContent = titles[state.view];
+  document.getElementById('subtitle').textContent = state.view === 'fleet'
+    ? (state.repo === 'all' ? D.repos.length + ' repos' : state.repo) + ' · ' + visible().length + ' branches'
+    : 'today · local reflog';
+  if (state.view === 'fleet') renderFleet();
+  else if (state.view === 'timeline') renderTimeline();
+  else renderHygiene();
+  renderDrawer();
+}
+document.querySelectorAll('#filters .chip').forEach(c => c.addEventListener('click', () => {
+  state.filter = c.dataset.f;
+  document.querySelectorAll('#filters .chip').forEach(x => x.classList.toggle('on', x.dataset.f === state.filter));
+  render();
+}));
+document.querySelectorAll('#views button').forEach(b => b.addEventListener('click', () => setView(b.dataset.v)));
+document.getElementById('q').addEventListener('input', render);
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bearing — Main Interface Prototype</title>
+<link rel="stylesheet" href="theme.css" />
+<link rel="stylesheet" href="app.css" />
+<style>
+  .proto-banner { background: #111827; color: #e5e7eb; font-size: 11.5px; text-align: center; padding: 5px 10px; }
+  .proto-banner b { color: #a5b4fc; }
+  .proto-bar { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; align-items: center; gap: 4px; background: #0e1320; color: #e5e7eb; border: 1px solid #2a3346; border-radius: 999px; padding: 5px 6px; box-shadow: 0 16px 40px rgba(0,0,0,.4); }
+  .proto-bar button { background: transparent; border: none; color: #a5b4fc; font-size: 16px; width: 30px; height: 30px; border-radius: 50%; }
+  .proto-bar button:hover { background: #1e2637; }
+  .proto-bar .lab { font-size: 12px; padding: 0 10px; font-family: var(--mono); white-space: nowrap; }
+  .proto-bar .lab b { color: #fff; }
+  .proto-bar .hint { font-size: 10.5px; color: #6b7280; border-left: 1px solid #2a3346; margin-left: 4px; padding: 0 10px; }
+
+  .eyebrow { font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--accent); font-weight: 700; }
+
+  /* ---------- branch dossier (the hierarchical core) ---------- */
+  .dossier { max-width: 880px; }
+  .dos-hd { padding-bottom: 15px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+  .dos-name { font-size: 25px; letter-spacing: -0.03em; font-weight: 700; line-height: 1.15; }
+  .dos-path { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .dos-row { display: flex; gap: 7px; align-items: center; margin-top: 11px; flex-wrap: wrap; }
+  .meter { display: flex; gap: 3px; margin-top: 12px; max-width: 320px; }
+  .meter i { height: 6px; border-radius: 3px; flex: 1; background: #e5e7eb; }
+  .meter i.done { background: var(--green); } .meter i.progress { background: var(--accent); }
+  .dos-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); font-weight: 700; margin: 22px 0 11px; display: flex; align-items: center; gap: 9px; }
+  .dos-label .ai { text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 10px; color: var(--accent-ink); background: var(--accent-soft); border-radius: 999px; padding: 2px 8px; }
+  .dos-label .prog { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--green); font-size: 11px; }
+  .dos-note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 14px; }
+  .dos-note .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; font-weight: 700; color: #92400e; margin-bottom: 4px; }
+  .dos-note p { margin: 0; font-size: 13px; color: #78350f; }
+
+  .chapters { list-style: none; margin: 0; padding: 0; }
+  .chapter { display: grid; grid-template-columns: 26px 1fr; gap: 13px; padding-bottom: 18px; position: relative; }
+  .chapter .node { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; border: 1.5px solid var(--line); background: #fff; z-index: 1; }
+  .chapter.done .node { background: var(--green-soft); border-color: #a7f3d0; color: var(--green); }
+  .chapter.progress .node { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 4px var(--accent-soft); }
+  .chapter.planned .node { color: var(--faint); }
+  .chapter:not(:last-child)::before { content: ''; position: absolute; left: 12.5px; top: 26px; bottom: -2px; width: 1.5px; background: var(--line); }
+  .ch-title { font-weight: 600; font-size: 14px; }
+  .ch-sum { font-size: 12.5px; color: var(--muted); margin: 3px 0 0; }
+  .ms { display: inline-flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 11.5px; background: #f8f9fc; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; }
+  .ms .star { color: #d97706; }
+  .ms .mono { color: var(--accent-ink); font-size: 11px; }
+  .ms .when { color: var(--faint); }
+  .ms.chore .star { color: var(--faint); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* ---------- cards / rows ---------- */
+  .selbar { display: flex; align-items: center; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; padding: 13px 16px; margin-bottom: 16px; }
+  .selbar .sp { flex: 1; }
+  .kb2 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 1400px) { .kb2 { grid-template-columns: repeat(2, 1fr); } }
+  .kcol2 { background: #edeff3; border-radius: 12px; padding: 11px; min-height: 280px; }
+  .kcol2 h5 { margin: 0 0 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); display: flex; justify-content: space-between; }
+  .kcol2.over h5 .cc { color: var(--red); font-weight: 700; }
+  .kc { background: #fff; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; padding: 11px 12px; margin-bottom: 9px; cursor: pointer; }
+  .kc:hover { box-shadow: var(--shadow); }
+  .kc .nm { font-weight: 600; font-size: 13.5px; letter-spacing: -0.01em; }
+  .kc .path { font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-top: 2px; }
+  .kc .mt { font-size: 10.5px; color: var(--muted); margin-top: 7px; display: flex; align-items: center; gap: 7px; }
+  .kc .note { color: #b45309; }
+  .kc.grn { border-left-color: var(--green); } .kc.amb { border-left-color: var(--amber); } .kc.red { border-left-color: var(--red); }
+  .rdot { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 5px; }
+
+  /* ---------- table ---------- */
+  .omni { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; margin-bottom: 14px; background: #fff; }
+  .omni input { flex: 1; border: none; outline: none; font-family: inherit; font-size: 13px; }
+  table.dt2 { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.dt2 th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); padding: 9px 10px; border-bottom: 1px solid var(--line); cursor: pointer; white-space: nowrap; }
+  table.dt2 th:hover { color: var(--accent); }
+  table.dt2 td { padding: 10px; border-bottom: 1px solid var(--line-2); white-space: nowrap; }
+  table.dt2 td.alias { font-weight: 600; font-size: 13px; white-space: normal; min-width: 170px; }
+  table.dt2 td.path { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  table.dt2 tr { cursor: pointer; }
+  table.dt2 tr:hover td { background: #fafbfc; }
+  table.dt2 tr.on td { background: var(--accent-soft); }
+  .mini { display: inline-flex; gap: 2px; vertical-align: middle; }
+  .mini i { width: 12px; height: 5px; border-radius: 2px; background: #e5e7eb; }
+  .mini i.done { background: var(--green); } .mini i.progress { background: var(--accent); }
+
+  /* ---------- queue ---------- */
+  .queue { display: grid; grid-template-columns: 340px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 1100px) { .queue { grid-template-columns: 1fr; } }
+  .qlist { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+  .qgrp { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); font-weight: 700; margin: 13px 8px 6px; display: flex; justify-content: space-between; }
+  .qitem { padding: 10px 11px; border-radius: 9px; cursor: pointer; }
+  .qitem:hover { background: var(--panel-2); }
+  .qitem.on { background: var(--accent-soft); }
+  .qitem .nm { font-weight: 600; font-size: 13px; }
+  .qitem .pt { font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-top: 1px; }
+  .qitem .sn { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .actbtn { display: block; width: 100%; text-align: left; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 10px 12px; font-size: 12.5px; margin-bottom: 8px; }
+  .actbtn:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .pbar { height: 7px; background: #e9ebef; border-radius: 6px; overflow: hidden; }
+  .pbar > i { display: block; height: 100%; background: var(--accent); transition: width .35s ease; }
+
+  /* ---------- runbook ---------- */
+  .stepx { display: flex; gap: 14px; padding: 15px 0; border-bottom: 1px solid var(--line-2); }
+  .stepx .mk { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; flex: 0 0 auto; border: 1.5px solid var(--line); }
+  .stepx.done .mk { background: var(--green-soft); border-color: #a7f3d0; color: var(--green); }
+  .stepx.now .mk { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .stepx .tt { font-weight: 600; font-size: 14px; }
+  .stepx .dd { font-size: 12.8px; color: var(--muted); margin-top: 2px; }
+  .stepx .adv { font-size: 12.8px; background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 8px 11px; margin-top: 9px; color: #312e81; }
+
+  /* ---------- atlas ---------- */
+  .gtrack { position: relative; height: 30px; background: repeating-linear-gradient(90deg,#eceef2,#eceef2 1px,transparent 1px,transparent 9%); border-radius: 7px; }
+  .gblk { position: absolute; top: 5px; height: 20px; border-radius: 5px; color: #fff; font-size: 10px; display: flex; align-items: center; padding: 0 6px; font-family: var(--mono); cursor: pointer; overflow: hidden; white-space: nowrap; }
+  .gblk.on { outline: 2px solid #111; }
+  .mk-star { position: absolute; top: -2px; transform: translateX(-50%); font-size: 13px; cursor: pointer; color: #d97706; }
+  .mrow { display: grid; grid-template-columns: 190px 1fr; gap: 10px; align-items: center; margin-bottom: 9px; }
+  .mrow .lbl { font-size: 12px; font-weight: 600; text-align: right; color: #374151; }
+  .mrow .lbl small { display: block; font-family: var(--mono); font-size: 10px; color: var(--faint); font-weight: 400; }
+  .radar { position: relative; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle at center, #eef2ff, #f7f8fa 72%); border: 1px solid var(--line); margin: 6px auto; overflow: hidden; }
+  .radar .ring { position: absolute; border: 1px solid #e0e3ea; border-radius: 50%; inset: 0; margin: auto; }
+  .radar .sweep { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, rgba(79,70,229,.26), transparent 55%); animation: sweep 4s linear infinite; }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+  .blip { position: absolute; width: 13px; height: 13px; border-radius: 50%; transform: translate(-50%,-50%); cursor: pointer; box-shadow: 0 0 0 3px rgba(255,255,255,.7); }
+  .blip.on { outline: 3px solid #111; }
+  .blip .tag { position: absolute; left: 16px; top: -4px; font-size: 10px; font-family: var(--mono); color: #4b5563; background: rgba(255,255,255,.9); border-radius: 4px; padding: 0 4px; white-space: nowrap; }
+  .axl { position: absolute; font-size: 10px; color: var(--faint); font-family: var(--mono); }
+  svg .edge { stroke: #ccd1dc; stroke-width: 1.5; } svg .edge.hi { stroke: #6366f1; stroke-width: 3; }
+  svg .node { stroke: #fff; stroke-width: 2; cursor: pointer; } svg .node.on { stroke: #111; stroke-width: 3; }
+  svg text { font-family: var(--mono); font-size: 9.5px; fill: #4b5563; }
+  .legend { display: flex; gap: 15px; flex-wrap: wrap; padding: 12px 4px; font-size: 12px; color: var(--muted); }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+
+<div class="proto-banner">PROTOTYPE · <b>Bearing main interface v2</b> — named branches, personal notes, agent chapters &amp; milestones. Use ← / → or the bottom bar.</div>
+
+<div class="app">
+  <div class="appbar">
+    <div class="brand"><span class="dm"></span>Bearing <small>main interface</small></div>
+    <div class="switcher"><label>Dashboard</label><select id="vsel"></select></div>
+    <div class="ctx"><span class="ctxchip"><span class="d"></span>scope: <b id="ctxlabel">all repos</b></span></div>
+  </div>
+  <div class="shell">
+    <aside class="side" id="side"></aside>
+    <main class="main" id="main"></main>
+    <aside class="rail" id="rail"></aside>
+  </div>
+</div>
+
+<div class="proto-bar">
+  <button id="pvar">‹</button><span class="lab" id="plab"></span><button id="nvar">›</button>
+  <span class="hint">← → to switch</span>
+</div>
+
+<script src="data.js"></script>
+<script src="advisor.js"></script>
+<script>
+const D = window.BEARING;
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const BR = [];
+D.repos.forEach(r => r.branches.forEach(b => BR.push(Object.assign({}, b, { repo: r.name, id: r.name + '/' + b.name }))));
+const RC = { 'api-service': '#4f46e5', 'web-app': '#0891b2', 'mobile': '#059669', 'docs-site': '#db2777' };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const byId = id => BR.find(b => b.id === id);
+const stateOf = b => b.flags.includes('merge_ready') ? ['Merge-ready', 'b-green'] : b.flags.includes('diverged') ? ['Diverged', 'b-red'] : b.flags.includes('ci_failing') ? ['CI failing', 'b-red'] : b.flags.includes('in_review') ? ['In review', 'b-cyan'] : b.flags.includes('stale') ? ['Stale', 'b-amber'] : ['Active', 'b-accent'];
+const colOf = b => b.flags.includes('merge_ready') ? 'ready' : b.flags.includes('in_review') ? 'review' : (b.flags.includes('stale') || b.flags.includes('diverged')) ? 'stale' : 'progress';
+const progressOf = b => { const c = b.chapters || []; const done = c.filter(x => x.state === 'done').length; return { done, total: c.length, pct: c.length ? done / c.length : 0 }; };
+const meter = b => { const p = progressOf(b); return `<span class="mini">${(b.chapters || []).map(c => `<i class="${c.state}"></i>`).join('')}</span>`; };
+
+const state = { variant: 'A', repo: 'all', view: 'all', q: '', sort: { c: 'last', dir: 1 }, selected: null, atlas: 'timeline', routine: 'morning', step: 0, done: {} };
+
+function currentContext() {
+  if (state.variant === 'D') { const r = ROUTINES[state.routine]; const s = r.steps[state.step]; return { type: 'step', label: r.name + ' · ' + s.t }; }
+  if (state.selected) { const b = byId(state.selected); if (b) return { type: 'branch', repo: b.repo, branch: b.name, label: b.alias }; return { type: 'file', repo: 'api-service', label: state.selected }; }
+  return { type: 'workspace', label: state.repo === 'all' ? 'all repos' : state.repo };
+}
+
+/* ================= the hierarchical dossier ================= */
+function dossier(b, opts) {
+  opts = opts || {};
+  const s = stateOf(b), p = progressOf(b);
+  const chapters = (b.chapters || []).map(c => `
+    <li class="chapter ${c.state}">
+      <div class="node">${c.state === 'done' ? '✓' : c.state === 'progress' ? '→' : ''}</div>
+      <div>
+        <div class="ch-title">${esc(c.title)}</div>
+        <p class="ch-sum">${esc(c.summary)}</p>
+        ${(c.milestones || []).map(m => `<div class="ms ${m.kind === 'chore' ? 'chore' : ''}"><span class="star">${m.kind === 'chore' ? '◇' : '★'}</span> ${esc(m.label)} <span class="mono">${m.sha}</span> <span class="when">${DAYS[m.day] || ''}</span></div>`).join('')}
+      </div>
+    </li>`).join('');
+  return `<div class="dossier">
+    ${opts.back ? `<div style="margin-bottom:14px"><button class="btn sm" data-back="1">← ${opts.back}</button></div>` : ''}
+    <div class="dos-hd">
+      ${opts.eyebrow ? `<div class="eyebrow">${esc(opts.eyebrow)}</div>` : ''}
+      <div class="dos-name">${esc(b.alias || b.name)}</div>
+      <div class="dos-path">${b.repo} / ${b.name} · from ${b.base} · last ${b.last} ago</div>
+      <div class="dos-row"><span class="badge ${s[1]}">${s[0]}</span>${b.pr ? `<span class="badge b-cyan">PR #${b.pr.number}</span>` : '<span class="badge b-grey">no PR</span>'}<span class="badge b-grey">ahead ${b.ahead} · behind ${b.behind}</span><span class="badge b-grey">+${b.diff.add} −${b.diff.del}</span></div>
+      <div class="meter">${(b.chapters || []).map(c => `<i class="${c.state}"></i>`).join('')}</div>
+    </div>
+    <div class="dos-note" style="margin-top:18px"><div class="k">Your note</div><p>${esc(b.notes || '—')}</p></div>
+    <div class="dos-label">Chapters <span class="ai">agent-generated</span><span class="prog">${p.done} of ${p.total} done</span></div>
+    <ul class="chapters">${chapters}</ul>
+    <div class="dos-label">Activity</div>
+    ${b.commits.map(c => `<div class="commit">${esc(c)}</div>`).join('')}
+    <div class="chips" style="margin-top:14px"><button class="btn sm" data-ask="Summarize this branch">✦ Explain</button><button class="btn sm" data-ask="What should I do next?">What's next?</button><button class="btn sm">Edit note</button></div>
+  </div>`;
+}
+function bindDossier() {
+  document.querySelectorAll('[data-back]').forEach(x => x.addEventListener('click', () => { state.selected = null; render(); }));
+  document.querySelectorAll('[data-ask]').forEach(x => x.addEventListener('click', e => { e.stopPropagation(); advisor.ask(x.dataset.ask); }));
+}
+
+/* ================= shared sidebar ================= */
+function repoSide() {
+  const items = [`<div class="item ${state.repo === 'all' ? 'on' : ''}" data-repo="all"><span class="sw" style="background:#4f46e5"></span>All repos<span class="n">${BR.length}</span></div>`];
+  D.repos.forEach(r => items.push(`<div class="item ${state.repo === r.id ? 'on' : ''}" data-repo="${r.id}"><span class="sw" style="background:${RC[r.id]}"></span>${r.name}<span class="n">${r.branches.length}</span></div>`));
+  return `<div class="grp">Repos</div>${items.join('')}<div class="foot">machine <span class="m">laptop-1</span><br>journal synced 4m ago · 2 machines</div>`;
+}
+function bindRepoSide() { document.querySelectorAll('#side [data-repo]').forEach(n => n.addEventListener('click', () => { state.repo = n.dataset.repo; state.selected = null; render(); })); }
+
+/* ================= Variant A · BOARD ================= */
+const A = {
+  key: 'A', name: 'Board — focus',
+  side: repoSide,
+  main() {
+    if (state.selected) { const b = byId(state.selected); return dossier(b, { back: 'Board', eyebrow: 'Selected branch' }); }
+    const list = BR.filter(b => (state.repo === 'all' || b.repo === state.repo) && (state.view === 'all' || colOf(b) === state.view));
+    const cols = { progress: 'In progress', review: 'In review', ready: 'Merge-ready', stale: 'Stale · decide' };
+    const board = ['progress', 'review', 'ready', 'stale'].map(c => {
+      const cards = list.filter(b => colOf(b) === c);
+      return `<div class="kcol2 ${c === 'progress' && cards.length > 3 ? 'over' : ''}"><h5>${cols[c]} <span class="cc">${cards.length}${c === 'progress' ? ' / 3' : ''}</span></h5>${cards.map(kcard).join('') || '<div class="tiny muted" style="padding:6px">—</div>'}</div>`;
+    }).join('');
+    return `<div class="page-hd"><div><div class="eyebrow">Delivery board</div><h1>What is in flight</h1><div class="sub">Click a branch to open its chapters</div></div><div class="tools">${A.filters()}</div></div>${board}`;
+  },
+  filters() { return [['all', 'All'], ['progress', 'In progress'], ['review', 'In review'], ['ready', 'Merge-ready'], ['stale', 'Stale']].map(([k, l]) => `<button class="chip ${state.view === k ? 'on' : ''}" data-view="${k}">${l}</button>`).join(''); },
+  wire() {
+    bindRepoSide(); bindDossier();
+    document.querySelectorAll('#main [data-view]').forEach(b => b.addEventListener('click', () => { state.view = b.dataset.view; render(); }));
+    document.querySelectorAll('#main [data-id]').forEach(c => c.addEventListener('click', () => { state.selected = c.dataset.id; render(); }));
+  }
+};
+function kcard(b) {
+  const cls = b.flags.includes('merge_ready') ? 'grn' : (b.flags.includes('ci_failing') || b.flags.includes('diverged')) ? 'red' : b.flags.includes('stale') ? 'amb' : '';
+  const p = progressOf(b);
+  return `<div class="kc ${cls}" data-id="${b.id}">
+    <div class="nm">${esc(b.alias || b.name)}</div>
+    <div class="path">${b.repo} / ${b.name}</div>
+    <div class="mt">${meter(b)} <span>${p.done}/${p.total} chapters</span>${b.notes ? '<span class="note" title="has a note">✎</span>' : ''}</div>
+  </div>`;
+}
+
+/* ================= Variant B · QUERY ================= */
+const VIEWS = { all: 'All branches', active: 'Active', stale: 'My stale', ci_failing: 'CI failing', merge_ready: 'Ready to merge' };
+const B = {
+  key: 'B', name: 'Query — dossier',
+  side() { return `<div class="grp">Saved views</div>` + Object.entries(VIEWS).map(([k, l]) => `<div class="item ${state.view === k ? 'on' : ''}" data-view="${k}"><span class="sw" style="background:${k === 'all' ? '#4f46e5' : k === 'stale' ? '#b45309' : k === 'ci_failing' ? '#dc2626' : k === 'merge_ready' ? '#059669' : '#0891b2'}"></span>${l}<span class="n">${countView(k)}</span></div>`).join('') + `<div class="grp">Repos</div>` + D.repos.map(r => `<div class="item ${state.repo === r.id ? 'on' : ''}" data-repo="${r.id}"><span class="sw" style="background:${RC[r.id]}"></span>${r.name}</div>`).join('') + `<div class="foot">views feed the table · ask the advisor anything</div>`; },
+  main() {
+    const rows = B.rows();
+    const body = state.selected ? `<div class="panelbox" style="margin-top:16px;padding:20px 22px">${dossier(byId(state.selected), { back: 'Table', eyebrow: 'Selected branch' })}</div>` : '';
+    return `<div class="page-hd"><div><div class="eyebrow">Branches</div><h1>Every branch, interrogated</h1><div class="sub">${rows.length} rows · click a row to read its chapters</div></div><div class="tools"><span class="badge b-accent">view: ${VIEWS[state.view]}</span></div></div>
+      <div class="omni"><span>⌕</span><input id="q" placeholder="Filter by name, branch, or note — e.g. “retry”" value="${esc(state.q)}" /><span class="k kbd">⌘K</span></div>
+      <div class="panelbox" style="overflow-x:auto"><table class="dt2"><thead><tr>${[['alias', 'Name'], ['repo', 'Repo'], ['state', 'State'], ['progress', 'Chapters'], ['behind', 'Behind'], ['last', 'Last']].map(([c, l]) => `<th data-sort="${c}">${l} ${state.sort.c === c ? (state.sort.dir > 0 ? '▲' : '▼') : ''}</th>`).join('')}</tr></thead><tbody>${rows.map(row).join('')}</tbody></table></div>${body}`;
+  },
+  rows() {
+    let list = BR.filter(b => state.repo === 'all' || b.repo === state.repo);
+    if (state.view !== 'all') list = list.filter(b => b.flags.includes(state.view));
+    if (state.q) { const q = state.q.toLowerCase(); list = list.filter(b => (b.id + ' ' + b.alias + ' ' + b.wip + ' ' + (b.notes || '')).toLowerCase().includes(q)); }
+    const key = { alias: b => (b.alias || ''), repo: b => b.repo, state: b => colOf(b), progress: b => progressOf(b).pct, behind: b => b.behind, last: b => parseFloat(b.last) }[state.sort.c];
+    return list.sort((x, y) => (key(x) > key(y) ? 1 : key(x) < key(y) ? -1 : 0) * state.sort.dir);
+  },
+  wire() {
+    document.querySelectorAll('#side [data-view]').forEach(n => n.addEventListener('click', () => { state.view = n.dataset.view; render(); }));
+    bindRepoSide(); bindDossier();
+    document.querySelectorAll('#main th[data-sort]').forEach(th => th.addEventListener('click', () => { const c = th.dataset.sort; state.sort = { c, dir: state.sort.c === c ? -state.sort.dir : 1 }; render(); }));
+    const qi = document.getElementById('q'); qi.addEventListener('input', () => { state.q = qi.value; const p = qi.selectionStart; render(); const n = document.getElementById('q'); n.focus(); n.setSelectionRange(p, p); });
+    document.querySelectorAll('#main tr[data-id]').forEach(tr => tr.addEventListener('click', () => { state.selected = tr.dataset.id === state.selected ? null : tr.dataset.id; render(); }));
+  }
+};
+function countView(k) { return BR.filter(b => state.repo === 'all' || b.repo === state.repo).filter(b => k === 'all' || b.flags.includes(k)).length; }
+function row(b) { const s = stateOf(b), p = progressOf(b); return `<tr data-id="${b.id}" class="${state.selected === b.id ? 'on' : ''}"><td class="alias">${esc(b.alias || b.name)}</td><td class="path">${b.repo}/${b.name}</td><td><span class="badge ${s[1]}">${s[0]}</span></td><td>${meter(b)} <span class="tiny muted">${p.done}/${p.total}</span></td><td>${b.behind}</td><td>${b.last}</td></tr>`; }
+
+/* ================= Variant C · QUEUE ================= */
+function qGroup(b) { if (b.flags.includes('stale') || b.flags.includes('diverged')) return 'Needs a decision'; if (b.flags.includes('ci_failing')) return 'CI failing'; if (b.flags.includes('merge_ready')) return 'Ready to merge'; if (b.flags.includes('in_review')) return 'In review'; return 'Active'; }
+function qAction(b) { if (b.flags.includes('stale') || b.flags.includes('diverged')) return 'Close as superseded'; if (b.flags.includes('ci_failing')) return 'Fix CI now'; if (b.flags.includes('merge_ready')) return 'Merge'; if (b.flags.includes('in_review')) return 'Address review'; return 'Park with a note'; }
+const C = {
+  key: 'C', name: 'Queue — triage',
+  side() { const total = BR.length, left = BR.filter(b => !state.done[b.id]).length; return `<div class="grp">Triage</div><div style="padding:8px 10px"><div class="small muted" style="margin-bottom:6px">${total - left} of ${total} processed</div><div class="pbar"><i style="width:${((total - left) / total * 100)}%"></i></div></div><div class="item on">Inbox <span class="n">${left}</span></div><div class="grp">Repos</div>${D.repos.map(r => `<div class="item" data-repo="${r.id}"><span class="sw" style="background:${RC[r.id]}"></span>${r.name}<span class="n">${BR.filter(b => b.repo === r.id && !state.done[b.id]).length}</span></div>`).join('')}<div class="foot">process to zero · nothing auto-runs</div>`; },
+  main() {
+    const list = BR.filter(b => !state.done[b.id] && (state.repo === 'all' || b.repo === state.repo));
+    const groups = ['Needs a decision', 'CI failing', 'Ready to merge', 'In review', 'Active'];
+    const leftList = groups.map(g => { const items = list.filter(b => qGroup(b) === g); return items.length ? `<div class="qgrp">${g}<span>${items.length}</span></div>` + items.map(b => `<div class="qitem ${state.selected === b.id ? 'on' : ''}" data-id="${b.id}"><div class="nm">${esc(b.alias || b.name)}</div><div class="pt">${b.repo}/${b.name}</div></div>`).join('') : ''; }).join('');
+    const sel = state.selected ? byId(state.selected) : list[0];
+    return `<div class="page-hd"><div><div class="eyebrow">Triage inbox</div><h1>${list.length} items to clear</h1><div class="sub">Process to zero — each action is a proposal</div></div></div>
+      <div class="queue"><div class="qlist">${leftList || '<div class="empty">Inbox zero 🎉</div>'}</div><div class="panelbox" style="padding:20px 22px">${sel ? queueDossier(sel) : '<div class="empty">Nothing left to triage.</div>'}</div></div>`;
+  },
+  wire() { bindRepoSide(); bindDossier(); document.querySelectorAll('#main .qitem').forEach(n => n.addEventListener('click', () => { state.selected = n.dataset.id; render(); })); document.querySelectorAll('#main [data-act]').forEach(btn => btn.addEventListener('click', () => { state.done[btn.dataset.act] = true; if (state.selected === btn.dataset.act) state.selected = null; render(); })); }
+};
+function queueDossier(b) {
+  const s = stateOf(b), p = progressOf(b);
+  return `<div class="dos-hd"><div class="eyebrow">Resolve this</div><div class="dos-name">${esc(b.alias || b.name)}</div><div class="dos-path">${b.repo}/${b.name} · last ${b.last} · ahead ${b.ahead} / behind ${b.behind}</div><div class="dos-row"><span class="badge ${s[1]}">${s[0]}</span>${b.pr ? `<span class="badge b-cyan">PR #${b.pr.number}</span>` : ''}<span class="badge b-grey">${p.done}/${p.total} chapters</span></div><div class="meter">${(b.chapters || []).map(c => `<i class="${c.state}"></i>`).join('')}</div></div>
+    <div class="dos-note" style="margin-top:16px"><div class="k">Your note</div><p>${esc(b.notes || '—')}</p></div>
+    <div class="dos-label">Chapters <span class="ai">agent-generated</span></div>
+    <ul class="chapters">${(b.chapters || []).map(c => `<li class="chapter ${c.state}"><div class="node">${c.state === 'done' ? '✓' : c.state === 'progress' ? '→' : ''}</div><div><div class="ch-title">${esc(c.title)}</div><p class="ch-sum">${esc(c.summary)}</p>${(c.milestones || []).map(m => `<div class="ms ${m.kind === 'chore' ? 'chore' : ''}"><span class="star">${m.kind === 'chore' ? '◇' : '★'}</span> ${esc(m.label)} <span class="mono">${m.sha}</span> <span class="when">${DAYS[m.day] || ''}</span></div>`).join('')}</div></li>`).join('')}</ul>
+    <div class="dos-label">Resolve</div>
+    <button class="actbtn" data-act="${b.id}"><b>${qAction(b)}</b><br><span class="muted">${esc(b.next)}</span></button>
+    <button class="actbtn" data-act="${b.id}"><b>Park with a note</b><br><span class="muted">Resurface in the next brief.</span></button>`;
+}
+
+/* ================= Variant D · RUNBOOK ================= */
+const ROUTINES = {
+  morning: { name: 'Morning re-entry', desc: 'Cold start to first productive action in under a minute.', steps: [
+    { t: 'Reconstruct last session', d: 'Read the local reflog to see where you stopped.', adv: 'You stopped in <b>Webhook signatures</b> 47m ago: signatures done, retry stubbed.' },
+    { t: 'Check what is merge-ready', d: 'Scan for green branches you can close.', adv: '2 branches are ready: <b>Sliding-window rate limit</b> and <b>Cold-start crash fix</b>. Merging both shrinks the board.' },
+    { t: 'Resolve the blocking item', d: 'Find the one thing stopping progress.', adv: 'CI on <b>Webhook signatures</b> is failing (2 tests). Want the diffs?' },
+    { t: 'Park today’s intent', d: 'Write one line so tomorrow is instant.', adv: 'Try: “finish retry path + tests, then merge rate-limit.”' } ] },
+  hygiene: { name: 'Weekly hygiene', desc: 'Shrink the branch fleet and clear decision debt.', steps: [
+    { t: 'List stale branches', d: 'Anything untouched past the threshold.', adv: '2 stale: <b>Predictive-back nav</b> (9d) and <b>Dependency bump</b> (6d).' },
+    { t: 'Decide each stale branch', d: 'Keep, rebase, or close.', adv: 'Dependency bump looks superseded by #503 → close. Predictive-back nav needs a real decision.' },
+    { t: 'Confirm safe-to-delete', d: 'Merged or no unique commits.', adv: '2 branches are safe to delete; nothing is removed automatically.' },
+    { t: 'Review conflict risk', d: 'Branches far behind main.', adv: 'Predictive-back nav is 41 behind — rebasing now costs less than later.' },
+    { t: 'Re-check WIP limits', d: 'Are too many things open?', adv: 'You are at 3 in progress. Hold until one merges.' } ] },
+  premerge: { name: 'Pre-merge check', desc: 'Everything that should be true before you merge.', steps: [
+    { t: 'Verify CI is green', d: 'No failing checks.', adv: 'Cold-start crash fix: CI green, verified on device. Clear to merge.' },
+    { t: 'Confirm reviews', d: 'Required approvals present.', adv: '1 approval on #133. Good to go.' },
+    { t: 'Check the diff one last time', d: 'No accidental files.', adv: 'Diff is +18 −6 across 2 files — clean.' } ] }
+};
+const Dv = {
+  key: 'D', name: 'Conductor — routines',
+  side() { return `<div class="grp">Routines</div>` + Object.entries(ROUTINES).map(([k, r]) => `<div class="item ${state.routine === k ? 'on' : ''}" data-routine="${k}"><span>${k === 'morning' ? '☀️' : k === 'hygiene' ? '🧹' : '✅'}</span>${r.name}<span class="n">${r.steps.length}</span></div>`).join('') + `<div class="foot">guided process · advisor assists each step</div>`; },
+  main() {
+    const r = ROUTINES[state.routine];
+    const steps = r.steps.map((s, i) => { const cls = i < state.step ? 'done' : i === state.step ? 'now' : ''; return `<div class="stepx ${cls}"><div class="mk">${i < state.step ? '✓' : i === state.step ? '→' : i + 1}</div><div><div class="tt">${s.t}</div><div class="dd">${s.d}</div>${i === state.step ? `<div class="adv">✦ ${s.adv}</div>` : ''}</div></div>`; }).join('');
+    const pct = Math.round(state.step / r.steps.length * 100);
+    return `<div class="page-hd"><div><div class="eyebrow">Routine</div><h1>${r.name}</h1><div class="sub">${r.desc}</div></div><div class="tools"><button class="btn sm" data-nav="-1" ${state.step === 0 ? 'disabled' : ''}>← Back</button><button class="btn primary sm" data-nav="1" ${state.step >= r.steps.length - 1 ? 'disabled' : ''}>Next step →</button></div></div>
+      <div class="panelbox" style="padding:16px 20px"><div class="pbar" style="margin-bottom:16px"><i style="width:${pct}%"></i></div>${steps}</div>`;
+  },
+  wire() { document.querySelectorAll('#side [data-routine]').forEach(n => n.addEventListener('click', () => { state.routine = n.dataset.routine; state.step = 0; render(); })); document.querySelectorAll('#main [data-nav]').forEach(b => b.addEventListener('click', () => { state.step = Math.max(0, Math.min(ROUTINES[state.routine].steps.length - 1, state.step + Number(b.dataset.nav))); render(); })); }
+};
+
+/* ================= Variant E · ATLAS ================= */
+const E = {
+  key: 'E', name: 'Atlas — evolution',
+  side() { return `<div class="grp">Views</div>` + [['timeline', 'Session timeline'], ['evolution', 'Branch evolution'], ['radar', 'Flight deck'], ['graph', 'Coupling graph']].map(([k, l]) => `<div class="item ${state.atlas === k ? 'on' : ''}" data-atlas="${k}">${l}</div>`).join('') + `<div class="grp">Repos</div>${D.repos.map(r => `<div class="item" data-repo="${r.id}"><span class="sw" style="background:${RC[r.id]}"></span>${r.name}</div>`).join('')}<div class="foot">click any mark to scope the advisor</div>`; },
+  main() { if (state.atlas === 'timeline') return E.timeline(); if (state.atlas === 'evolution') return E.evolution(); if (state.atlas === 'radar') return E.radar(); return E.graph(); },
+  timeline() {
+    const rows = [['Webhook signatures', 'api-service/feat/webhooks', [[9, 26, 'ga'], [52, 30, 'ga']]], ['Auth token rotation', 'web-app/fix/auth-refresh', [[30, 18, 'gb'], [78, 12, 'gb']]], ['Billing portal', 'web-app/feat/billing-portal', [[44, 22, 'gd']]], ['Docs site revamp', 'docs-site/site-revamp', [[66, 10, 'gc']]], ['Predictive-back nav', 'mobile/exp/new-nav', [[2, 6, 'gd']]]];
+    return `<div class="page-hd"><div><div class="eyebrow">Atlas · timeline</div><h1>Where the time went</h1><div class="sub">last 7 days · reconstructed from the local reflog</div></div></div>
+      <div class="panelbox" style="padding:16px"><div class="mrow"><div></div><div class="tiny muted" style="display:flex;justify-content:space-between">${DAYS.map(d => `<span>${d}</span>`).join('')}</div></div>
+      ${rows.map(([alias, id, blocks]) => `<div class="mrow"><div class="lbl">${alias}<small>${id.split('/')[1]}</small></div><div class="gtrack">${blocks.map(([l, w, c]) => `<div class="gblk ${c}" style="left:${l}%;width:${w}%" data-id="${id}">${alias.split(' ')[0]}</div>`).join('')}</div></div>`).join('')}</div>`;
+  },
+  evolution() {
+    const rows = BR.filter(b => state.repo === 'all' || b.repo === state.repo);
+    return `<div class="page-hd"><div><div class="eyebrow">Atlas · branch evolution</div><h1>How each branch grew</h1><div class="sub">★ = a feature was committed · ◇ = smaller commit · click a branch to read its chapters</div></div></div>
+      <div class="panelbox" style="padding:18px"><div class="mrow"><div></div><div class="tiny muted" style="display:flex;justify-content:space-between">${DAYS.map(d => `<span>${d}</span>`).join('')}</div></div>
+      ${rows.map(b => `<div class="mrow"><div class="lbl">${esc(b.alias)}<small>${b.repo}</small></div><div class="gtrack">${(b.chapters || []).flatMap(c => (c.milestones || []).map(m => `<span class="mk-star ${m.kind === 'chore' ? 'chore' : ''}" style="left:${(m.day / 7) * 100 + 4}%" data-id="${b.id}" title="${esc(m.label)} · ${m.sha}">${m.kind === 'chore' ? '◇' : '★'}</span>`)).join('')}</div></div>`).join('')}
+      <div class="legend" style="padding-bottom:0"><span><span style="color:#d97706">★</span> feature committed</span><span><span style="color:#9aa1ad">◇</span> supporting commit</span></div></div>
+      ${state.selected ? `<div class="panelbox" style="margin-top:16px;padding:20px 22px">${dossier(byId(state.selected), { back: 'Evolution', eyebrow: 'Selected branch' })}</div>` : ''}`;
+  },
+  radar() {
+    const blips = [['api-service/feat/webhooks', 38, 74, '#4f46e5'], ['api-service/fix/rate-limit', 64, 70, '#4f46e5'], ['web-app/fix/auth-refresh', 46, 40, '#0891b2'], ['web-app/feat/billing-portal', 30, 30, '#0891b2'], ['mobile/fix/crash-on-start', 22, 22, '#059669'], ['docs-site/site-revamp', 74, 34, '#db2777'], ['mobile/exp/new-nav', 82, 18, '#059669']];
+    return `<div class="page-hd"><div><div class="eyebrow">Atlas · flight deck</div><h1>What needs attention</h1><div class="sub">distance = staleness · horizontal = merge risk</div></div></div>
+      <div style="display:grid;grid-template-columns:1fr 300px;gap:16px"><div class="panelbox" style="padding:12px"><div class="radar"><div class="sweep"></div><div class="ring" style="inset:12%"></div><div class="ring" style="inset:32%"></div><div class="ring" style="inset:52%"></div><div class="axl" style="left:8px;bottom:8px">recent · low risk</div><div class="axl" style="right:8px;top:8px">stale · high risk</div>${blips.map(([id, x, y, c]) => { const b = byId(id); return `<div class="blip ${state.selected === id ? 'on' : ''}" style="left:${x}%;top:${y}%;background:${c}" data-id="${id}"><span class="tag">${b ? b.alias.split(' ')[0] : ''}</span></div>`; }).join('')}</div></div>
+        <div class="panelbox" style="padding:14px"><div class="dos-label" style="margin-top:0">Attention</div><div class="qitem"><div class="nm">Predictive-back nav</div><div class="sn">stale &amp; high merge risk</div></div><div class="qitem"><div class="nm">Webhook signatures</div><div class="sn">CI failing · 47m ago</div></div><div class="qitem"><div class="nm">2 merge-ready</div><div class="sn">rate limit · crash fix</div></div></div></div>`;
+  },
+  graph() {
+    const nodes = [['webhooks/verify.py', 290, 60, '#4f46e5'], ['webhooks/delivery.py', 170, 150, '#4f46e5'], ['webhooks/retry.py', 300, 110, '#4f46e5'], ['db/models.py', 400, 160, '#4f46e5'], ['db/migrations.py', 120, 300, '#4f46e5'], ['api/routes.py', 500, 235, '#0891b2'], ['ratelimit.py', 560, 110, '#0891b2'], ['auth/tokens.py', 690, 95, '#059669'], ['webhooks_test.py', 680, 290, '#d97706'], ['test_util.py', 620, 268, '#d97706']];
+    const edges = [[0, 1, 1], [2, 3, 1], [1, 3, 1], [3, 5, 0], [5, 6, 0], [8, 9, 0]];
+    return `<div class="page-hd"><div><div class="eyebrow">Atlas · coupling</div><h1>What changes together</h1><div class="sub">files linked by shared history · the webhooks cluster is your conflict hotspot</div></div></div>
+      <div class="panelbox" style="padding:10px"><svg viewBox="0 0 760 360" width="100%"><ellipse cx="290" cy="140" rx="185" ry="95" fill="none" stroke="#8b93ff" stroke-dasharray="5 5"/><text x="150" y="42" fill="#6366f1" style="font-size:12px;font-weight:700">webhooks cluster</text>${edges.map(([a, b, s]) => `<line class="edge ${s ? 'hi' : ''}" x1="${nodes[a][1]}" y1="${nodes[a][2]}" x2="${nodes[b][1]}" y2="${nodes[b][2]}"/>`).join('')}${nodes.map(([label, x, y, c]) => `<circle class="node" cx="${x}" cy="${y}" r="10" fill="${c}"/><text x="${x + 14}" y="${y + 4}">${label.split('/').pop()}</text>`).join('')}</svg></div>`;
+  },
+  wire() { document.querySelectorAll('#side [data-atlas]').forEach(n => n.addEventListener('click', () => { state.atlas = n.dataset.atlas; state.selected = null; render(); })); bindRepoSide(); bindDossier(); document.querySelectorAll('#main [data-id]').forEach(n => n.addEventListener('click', e => { e.stopPropagation(); state.selected = n.dataset.id === state.selected ? null : n.dataset.id; render(); })); }
+};
+
+const VARIANTS = { A, B, C, D: Dv, E };
+
+/* ================= shell ================= */
+const sideEl = document.getElementById('side'), mainEl = document.getElementById('main'), railEl = document.getElementById('rail');
+const ctxLabel = document.getElementById('ctxlabel'), vsel = document.getElementById('vsel');
+vsel.innerHTML = Object.values(VARIANTS).map(v => `<option value="${v.key}">${v.key} · ${v.name}</option>`).join('');
+vsel.addEventListener('change', () => setVariant(vsel.value));
+const advisor = BearingAdvisor.mount(railEl, { getContext: currentContext });
+
+function render() {
+  const v = VARIANTS[state.variant];
+  sideEl.innerHTML = v.side();
+  mainEl.innerHTML = v.main();
+  v.wire();
+  advisor.refresh();
+  ctxLabel.textContent = currentContext().label;
+  vsel.value = state.variant;
+  document.getElementById('plab').innerHTML = `<b>${v.key}</b> · ${v.name}`;
+}
+function setVariant(k) { if (!VARIANTS[k]) k = 'A'; state.variant = k; state.selected = null; history.replaceState(null, '', '?variant=' + k); render(); }
+document.getElementById('pvar').addEventListener('click', () => cycle(-1));
+document.getElementById('nvar').addEventListener('click', () => cycle(1));
+function cycle(d) { const keys = Object.keys(VARIANTS); const i = (keys.indexOf(state.variant) + d + keys.length) % keys.length; setVariant(keys[i]); }
+document.addEventListener('keydown', e => { const tag = (document.activeElement || {}).tagName; if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement.isContentEditable) return; if (e.key === 'ArrowLeft') cycle(-1); if (e.key === 'ArrowRight') cycle(1); });
+setVariant(new URLSearchParams(location.search).get('variant') || 'A');
+</script>
+</body>
+</html>
