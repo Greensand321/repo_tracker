@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bearing"
+version = "0.0.0"
+description = "Reconstructs your working context across many branches and repos."
+requires-python = ">=3.11"
+dependencies = []          # stdlib only — see docs/decisions/decision-log.md #2
+
+[project.scripts]
+bearing = "bearing.cli:main"
+
+[tool.setuptools]
+packages = ["bearing"]

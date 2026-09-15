@@ -3,6 +3,13 @@
 **Status:** ready for implementation handoff · **Date:** 13 Sep 2026 · **Plan version:** 1.0
 **Companion documents:** `bearing-spec.html` (product spec v0.3, same folder), prototype GUI (`bearing-prototype.html` + `bearing.css` + `bearing.js`, same folder).
 
+> **Repo note (added 15 Sep 2026, during the repo reorganization).** Two things below are
+> out of date, and are corrected in [`README.md`](README.md) rather than edited into this
+> plan: §3 says to create a fresh repository — that is now *this* repo (`repo_tracker`),
+> with the §3 module layout rooted at `bearing/` — and the companion files are no longer in
+> one flat folder (spec → `../spec/bearing-spec-v0.3.html`, prototype → `../design/prototype/`).
+> Everything else stands as written.
+
 This document is written for an implementing agent with no prior context. It is intentionally explicit: exact commands, exact schemas, exact thresholds. Where a choice is already made, it states the choice; where the implementer must decide, it says so and bounds the decision.
 
 ---
