@@ -2,9 +2,20 @@
  * The advisor's connection to the outside world. The second I/O boundary, alongside
  * server/github.ts.
  *
- * OpenAI-compatible chat completions, against OpenCode Zen by default (D32). Written
- * against the wire format rather than a vendor SDK because the endpoint is deliberately
- * swappable — the same code reaches any OpenAI-compatible provider by changing a setting.
+ * Written against the wire format rather than a vendor SDK because the endpoint is
+ * deliberately swappable — pointing at a different provider is a settings change.
+ *
+ * **Three protocols, not one.** OpenCode Zen (D32) routes model families to different
+ * endpoints, and sending a Claude model to `/chat/completions` fails with a flat
+ * "Model is unavailable":
+ *
+ *   /v1/chat/completions   DeepSeek, GLM, Kimi, MiniMax, Big Pickle, Nemotron, …
+ *   /v1/messages           Claude, Qwen, Union Alpha        (Anthropic shape)
+ *   /v1/responses          GPT, Grok, Muse Spark            (OpenAI Responses shape)
+ *
+ * The model ID picks the first guess; if that is wrong we try the others and remember
+ * what worked, so a mis-guess costs one extra request per model per run and never
+ * strands you on a model that would have been fine.
  *
  * Deliberately NOT using `response_format: json_object`: Zen fronts 100+ models of
  * varying capability and the ones that reject that parameter fail the whole request.
@@ -31,45 +42,185 @@ export type CompletionRequest = {
   maxTokens?: number;
 };
 
+export type Protocol = 'chat' | 'messages' | 'responses';
+
+/** What worked last time, per model. Avoids re-probing on every branch. */
+const learned = new Map<string, Protocol>();
+
+/** Exported for tests; resets the learned routing. */
+export function forgetProtocols(): void {
+  learned.clear();
+}
+
+/**
+ * First guess from the model ID. Wrong guesses are recovered from, so this only has to
+ * be right often enough to save a request.
+ */
+export function guessProtocol(model: string): Protocol {
+  const id = model.toLowerCase();
+  if (/(^|\/)(claude|qwen|union)/.test(id)) return 'messages';
+  if (/(^|\/)(gpt|grok|muse|o[0-9])/.test(id)) return 'responses';
+  return 'chat';
+}
+
+const ALL: Protocol[] = ['chat', 'messages', 'responses'];
+
 export async function complete(settings: Settings, request: CompletionRequest): Promise<string> {
   if (!settings.llmApiKey) throw new LlmError('no API key set');
   if (!settings.llmModel) throw new LlmError('no model chosen');
 
-  const body = {
-    model: settings.llmModel,
-    max_tokens: request.maxTokens ?? 700,
-    temperature: 0.2, // the same branch should not describe itself differently each run
-    messages: [
-      { role: 'system', content: request.system },
-      { role: 'user', content: request.user },
-    ],
-  };
+  const model = settings.llmModel;
+  const known = learned.get(model);
+  const order = known ? [known] : [guessProtocol(model), ...ALL.filter((p) => p !== guessProtocol(model))];
+
+  const tried: string[] = [];
+  let lastError: LlmError | null = null;
+
+  for (const protocol of order) {
+    try {
+      const text = await callProtocol(protocol, settings, request);
+      learned.set(model, protocol);
+      return text;
+    } catch (err) {
+      const error = err instanceof LlmError ? err : new LlmError(String(err));
+      lastError = error;
+      tried.push(protocol);
+      // A wrong endpoint for the model looks like a 400/404/405. Anything else — a bad
+      // key, no credit, a rate limit — means the protocol was fine and retrying the
+      // others would just repeat the same failure three times.
+      if (!looksLikeWrongEndpoint(error)) throw error;
+    }
+  }
+
+  const detail = lastError?.message ?? 'unknown error';
+  throw new LlmError(
+    `"${model}" did not answer on any known endpoint (tried ${tried.join(', ')}) — ${detail}`,
+    lastError?.status,
+  );
+}
+
+function looksLikeWrongEndpoint(err: LlmError): boolean {
+  if (err.status === 404 || err.status === 405) return true;
+  if (err.status !== 400) return false;
+  return /unavailable|not found|unsupported|unknown model|invalid model|does not exist/i.test(err.message);
+}
+
+async function callProtocol(
+  protocol: Protocol,
+  settings: Settings,
+  request: CompletionRequest,
+): Promise<string> {
+  const maxTokens = request.maxTokens ?? 700;
+  const spec =
+    protocol === 'messages'
+      ? {
+          path: '/messages',
+          // Zen fronts Anthropic's shape; the version header is required by it.
+          headers: { 'anthropic-version': '2023-06-01' } as Record<string, string>,
+          body: {
+            model: settings.llmModel,
+            max_tokens: maxTokens,
+            temperature: 0.2,
+            system: request.system,
+            messages: [{ role: 'user', content: request.user }],
+          },
+        }
+      : protocol === 'responses'
+        ? {
+            path: '/responses',
+            headers: {},
+            body: {
+              model: settings.llmModel,
+              max_output_tokens: maxTokens,
+              instructions: request.system,
+              input: request.user,
+            },
+          }
+        : {
+            path: '/chat/completions',
+            headers: {},
+            body: {
+              model: settings.llmModel,
+              max_tokens: maxTokens,
+              // The same branch should not describe itself differently each run.
+              temperature: 0.2,
+              messages: [
+                { role: 'system', content: request.system },
+                { role: 'user', content: request.user },
+              ],
+            },
+          };
 
   const res = await withTimeout((signal) =>
-    fetch(`${baseUrl(settings)}/chat/completions`, {
+    fetch(`${baseUrl(settings)}${spec.path}`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${settings.llmApiKey}`,
+        ...spec.headers,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(spec.body),
       signal,
     }),
   );
 
   if (!res.ok) throw new LlmError(await describeFailure(res), res.status);
 
-  const payload = (await res.json()) as {
-    choices?: { message?: { content?: unknown } }[];
-    error?: { message?: string };
-  };
-  if (payload.error?.message) throw new LlmError(payload.error.message);
+  const payload = (await res.json()) as Record<string, unknown>;
+  const error = payload['error'] as { message?: string } | string | undefined;
+  if (error) throw new LlmError(typeof error === 'string' ? error : (error.message ?? 'provider error'));
 
-  const content = payload.choices?.[0]?.message?.content;
-  if (typeof content !== 'string' || content.trim() === '') {
-    throw new LlmError('the model returned an empty reply');
+  const text = extractText(payload);
+  if (!text) throw new LlmError('the model returned an empty reply');
+  return text;
+}
+
+/**
+ * Pulls the reply text out of whichever shape came back. Written to accept all three
+ * rather than branching on the protocol, because gateways are not always faithful to
+ * the format they claim.
+ */
+export function extractText(payload: Record<string, unknown>): string | null {
+  // OpenAI chat completions
+  const choices = payload['choices'];
+  if (Array.isArray(choices)) {
+    const message = (choices[0] as { message?: { content?: unknown }; text?: unknown } | undefined);
+    const content = message?.message?.content ?? message?.text;
+    if (typeof content === 'string' && content.trim()) return content;
+    // Some gateways return content as an array of parts.
+    if (Array.isArray(content)) {
+      const joined = content
+        .map((part) => (typeof part === 'string' ? part : ((part as { text?: string })?.text ?? '')))
+        .join('');
+      if (joined.trim()) return joined;
+    }
   }
-  return content;
+
+  // OpenAI Responses convenience field
+  const outputText = payload['output_text'];
+  if (typeof outputText === 'string' && outputText.trim()) return outputText;
+
+  // Anthropic messages, and the Responses `output` array
+  for (const key of ['content', 'output'] as const) {
+    const blocks = payload[key];
+    if (!Array.isArray(blocks)) continue;
+    const joined = blocks
+      .flatMap((block) => {
+        if (typeof block === 'string') return [block];
+        const record = block as { text?: unknown; content?: unknown };
+        if (typeof record.text === 'string') return [record.text];
+        if (Array.isArray(record.content)) {
+          return record.content.map((part) =>
+            typeof part === 'string' ? part : ((part as { text?: string })?.text ?? ''),
+          );
+        }
+        return [];
+      })
+      .join('');
+    if (joined.trim()) return joined;
+  }
+
+  return null;
 }
 
 export type ModelInfo = { id: string; name?: string };

@@ -62,6 +62,8 @@ open: [`open-questions.md`](open-questions.md).
 | D45 | **CI comes from GitHub Actions runs (`Actions: Read`), falling back to the commit-status API (`Commit statuses: Read`). Never from check runs.** | **GitHub does not offer the `Checks` permission to fine-grained personal access tokens** — it was withdrawn and is GitHub-App-only ([community discussion #129512](https://github.com/orgs/community/discussions/129512)). A token created exactly as this tool instructs would have 403'd on every call, and every branch would have silently read "no CI". Actions answers in one request for the common case; commit statuses are only consulted when Actions has nothing, so the cost is unchanged. |
 | D46 | **The token's required permissions are: Metadata, Contents, Pull requests, Actions — all Read-only — plus Commit statuses for non-Actions CI. Nothing under Account.** | The minimum that makes every call in `github.ts` work. Recorded here because the wrong list was shipped once already. |
 
+| D47 | **Speak all three of OpenCode Zen's protocols**, guessing from the model ID and recovering when the guess is wrong. | Zen routes model families to different endpoints — `/chat/completions` (DeepSeek, GLM, Kimi, …), `/messages` (Claude, Qwen), `/responses` (GPT, Grok). Sending a Claude model to `/chat/completions` returns a flat *"Model is unavailable"*, which reads like a billing or availability problem rather than a wrong endpoint. Supporting only one protocol silently made most of the model list unusable. What worked is remembered per model, so a wrong guess costs one extra request per run, and a failure that is *not* an endpoint mismatch (a bad key, no credit) is never retried three times. |
+
 ---
 
 ## 2. Carried over from the old documents
