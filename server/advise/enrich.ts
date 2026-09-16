@@ -10,6 +10,8 @@
  * page needs to be useful is already there without this file.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import type { Branch, Settings, Snapshot } from '../../shared/types.ts';
 import { LlmError, complete } from './client.ts';
 import { PROMPT_VERSION, SYSTEM_PROMPT, buildUserPrompt, parseInsight } from './prompt.ts';
@@ -79,6 +81,10 @@ export async function enrich(
 
   if (todo.length === 0) return result;
 
+  // One session per run: every branch in a run shares an identical system prompt, so
+  // routing them together is exactly what the header is for. Runs stay distinct.
+  const sessionId = randomUUID();
+
   let cursor = 0;
   let stop = false;
 
@@ -87,7 +93,7 @@ export async function enrich(
       const branch = todo[cursor++];
       if (!branch) continue;
       try {
-        const stored = await summariseBranch(branch, settings);
+        const stored = await summariseBranch(branch, settings, sessionId);
         putInsight(branch.repoKey, branch.name, stored);
         assign(branch, stored);
         result.summarised++;
@@ -114,10 +120,15 @@ export async function enrich(
   return result;
 }
 
-async function summariseBranch(branch: Branch, settings: Settings): Promise<StoredInsight> {
+async function summariseBranch(
+  branch: Branch,
+  settings: Settings,
+  sessionId: string,
+): Promise<StoredInsight> {
   const raw = await complete(settings, {
     system: SYSTEM_PROMPT,
     user: buildUserPrompt(branch, new Date()),
+    sessionId,
   });
   const insight = parseInsight(raw, branch);
 

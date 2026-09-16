@@ -66,6 +66,8 @@ open: [`open-questions.md`](open-questions.md).
 
 | D48 | **OpenCode Go and Zen pay-as-you-go are different endpoints.** Go is `https://opencode.ai/zen/go/v1` and serves every model over `/chat/completions`; Zen is `https://opencode.ai/zen/v1` and routes by model family (D47). The API key is the same for both. | A Go subscription used against the Zen URL reports *"Insufficient balance"* — indistinguishable from an empty wallet, and it sends you to add credit you do not need. The error now names the Go endpoint when it sees that message, and protocol guessing is skipped entirely on Go so no request is wasted probing `/messages` for a Claude model. |
 
+| D49 | **Send `x-opencode-session` on every OpenCode request: one opaque ID per enrichment run, shared by every branch in that run.** | OpenCode has required the header since 6 Sep 2026 and returns 400 without it. It exists so a conversation's requests reach the same provider and keep its prompt prefix cached — and every branch in a run sends an *identical* system prompt, so routing a run together is exactly the intended use. Runs stay distinct, per the guidance that the ID be distinct across conversations. Sent only to `opencode.ai` hosts, since other providers may reject unknown headers. |
+
 ---
 
 ## 2. Carried over from the old documents

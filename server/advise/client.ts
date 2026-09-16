@@ -40,6 +40,12 @@ export type CompletionRequest = {
   system: string;
   user: string;
   maxTokens?: number;
+  /**
+   * Opaque, stable for one batch of work, distinct between batches. OpenCode requires
+   * this on Go (400 without it since 6 Sep 2026) and uses it to route a conversation's
+   * requests to the same provider so the shared prompt prefix stays cached.
+   */
+  sessionId?: string;
 };
 
 export type Protocol = 'chat' | 'messages' | 'responses';
@@ -54,6 +60,9 @@ export function forgetProtocols(): void {
 
 /** The OpenCode Go subscription endpoint, which is plain chat-completions for everything. */
 export const isGoEndpoint = (baseUrl: string): boolean => /\/zen\/go(\/|$)/.test(baseUrl);
+
+/** Only OpenCode wants the session header; other providers may reject unknown headers. */
+export const isOpenCode = (baseUrl: string): boolean => /(^|\/\/)([^/]*\.)?opencode\.ai\//.test(baseUrl);
 
 /**
  * First guess from the model ID. Wrong guesses are recovered from, so this only has to
@@ -159,14 +168,19 @@ async function callProtocol(
             },
           };
 
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    authorization: `Bearer ${settings.llmApiKey}`,
+    ...spec.headers,
+  };
+  if (request.sessionId && isOpenCode(settings.llmBaseUrl)) {
+    headers['x-opencode-session'] = request.sessionId;
+  }
+
   const res = await withTimeout((signal) =>
     fetch(`${baseUrl(settings)}${spec.path}`, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${settings.llmApiKey}`,
-        ...spec.headers,
-      },
+      headers,
       body: JSON.stringify(spec.body),
       signal,
     }),
