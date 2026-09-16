@@ -28,6 +28,41 @@ const $ = <T extends HTMLElement>(sel: string): T => {
   return el;
 };
 
+/**
+ * Show failures instead of dying quietly.
+ *
+ * An uncaught error here used to leave a page that looked completely normal and did
+ * nothing at all — no banner, no console unless you went looking, no clue which of the
+ * dozen buttons was supposed to respond. Anything that breaks should say so on screen.
+ */
+function showFailure(what: string, err: unknown): void {
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(what, err);
+
+  let banner = document.querySelector<HTMLElement>('#failBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'failBanner';
+    banner.className = 'fail-banner';
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML = `<b>${esc(what)}</b> ${esc(message)}
+    <span class="fix">Restart Bearing — a half-updated page cannot fix itself by reloading.</span>`;
+}
+
+window.addEventListener('error', (event) => showFailure('Something broke:', event.error ?? event.message));
+window.addEventListener('unhandledrejection', (event) => showFailure('Something broke:', event.reason));
+
+/** Attaches one listener, and keeps going if that particular element is missing. */
+function on(selector: string, event: string, handler: (event: Event) => void): void {
+  try {
+    $(selector).addEventListener(event, handler);
+  } catch (err) {
+    // One stale selector must not cost every other button on the page.
+    showFailure(`Could not wire ${selector} —`, err);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------------------
@@ -242,6 +277,14 @@ function applyProviderChoice(): void {
 }
 
 async function openSettings(): Promise<void> {
+  try {
+    await openSettingsInner();
+  } catch (err) {
+    showFailure('Could not open settings:', err);
+  }
+}
+
+async function openSettingsInner(): Promise<void> {
   const settings = (await (await fetch('/api/settings')).json()) as SafeSettings;
   $<HTMLTextAreaElement>('#repos').value = settings.repos.join('\n');
   $<HTMLInputElement>('#refreshSeconds').value = String(settings.refreshSeconds);
@@ -321,7 +364,7 @@ async function saveSettings(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function wire(): void {
-  $('#viewTabs').addEventListener('click', (event) => {
+  on('#viewTabs', 'click', (event) => {
     const tab = (event.target as HTMLElement).closest<HTMLElement>('[data-view]');
     if (!tab) return;
     state.view = tab.dataset['view'] as View;
@@ -329,14 +372,14 @@ function wire(): void {
     render();
   });
 
-  $('#projTabs').addEventListener('click', (event) => {
+  on('#projTabs', 'click', (event) => {
     const tab = (event.target as HTMLElement).closest<HTMLElement>('[data-repo]');
     if (!tab) return;
     state.repo = tab.dataset['repo'] ?? 'all';
     render();
   });
 
-  $('#board').addEventListener('click', (event) => {
+  on('#board', 'click', (event) => {
     const target = event.target as HTMLElement;
     if (target.closest('a')) return; // links out to GitHub are not card toggles
     if (target.closest('[data-open-settings]')) {
@@ -351,7 +394,7 @@ function wire(): void {
   });
 
   const search = $<HTMLInputElement>('#search');
-  search.addEventListener('input', () => {
+  on('#search', 'input', () => {
     state.search = search.value;
     render();
   });
@@ -369,7 +412,7 @@ function wire(): void {
   });
 
   // The provider's own model list, so nobody has to guess an ID.
-  $('#loadModels').addEventListener('click', async (event) => {
+  on('#loadModels', 'click', async (event) => {
     event.preventDefault();
     const link = event.target as HTMLElement;
     const before = link.textContent;
@@ -397,7 +440,7 @@ function wire(): void {
     link.textContent = before;
   });
 
-  $('#llmProvider').addEventListener('change', () => {
+  on('#llmProvider', 'change', () => {
     applyProviderChoice();
     // The model list belongs to the old endpoint; keeping it would offer models the new
     // plan may not serve.
@@ -406,10 +449,10 @@ function wire(): void {
     $('#loadModels').textContent = 'Load the list';
   });
 
-  $('#openSettings').addEventListener('click', () => void openSettings());
-  $('#closeSettings').addEventListener('click', () => $('#settingsSheet').classList.add('hidden'));
-  $('#saveSettings').addEventListener('click', () => void saveSettings());
-  $('#refreshNow').addEventListener('click', async () => {
+  on('#openSettings', 'click', () => void openSettings());
+  on('#closeSettings', 'click', () => $('#settingsSheet').classList.add('hidden'));
+  on('#saveSettings', 'click', () => void saveSettings());
+  on('#refreshNow', 'click', async () => {
     await fetch('/api/refresh', { method: 'POST' });
     await loadSnapshot();
   });

@@ -68,6 +68,8 @@ open: [`open-questions.md`](open-questions.md).
 
 | D49 | **Send `x-opencode-session` on every OpenCode request: one opaque ID per enrichment run, shared by every branch in that run.** | OpenCode has required the header since 6 Sep 2026 and returns 400 without it. It exists so a conversation's requests reach the same provider and keep its prompt prefix cached — and every branch in a run sends an *identical* system prompt, so routing a run together is exactly the intended use. Runs stay distinct, per the guidance that the ID be distinct across conversations. Sent only to `opencode.ai` hosts, since other providers may reject unknown headers. |
 
+| D50 | **The page and its bundle are served `no-store`, and the UI shows a banner on any uncaught error.** | The bundle is built once at startup while `index.html` is read per request, so a browser holding an older `/app.js` pairs it with newer HTML. The old code then looks for an element the new page no longer has, throws, and the interface silently stops responding — and *reloading is what serves the stale copy*, so the obvious remedy does not work. It bricked a running install. Caching a 100 KB file from localhost buys nothing; a visible failure buys everything. |
+
 ---
 
 ## 2. Carried over from the old documents

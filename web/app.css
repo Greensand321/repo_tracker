@@ -365,3 +365,10 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 
 .sheet select { width: 100%; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line-2);
   background: var(--ink); color: var(--text); font-family: var(--sans); font-size: 13px; }
+
+/* A failure people can see. Silence was the actual bug once. */
+.fail-banner { position: fixed; left: 0; right: 0; top: 0; z-index: 200; padding: 11px 18px;
+  background: #3a1714; border-bottom: 1px solid var(--coral); color: #ffd9d3;
+  font-family: var(--mono); font-size: 12px; line-height: 1.6; }
+.fail-banner b { color: var(--coral); margin-right: 6px; }
+.fail-banner .fix { display: block; color: #e8b9b2; opacity: .85; }
