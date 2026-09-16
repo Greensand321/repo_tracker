@@ -179,3 +179,48 @@ test('junk rows are dropped rather than becoming a broken model choice', () => {
     assert.equal(toModelInfo(row), null, JSON.stringify(row));
   }
 });
+
+// --- OpenCode Go: same key, different endpoint, different billing ---
+
+import { isGoEndpoint } from '../server/advise/client.ts';
+
+test('the Go endpoint is recognised', () => {
+  assert.equal(isGoEndpoint('https://opencode.ai/zen/go/v1'), true);
+  assert.equal(isGoEndpoint('https://opencode.ai/zen/go/v1/'), true);
+  assert.equal(isGoEndpoint('https://opencode.ai/zen/v1'), false);
+});
+
+test('on Go every model goes straight to /chat/completions', () => {
+  // Go serves everything over chat-completions, so guessing by model family there
+  // would waste a request on every Claude and GPT model.
+  assert.equal(guessProtocol('claude-opus-5', 'https://opencode.ai/zen/go/v1'), 'chat');
+  assert.equal(guessProtocol('gpt-5.5', 'https://opencode.ai/zen/go/v1'), 'chat');
+  // ...while the pay-as-you-go endpoint still routes by family.
+  assert.equal(guessProtocol('claude-opus-5', 'https://opencode.ai/zen/v1'), 'messages');
+});
+
+test('a Go model reaches chat-completions in one request', async () => {
+  const { paths } = routeTo('/chat/completions', { choices: [{ message: { content: 'ok' } }] });
+  const config: Settings = {
+    ...settings('claude-opus-5'),
+    llmBaseUrl: 'https://opencode.ai/zen/go/v1',
+  };
+
+  assert.equal(await complete(config, request), 'ok');
+  assert.equal(paths.length, 1, 'no wasted probe of /messages');
+  assert.equal(paths[0], '/zen/go/v1/chat/completions');
+});
+
+test('an empty-balance error points at the Go endpoint', async () => {
+  // A Go subscription billed through the Zen URL looks exactly like an empty wallet.
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ error: { message: 'Insufficient balance. Manage your billing here: ...' } }), {
+      status: 401,
+    })) as typeof fetch;
+
+  await assert.rejects(complete(settings('kimi-k3'), request), (err: LlmError) => {
+    assert.match(err.message, /Insufficient balance/);
+    assert.match(err.message, /zen\/go\/v1/, 'should name the Go endpoint');
+    return true;
+  });
+});

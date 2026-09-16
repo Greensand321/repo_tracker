@@ -64,6 +64,8 @@ open: [`open-questions.md`](open-questions.md).
 
 | D47 | **Speak all three of OpenCode Zen's protocols**, guessing from the model ID and recovering when the guess is wrong. | Zen routes model families to different endpoints — `/chat/completions` (DeepSeek, GLM, Kimi, …), `/messages` (Claude, Qwen), `/responses` (GPT, Grok). Sending a Claude model to `/chat/completions` returns a flat *"Model is unavailable"*, which reads like a billing or availability problem rather than a wrong endpoint. Supporting only one protocol silently made most of the model list unusable. What worked is remembered per model, so a wrong guess costs one extra request per run, and a failure that is *not* an endpoint mismatch (a bad key, no credit) is never retried three times. |
 
+| D48 | **OpenCode Go and Zen pay-as-you-go are different endpoints.** Go is `https://opencode.ai/zen/go/v1` and serves every model over `/chat/completions`; Zen is `https://opencode.ai/zen/v1` and routes by model family (D47). The API key is the same for both. | A Go subscription used against the Zen URL reports *"Insufficient balance"* — indistinguishable from an empty wallet, and it sends you to add credit you do not need. The error now names the Go endpoint when it sees that message, and protocol guessing is skipped entirely on Go so no request is wasted probing `/messages` for a Claude model. |
+
 ---
 
 ## 2. Carried over from the old documents
