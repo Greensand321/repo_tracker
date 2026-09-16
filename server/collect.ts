@@ -13,7 +13,7 @@ import { readCache, writeCache, type CachedDetail, type RepoCache } from './cach
 import {
   GitHubError,
   fetchBranches,
-  fetchCheckRuns,
+  fetchCi,
   fetchCompare,
   fetchPulls,
   fetchRepo,
@@ -106,8 +106,8 @@ async function collectRepo(
  * Decides what actually has to be fetched for one branch.
  *
  * - The head SHA moved, or we have never seen it → fetch the compare.
- * - CI was still running last time → re-fetch the checks even though the SHA is the
- *   same, because a build finishing is a change the SHA cannot tell us about.
+ * - CI was still running last time → re-fetch it even though the SHA is the same,
+ *   because a build finishing is a change the SHA cannot tell us about.
  * - Otherwise → the cache is still correct and this branch costs nothing.
  */
 async function detailFor(
@@ -123,21 +123,21 @@ async function detailFor(
 
   // The base branch compared against itself is always empty — skip the round trip.
   if (branchName === base) {
-    return { sha: headSha, compare: { ahead_by: 0, behind_by: 0, commits: [], files: [] }, checks: null };
+    return { sha: headSha, compare: { ahead_by: 0, behind_by: 0, commits: [], files: [] }, ci: null };
   }
 
   const compare = moved ? await fetchCompare(key, token, base, branchName) : cached.compare;
 
-  const ciUnsettled = !cached || toCiState(cached.checks).state === 'pending';
-  const checks = moved || ciUnsettled ? await fetchCheckRuns(key, token, headSha) : cached.checks;
+  const ciUnsettled = !cached || toCiState(cached.ci).state === 'pending';
+  const ci = moved || ciUnsettled ? await fetchCi(key, token, headSha) : cached.ci;
 
-  return { sha: headSha, compare, checks };
+  return { sha: headSha, compare, ci };
 }
 
 function toBranchDetails(details: Record<string, CachedDetail>): Record<string, BranchDetail> {
   const out: Record<string, BranchDetail> = {};
   for (const [name, detail] of Object.entries(details)) {
-    out[name] = { compare: detail.compare, checks: detail.checks };
+    out[name] = { compare: detail.compare, ci: detail.ci };
   }
   return out;
 }

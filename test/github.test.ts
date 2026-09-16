@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   GitHubError,
   fetchBranches,
-  fetchCheckRuns,
+  fetchCi,
   getRateLimit,
   parseNextLink,
   splitRepoKey,
@@ -108,9 +108,35 @@ test('a 404 names the repo it could not see', async () => {
   });
 });
 
-test('a repo with checks disabled reports no CI rather than failing the branch', async () => {
+test('CI comes from Actions first, in one request', async () => {
+  const { calls } = stub({ status: 200, body: { workflow_runs: [{ status: 'completed', conclusion: 'success', html_url: 'u' }] } });
+  const ci = await fetchCi('o/r', 't', 'deadbee');
+
+  assert.equal(ci.runs?.workflow_runs.length, 1);
+  assert.equal(calls.length, 1, 'commit statuses should not be needed when Actions answered');
+  assert.match(calls[0]!.url, /\/actions\/runs\?head_sha=deadbee/);
+});
+
+test('with no Actions runs it also asks the commit-status API', async () => {
+  const { calls } = stub(
+    { status: 200, body: { workflow_runs: [] } },
+    { status: 200, body: { state: 'success', total_count: 1, statuses: [] } },
+  );
+  const ci = await fetchCi('o/r', 't', 'deadbee');
+
+  assert.equal(ci.status?.state, 'success');
+  assert.equal(calls.length, 2);
+  assert.match(calls[1]!.url, /\/commits\/deadbee\/status/);
+});
+
+test('a token lacking the CI permissions loses the CI column, not the branch', async () => {
+  // Fine-grained tokens cannot read check runs at all, and a user may well decline
+  // Actions too. Neither may fail the branch.
   stub({ status: 403, headers: { 'x-ratelimit-remaining': '4990' } });
-  assert.equal(await fetchCheckRuns('o/r', 't', 'sha'), null);
+  const ci = await fetchCi('o/r', 't', 'sha');
+
+  assert.equal(ci.runs, null);
+  assert.equal(ci.status, null);
 });
 
 // --- plumbing ---

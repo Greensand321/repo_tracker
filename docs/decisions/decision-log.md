@@ -59,6 +59,9 @@ open: [`open-questions.md`](open-questions.md).
 | D43 | **`BEARING_DATA_DIR` overrides where the tool's data lives.** | Lets the second machine put it elsewhere, and keeps tests out of the real data directory. |
 | D44 | **A debug CLI exists (`npm run brief` / `models` / `config`) and is explicitly not a product surface.** | CLAUDE.md rule 2 already allows a debug entry point. It lets the engine be exercised and read while the interface is redesigned. No feature may be shaped around it. |
 
+| D45 | **CI comes from GitHub Actions runs (`Actions: Read`), falling back to the commit-status API (`Commit statuses: Read`). Never from check runs.** | **GitHub does not offer the `Checks` permission to fine-grained personal access tokens** — it was withdrawn and is GitHub-App-only ([community discussion #129512](https://github.com/orgs/community/discussions/129512)). A token created exactly as this tool instructs would have 403'd on every call, and every branch would have silently read "no CI". Actions answers in one request for the common case; commit statuses are only consulted when Actions has nothing, so the cost is unchanged. |
+| D46 | **The token's required permissions are: Metadata, Contents, Pull requests, Actions — all Read-only — plus Commit statuses for non-Actions CI. Nothing under Account.** | The minimum that makes every call in `github.ts` work. Recorded here because the wrong list was shipped once already. |
+
 ---
 
 ## 2. Carried over from the old documents

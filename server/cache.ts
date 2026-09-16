@@ -6,14 +6,14 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { GhBranch, GhCheckRuns, GhCompare, GhPull, GhRepo } from './gh-types.ts';
+import type { GhBranch, GhCi, GhCompare, GhPull, GhRepo } from './gh-types.ts';
 import { CACHE_DIR, ensureDirs, repoFileName } from './paths.ts';
 
 export type CachedDetail = {
   /** The head SHA this detail describes. Stale the moment the branch moves. */
   sha: string;
   compare: GhCompare;
-  checks: GhCheckRuns | null;
+  ci: GhCi | null;
 };
 
 export type RepoCache = {

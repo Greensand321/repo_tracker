@@ -34,9 +34,14 @@ load.**
 First run installs dependencies, then opens <http://127.0.0.1:4321> in your browser and
 asks for two things:
 
-1. **A GitHub token.** Fine-grained, **read-only**, scoped to the repos you want —
-   Contents: Read, Pull requests: Read, Checks: Read.
+1. **A GitHub token.** Fine-grained, **read-only**, scoped to the repos you want.
+   Under **Repository permissions** set four to Read-only:
+   **Metadata** (required), **Contents**, **Pull requests**, **Actions**.
+   Add **Commit statuses** too if your CI is not GitHub Actions. Nothing under *Account*.
    [Create one](https://github.com/settings/personal-access-tokens/new).
+
+   > Not **Checks** — GitHub does not offer that permission to fine-grained tokens; it is
+   > GitHub-App-only. Actions is what reads your CI.
 2. **The repos**, one `owner/name` per line.
 
 The token is stored in `data/settings.json` on that machine and is never sent anywhere
