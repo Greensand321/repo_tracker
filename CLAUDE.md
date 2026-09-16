@@ -21,9 +21,18 @@ state is wrong by construction.
 ## Layout
 
 - **Root is program files.** `docs/` is everything written.
-- Precedence: `requirements.md` > `ROADMAP.md` > `decisions/decision-log.md` > `spec/` >
-  `plans/` > `archive/`. The last three are superseded — reasoning, never instructions.
-- `bearing/` is a leftover CLI skeleton from the old design. Do not build on it.
+- Precedence: `requirements.md` > `ROADMAP.md` > `plans/stage-1-plan.md` >
+  `decisions/decision-log.md` > `spec/` > the other `plans/` files > `archive/`.
+  Everything after the decision log is superseded — reasoning, never instructions.
+
+## The stack
+
+A **local program + a browser UI, in TypeScript** (D20). Node 22+, Hono for the server,
+Octokit for GitHub, Vite + vanilla TS for the front end. You click `start.bat`; it opens
+the browser. Full detail: [`docs/plans/stage-1-plan.md`](docs/plans/stage-1-plan.md) §1.
+
+Vanilla TS, not a framework (D23) — the mockup is vanilla, so it transplants directly.
+Revisit at Stage 3 if the UI gets painful.
 
 ## Hard rules
 
@@ -50,9 +59,10 @@ Check [`docs/decisions/decision-log.md`](docs/decisions/decision-log.md) — §3
 was already overturned and why, so dead ideas do not get rebuilt. Check the stage in
 [`docs/ROADMAP.md`](docs/ROADMAP.md): each one names what it explicitly does *not* include.
 
-**Two questions currently block implementation** — the stack (Q30) and where the LLM goes
-(C1), in [`docs/decisions/open-questions.md`](docs/decisions/open-questions.md). Do not
-start Stage 1 before they are answered.
+**Stage 1 is the current work** and is planned in full at
+[`docs/plans/stage-1-plan.md`](docs/plans/stage-1-plan.md). Nothing blocks it. Remaining
+open questions all have working defaults — see
+[`docs/decisions/open-questions.md`](docs/decisions/open-questions.md).
 
 ## When you finish a session
 

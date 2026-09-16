@@ -16,7 +16,8 @@ When two documents disagree, this is the order of precedence:
 3. **`decisions/decision-log.md`** — decisions with their reasons, and what was overturned.
 4. **`spec/bearing-spec-v0.3.html`** — the old product spec. Still the best writing on the
    *problem*; wrong about the solution. Awaiting a v0.4 rewrite.
-5. **`plans/`** — ⛔ both plans are superseded. Mine them for patterns, not for instructions.
+5. **`plans/stage-1-plan.md`** — the live implementation plan. The other two files in
+   `plans/` are ⛔ superseded; mine them for patterns, not for instructions.
 6. **`archive/`** — superseded. Read for reasoning, never for instructions.
 
 ## Contents

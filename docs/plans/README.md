@@ -2,12 +2,13 @@
 
 | File | Scope | Status |
 |---|---|---|
-| `phase-0-plan.md` | A local-first CLI "Brief engine" | **⛔ Superseded 15 Sep 2026.** Do not implement from it. |
-| `build-plan-v0.2.md` | Whole-product architecture and milestones M0–M7 | **⛔ Largely superseded.** Mine it for patterns, not for plans. |
+| **`stage-1-plan.md`** | **Stage 1 — the git history on screen** | ✅ **Current. Ready to build.** |
+| `phase-0-plan.md` | A local-first CLI "Brief engine" | ⛔ Superseded 15 Sep 2026. Do not implement from it. |
+| `build-plan-v0.2.md` | Whole-product architecture and milestones M0–M7 | ⛔ Largely superseded. Mine it for patterns, not for plans. |
 
-**There is no current implementation plan.** [`../requirements.md`](../requirements.md) and
-[`../ROADMAP.md`](../ROADMAP.md) are the live documents; a Stage 1 plan gets written once
-the stack is chosen (open question Q30).
+`stage-1-plan.md` is the live plan: the stack, the layout, the canonical `Snapshot` type,
+the GitHub calls and their cost, a field-by-field map of what fills the mockup, and a
+10-step build order.
 
 Both files below were written for a different product: a local-first terminal CLI reading
 local git for a developer working at a keyboard. What is actually being built is a GUI

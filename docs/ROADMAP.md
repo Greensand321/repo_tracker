@@ -9,13 +9,10 @@ Ordered by the owner's stated priorities: **git history on screen in plain Engli
 > terminal CLI. See `requirements.md` §9. Stages 1–5 replace it, and
 > `plans/phase-0-plan.md` is superseded pending a rewrite.
 
-> ⚠️ **Stage 2 contradicts one of your answers.** You said to keep the LLM deferred until
-> last. But you also ranked "the LLM reading those logs and giving me useful insights" as
-> the **second** thing you want working, and the whole goal/milestone upkeep depends on it.
-> I have put it second here to match your priorities, not your instruction. **Confirm or
-> correct — see conflict C1 in `decisions/open-questions.md`.**
-
-> **One decision gates everything:** the stack (Q30). Stage 1 cannot start without it.
+> ✅ **Unblocked 16 Sep 2026.** The stack is a **local program + browser UI in TypeScript**
+> (D20); the **LLM lands at Stage 2** (D21); the build target is
+> **`design/dashboard-concept.html`** (D22). Stage 1 is planned in
+> [`plans/stage-1-plan.md`](plans/stage-1-plan.md) and ready to build.
 
 ---
 
@@ -57,13 +54,13 @@ actually done — in the commit authors' own words, newest first, grouped by rep
 
 | # | Feature | Notes |
 |---|---|---|
-| 1.1 | Authenticate to GitHub; read the tracked repo list | **[OPEN — auth method, Q34]** |
+| 1.1 | Authenticate to GitHub; read the tracked repo list | Pasted read-only token for now (Q34) |
 | 1.2 | List branches per repo with their PR state | `main` is the base, always |
 | 1.3 | **Commit history per branch** — message, body, author, date, SHA | The core of the stage |
 | 1.4 | PR state and CI status per branch | Cheap once you are already calling the API |
 | 1.5 | Local cache: instant reopen, incremental re-fetch, degraded offline mode | |
 | 1.6 | Supporting metadata: ahead/behind `main`, last activity, diff size | Secondary display, never the headline |
-| 1.7 | Render into the chosen mockup layout | **[OPEN — which mockup, Q31]** |
+| 1.7 | Render into `design/dashboard-concept.html`'s layout | Board and Timeline light up; "Needs you" runs on CI + PR state; "Your notes" waits for Stage 3 |
 | 1.8 | Settings screen: repos, refresh interval, display caps, thresholds | R8 — nothing hardcoded |
 
 **Not in Stage 1:** no LLM, no goals, no tags, no notes, no sync.
@@ -151,15 +148,12 @@ Dropped by your answers. Kept here so the reasoning is not lost.
 
 ---
 
-## What is blocked right now
+## Nothing is blocked
 
-| Gate | Blocks | Question |
-|---|---|---|
-| **Stack choice** | All of Stage 1 | **Q30** |
-| LLM at Stage 2 vs last | Stage order | **C1** |
-| Which mockup to build from | 1.7 | Q31 |
-| GitHub auth method | 1.1 | Q34 |
-| Goal/task cardinality | 3.2 and the schema | Q32 |
-| Supabase vs Firebase | Stage 4 | Q33 |
+The gating decisions were answered on 16 Sep. **Stage 1 is ready to build** —
+[`plans/stage-1-plan.md`](plans/stage-1-plan.md).
 
-Q30 and C1 first. The rest can be settled while Stage 1 is being built.
+What is still open has a working default and can be settled while Stage 1 is built:
+C4 (scale) · C5 (timestamp display) · C6 (evolving tasks) · Q32 (goal cardinality) ·
+Q33 (Supabase vs Firebase) · Q34 (GitHub auth) · Q36 (the product name) · Q37 (LLM titles
+alongside branch names) · Q38 (LLM provider) · Q39 (refresh cadence) · Q40 (t3 code).

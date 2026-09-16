@@ -1,6 +1,6 @@
 # Status — where the project stands
 
-**Updated:** 15 Sep 2026 · **Stage:** planning · **Branch:** `claude/kind-meitner-cpis9v`
+**Updated:** 16 Sep 2026 · **Stage:** 1, ready to build · **Branch:** `claude/kind-meitner-cpis9v`
 
 > Keep this short and current. It is the first thing to read after any time away.
 
@@ -8,52 +8,66 @@
 
 ## Where we are
 
-**The product changed on 15 Sep 2026**, when the owner answered the first round of
-questions. It is not the tool the old spec describes.
+Planning is finished. **Nothing blocks the build.**
 
-| | Old documents assumed | Actually true |
-|---|---|---|
-| Who writes the code | The owner, at a keyboard | **AI agents**, each session on its own branch, pushed to origin |
-| Data source | Local git — reflog, working tree, stashes | **GitHub.** Local signals are empty for agent branches. |
-| Surface | A terminal CLI printing markdown | **A GUI.** No terminal. |
-| Content | Branch state: ahead/behind, flags, SHAs | **Plain English** — what was committed, not when |
-| Organizing | Nothing | **Milestones → Goals → Tasks → Branches**, plus tags |
-| Sync | A folder replicated by Dropbox | **A cloud backend**, two machines daily |
-| Success | Fewer branches | **More branches**, less mental load |
+The product was redefined on 15 Sep once the real workflow was understood: branches are
+created by **AI agents** — one per session, pushed to origin, sessions running a week or
+more — and are never checked out locally. GitHub is the data source. The surface is a GUI.
+The content is plain English, not git facts. Written up in
+[`requirements.md`](requirements.md).
 
-Written up in [`requirements.md`](requirements.md). Both implementation plans are
-superseded; `ROADMAP.md` is rebuilt around Stages 1–5.
+The four gating decisions were answered on 16 Sep:
+
+| | Decision |
+|---|---|
+| **Stack** | A local program + a browser UI, in **TypeScript**. Node 22+, Hono, Octokit, Vite + vanilla TS. You click `start.bat`. |
+| **LLM** | **Stage 2** — right after the git history lands, not last. |
+| **Layout** | Build from `design/dashboard-concept.html`. |
+| **Front end** | Vanilla TS, not a framework — the mockup transplants directly. |
 
 ## The next concrete action
 
-**Answer the two blocking items in [`decisions/open-questions.md`](decisions/open-questions.md).**
+**Build Stage 1**, planned in full at [`plans/stage-1-plan.md`](plans/stage-1-plan.md).
 
-| | | |
-|---|---|---|
-| **Q30** | **The stack.** Local program + browser UI, pure browser page, or desktop app — and Python or TypeScript. | Blocks all of Stage 1 |
-| **C1** | **Where the LLM goes.** You said defer it; you also ranked it your #2 priority and made it responsible for goal upkeep. It is currently at Stage 2. | Blocks the stage order |
+> *"If exactly one thing worked a week from now it would be having the git logs show up in
+> the mockups I created."*
 
-Then six smaller ones: C4 (scale), C5 (time display), C6 (evolving tasks), Q31 (which
-mockup), Q32 (goal cardinality), Q34 (GitHub auth).
+Ten steps, in order. Step 7 is the milestone — the moment real commit history renders in
+the mockup's Board view. Steps 1–6 are plumbing toward it.
 
-## Then — Stage 1
+1. Scaffold + `start.bat` → a page that says hello
+2. Settings screen: paste a GitHub token, add repos
+3. `github.ts` against one repo — prove auth and pagination
+4. `snapshot.ts` + tests against recorded fixtures *(no network in tests)*
+5. `GET /api/snapshot` returns a real Snapshot
+6. Lift the mockup's markup and CSS into `web/`
+7. **Render the Board view from real data** ← the proof
+8. Timeline view, then Needs-you from CI + PR state
+9. Cache, incremental refresh, "as of" timestamp
+10. Second machine — clone, paste token, confirm
 
-Get the git history on screen in plain English: authenticate to GitHub, list repos and
-branches, fetch commit history and PR/CI state per branch, cache it, render it into the
-chosen mockup. No LLM, no goals, no sync.
+## What Stage 1 will and will not show
 
-*"That's really the biggest thing that needs to be solved to prove this is possible."*
+The mockup's `log[]` — the commit trail — is exactly what Stage 1 delivers, along with
+ages, commit counts, CI state, PR titles and the activity strip. Its invented branch titles
+("the signup flow"), the recall/blocker/next prose, and the step checklists are **Stage 2**,
+when the LLM arrives. Your notes are **Stage 3**. Field-by-field map:
+`plans/stage-1-plan.md` §4.
 
-## Nothing is implemented
+## Still open — none of it blocks anything
 
-`bearing/` holds a Python CLI skeleton from the old design. It is three small files and
-**will likely be deleted** once Q30 is answered — do not build on it.
+Each has a working default: C4 (scale) · C5 (timestamp display) · C6 (evolving tasks) ·
+Q32 (goal cardinality) · Q33 (Supabase vs Firebase) · Q34 (GitHub auth — proceeding with a
+pasted read-only token) · Q36 (the product name) · Q37 (LLM titles alongside branch names) ·
+Q38 (LLM provider) · Q39 (refresh cadence) · Q40 (t3 code).
+See [`decisions/open-questions.md`](decisions/open-questions.md).
 
 ## Log
 
 | Date | What happened |
 |---|---|
-| 13 Sep 2026 | Spec v0.1 → v0.3; build plan v0.2; Phase 0 plan; mockups explored, dashboard-first chosen |
-| 15 Sep 2026 | Repo reorganized: `docs/` structure, roadmap, decision log, package skeleton |
-| 15 Sep 2026 | `sync-branches.yml` → `.github/workflows/`; roadmap expanded; 29 questions raised |
-| 15 Sep 2026 | **Owner answered. Product substantially redefined.** `requirements.md` written; roadmap rebuilt as Stages 1–5; decision log restructured; both plans marked superseded; 6 conflicts and 11 new questions raised |
+| 13 Sep 2026 | Spec v0.1 → v0.3; build plan v0.2; Phase 0 plan; mockups explored |
+| 15 Sep 2026 | Repo reorganized: `docs/` structure, roadmap, decision log |
+| 15 Sep 2026 | `sync-branches.yml` → `.github/workflows/`; 29 questions raised |
+| 15 Sep 2026 | **Owner answered. Product redefined.** `requirements.md` written; roadmap rebuilt as Stages 1–5; both old plans superseded; 6 conflicts + 11 questions raised |
+| 16 Sep 2026 | **Gating decisions made (D20–D24).** Stage 1 planned; Python skeleton deleted; nothing blocking |

@@ -31,6 +31,12 @@ open: [`open-questions.md`](open-questions.md).
 | D13 | **GitHub is already the sync layer** for commits, branches, PRs and CI. Only Plane B needs a sync backend. | Both machines read the same origin, so that data matches by construction. Shrinks the sync problem to a few kilobytes of text. |
 | D14 | **`sync-branches.yml` stays as it is** and is not part of the product. | It is a bulk merge-to-main time-saver for when several branches finish together. The tool may report drift; it never merges. |
 
+| D20 | **Stack: a local program + a browser UI, in TypeScript.** Node 22+, Hono for the server, Octokit for GitHub, Vite + vanilla TS for the front end. You click `start.bat`; it opens the browser. | Only a program behind the page can hold a GitHub token safely, write a local backup, and call the API without `file://` restrictions. TypeScript gives one language across front and back. Bundles to a single `.exe` later without a rewrite. |
+| D21 | **The LLM arrives at Stage 2**, immediately after the git history lands — not last. | The owner's stated priority order put LLM insight second, and the goal/milestone upkeep depends on it. Overturns the old "advisor built last" decision (§3). |
+| D22 | **Build from `design/dashboard-concept.html`.** | It already carries the Timeline and Notes surfaces the requirements call for. Variant A ("The Bridge") is built around a "you were just here" moment that does not apply when agents did the work. |
+| D23 | **Vanilla TS on the front end, not a framework.** | The mockup is vanilla HTML/CSS/JS, so it transplants directly rather than being reimplemented — and Stage 1 is exactly "make the mockup show real data." Revisit at Stage 3 if the UI gets painful; contained, because everything renders one data structure. |
+| D24 | **Only commits *ahead of* `main` are shown**, via the GitHub `compare` endpoint. | A branch's full history is mostly `main`'s and says nothing about the thread. One call returns the branch's own commits, ahead/behind, and diff size together. |
+
 ---
 
 ## 2. Carried over from the old documents
@@ -59,7 +65,8 @@ Kept because the arguments still explain how the current design was reached.
 | ~~Multi-machine sync via one append-only journal file per machine in a replicated folder~~ | D13 + Stage 4 | Owner wants a real backend (Supabase/Firebase). Also unnecessary: GitHub already syncs everything except annotations. |
 | ~~Journal scope is metadata-only by default~~ | — | Obsolete with the journal design. Privacy question re-asked as part of Q33. |
 | ~~GitHub via `gh` CLI passthrough, no token management~~ | Q34 (open) | "Built from the ground up"; `gh` on both machines complicates packaging. |
-| ~~The advisor is built last; v1 is fully deterministic~~ | **Under review — C1** | Owner said defer, but ranked LLM insight as priority #2 and made the LLM responsible for goal/milestone upkeep. Currently placed at Stage 2. |
+| ~~The advisor is built last; v1 is fully deterministic~~ | **D21** | Owner said defer, but ranked LLM insight as priority #2 and made the LLM responsible for goal/milestone upkeep. Resolved 16 Sep: the LLM lands at Stage 2. |
+| ~~Python 3.11+ as the implementation language~~ | **D20** | Chosen for a portable stdlib-only CLI. The product is a GUI; TypeScript spans front and back. The Python skeleton was deleted. |
 | ~~Brief cadence: on-demand plus a shell-startup one-liner~~ | Q39 (open) | No terminal, so no shell hook. |
 | ~~`diverged` = behind base by > 20 commits~~ (and every other fixed threshold) | D11 | All thresholds move to settings. |
 | ~~Success metric: branch reduction~~ | D7 | The goal is the opposite. |
@@ -72,4 +79,8 @@ Kept because the arguments still explain how the current design was reached.
 
 See [`open-questions.md`](open-questions.md) §2 (conflicts C1–C6) and §3 (decisions Q30–Q40).
 
-**Blocking:** Q30 (the stack) and C1 (where the LLM goes).
+**Nothing is blocking.** Q30, Q31 and C1 were answered on 16 Sep (→ D20–D23). What remains
+is smaller: C4 (scale), C5 (timestamp display), C6 (evolving tasks), Q32 (goal cardinality),
+Q33 (Supabase vs Firebase), Q34 (GitHub auth), Q36 (the product name), Q37 (LLM titles),
+Q38 (LLM provider), Q39 (refresh cadence), Q40 (t3 code). Each has a working default and is
+answerable while Stage 1 is built.

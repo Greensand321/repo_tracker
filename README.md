@@ -19,6 +19,7 @@ load.**
 | If you want to… | Read |
 |---|---|
 | **Understand what this is** | [`docs/requirements.md`](docs/requirements.md) |
+| **Build the next thing** | [`docs/plans/stage-1-plan.md`](docs/plans/stage-1-plan.md) |
 | Know what to do **right now** | [`docs/STATUS.md`](docs/STATUS.md) |
 | **Answer what's blocking the build** | [`docs/decisions/open-questions.md`](docs/decisions/open-questions.md) |
 | See the stages and what's in each | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
@@ -30,8 +31,6 @@ load.**
 
 ```
 repo_tracker/
-├── bearing/          ← leftover CLI skeleton from the old design; do not build on it
-├── tests/
 ├── .github/workflows ← repo infrastructure (branch-sync workflow)
 └── docs/
     ├── requirements.md   what the tool actually is  ← start here
@@ -49,14 +48,15 @@ repo_tracker/
 
 ## Current state
 
-Planning. Nothing is implemented.
+Planned, not yet built. **Stage 1 is ready to start** —
+[`docs/plans/stage-1-plan.md`](docs/plans/stage-1-plan.md).
 
-The product was substantially redefined on 15 Sep 2026 once the owner's workflow was
-understood — branches come from AI agents on GitHub, not from a developer at a keyboard.
-The older spec and plans describe a different tool and are marked superseded.
+The product was redefined on 15 Sep 2026 once the real workflow was understood: branches
+come from AI agents on GitHub, not from a developer at a keyboard. The older spec and plans
+describe a different tool and are marked superseded.
 
-**Two things block the first build** — the stack, and where the LLM belongs. Both are in
-[`docs/decisions/open-questions.md`](docs/decisions/open-questions.md).
+**The stack:** a local program plus a browser UI, in TypeScript. You click `start.bat`, it
+opens the dashboard in your browser. Nothing blocks the build.
 
 ## Ground rules
 

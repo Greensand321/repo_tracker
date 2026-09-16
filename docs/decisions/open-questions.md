@@ -2,6 +2,9 @@
 
 **Round 1:** asked 15 Sep 2026, **answered 15 Sep 2026**. Recorded in §1 below.
 **Round 2:** the conflicts those answers created (§2) and the decisions still needed (§3).
+**Q30, Q31 and C1 were answered 16 Sep** and became decisions D20–D23 — **nothing is
+blocking now.** Everything still open has a working default and can be settled while
+Stage 1 is built.
 
 Answers go inline. Anything that settles a design choice graduates to
 [`decision-log.md`](decision-log.md); anything that describes the product goes to
@@ -49,7 +52,11 @@ Answers go inline. Anything that settles a design choice graduates to
 These are places where two things you said cannot both be true as stated. Each needs a
 one-line answer from you.
 
-### C1 — The LLM cannot be both deferred and second **[BLOCKING]**
+### C1 — The LLM cannot be both deferred and second ✅ **ANSWERED 16 Sep → D21**
+
+**Answer: Stage 2**, right after the git history. Reasoning below stands.
+
+
 
 You said (Q2) to keep the LLM deferred until last. But you also said the LLM should do the
 upkeep of judging branch and milestone progress (Q7), that plain-English summaries are the
@@ -115,7 +122,12 @@ from you.
 
 ## 3. Round 2 — decisions still needed
 
-### Q30 — The stack **[BLOCKING — everything waits on this]**
+### Q30 — The stack ✅ **ANSWERED 16 Sep → D20**
+
+**Answer: option A — a local program + browser UI — in TypeScript.** Planned in
+[`../plans/stage-1-plan.md`](../plans/stage-1-plan.md) §1. Reasoning below stands.
+
+
 
 You want: click something → the app opens · reads GitHub · stores your notes and goals ·
 syncs to a second machine · is a proper installed program eventually · developed from VS
@@ -151,7 +163,12 @@ your preference.
 
 ---
 
-### Q31 — Which mockup, exactly? **[BLOCKING for 1.7]**
+### Q31 — Which mockup, exactly? ✅ **ANSWERED 16 Sep → D22**
+
+**Answer: `design/dashboard-concept.html`.** What it can and cannot show with Stage 1 data
+is mapped field by field in [`../plans/stage-1-plan.md`](../plans/stage-1-plan.md) §4.
+
+
 
 "Start with the first mockup" is ambiguous — there are two candidates and they are very
 different:
