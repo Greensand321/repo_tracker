@@ -136,3 +136,38 @@ test('branch names with slashes survive the round trip into a URL', async () => 
 
   assert.match(calls[0]!.url, /main\.\.\.claude%2Fkind-meitner-cpis9v/);
 });
+
+// --- token checking (the first thing anyone does, so it must not reject a good token) ---
+
+test('a token is checked against a configured repo, not GET /user', async () => {
+  // A fine-grained token with no Account permissions can be refused at /user while
+  // being perfectly good for every call this tool makes. Checking a real repo proves
+  // both that the token works and that it can see the work.
+  const { calls } = stub({
+    status: 200,
+    body: { name: 'repo_tracker', owner: { login: 'greensand321' }, default_branch: 'main', html_url: 'u' },
+  });
+  const result = await verifyToken('t', ['greensand321/repo_tracker']);
+
+  assert.equal(result.repo, 'greensand321/repo_tracker');
+  assert.equal(result.login, 'greensand321');
+  assert.match(calls[0]!.url, /\/repos\/greensand321\/repo_tracker$/);
+  assert.doesNotMatch(calls[0]!.url, /\/user$/);
+});
+
+test('with no repos configured yet it falls back to GET /user', async () => {
+  const { calls } = stub({ status: 200, body: { login: 'greensand321' } });
+  const result = await verifyToken('t', []);
+
+  assert.equal(result.login, 'greensand321');
+  assert.equal(result.repo, null);
+  assert.match(calls[0]!.url, /\/user$/);
+});
+
+test('a token that cannot see the repo is rejected with the repo named', async () => {
+  stub({ status: 404 });
+  await assert.rejects(verifyToken('t', ['greensand321/private-thing']), (err: GitHubError) => {
+    assert.equal(err.repo, 'greensand321/private-thing');
+    return true;
+  });
+});

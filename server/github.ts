@@ -205,9 +205,26 @@ export async function fetchCheckRuns(
   }
 }
 
-/** Used by the settings screen to verify a pasted token before saving it. */
-export async function verifyToken(token: string): Promise<{ login: string }> {
+export type TokenCheck = { login: string | null; repo: string | null };
+
+/**
+ * Checks a pasted token before it is saved.
+ *
+ * Prefers checking against a repo you actually configured, because that proves two
+ * things at once: the token works, AND it can see your work. `GET /user` proves only
+ * the first — and a fine-grained token with no *Account* permissions (which is exactly
+ * what Bearing asks you to create) can legitimately be refused there while being
+ * perfectly good for everything this tool does. Verifying via `/user` alone would
+ * reject a working token at the door.
+ */
+export async function verifyToken(token: string, repos: string[] = []): Promise<TokenCheck> {
+  const first = repos.find((repo) => repo.trim());
+  if (first) {
+    const repo = await fetchRepo(first.trim(), token);
+    return { login: repo.owner.login, repo: first.trim() };
+  }
+
   const res = await request('/user', { token });
-  const user = (await res.json()) as { login: string };
-  return { login: user.login };
+  const user = (await res.json()) as { login?: string };
+  return { login: user.login ?? null, repo: null };
 }
