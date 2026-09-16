@@ -315,3 +315,25 @@ test('every branch in one run shares a session, and runs differ', async () => {
   assert.ok(runOne[0] && runOne[0] === runOne[1], 'one session across the run');
   assert.notEqual(runOne[0], runTwo[0], 'a later run is a different session');
 });
+
+// --- the tool-calling probe (docs/plans/agent-plan.md step 1) ---
+
+import { findToolCall } from '../server/advise/probe.ts';
+
+test('a tool call is found in both response shapes', () => {
+  assert.deepEqual(
+    findToolCall({ choices: [{ message: { tool_calls: [{ function: { name: 'get_branch', arguments: '{"repo":"a/b"}' } }] } }] }),
+    { name: 'get_branch', args: '{"repo":"a/b"}' },
+  );
+  assert.deepEqual(
+    findToolCall({ content: [{ type: 'text', text: 'let me look' }, { type: 'tool_use', name: 'get_branch', input: { repo: 'a/b' } }] }),
+    { name: 'get_branch', args: '{"repo":"a/b"}' },
+  );
+});
+
+test('a prose reply is not mistaken for a tool call', () => {
+  // The failure that matters: a model that accepts `tools` and then ignores them.
+  assert.equal(findToolCall({ choices: [{ message: { content: 'I would look up that branch.' } }] }), null);
+  assert.equal(findToolCall({ content: [{ type: 'text', text: 'I would look it up.' }] }), null);
+  assert.equal(findToolCall({}), null);
+});

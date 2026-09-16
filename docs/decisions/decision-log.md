@@ -70,6 +70,10 @@ open: [`open-questions.md`](open-questions.md).
 
 | D50 | **The page and its bundle are served `no-store`, and the UI shows a banner on any uncaught error.** | The bundle is built once at startup while `index.html` is read per request, so a browser holding an older `/app.js` pairs it with newer HTML. The old code then looks for an element the new page no longer has, throws, and the interface silently stops responding — and *reloading is what serves the stale copy*, so the obvious remedy does not work. It bricked a running install. Caching a 100 KB file from localhost buys nothing; a visible failure buys everything. |
 
+| D51 | **"Agent-native" means native to the program, not the browser.** The agent runs server-side, reads and writes the tool's own data through a tool catalogue, and the page is its surface. It does not drive a browser and does not run in the page. | Owner's clarification. The program already holds both keys, the cache and the history, so tools are local function calls over data in memory and no secret reaches the browser. |
+| D52 | **The agent writes Plane B on its own — no per-action confirmation — and every write is visible and reversible, with a log of what it did.** | Filing a hundred branches into goals is only a saving if you are not confirming each one. The safety comes from visibility and undo rather than from a prompt before each write. Plane A stays untouchable regardless (D1). |
+| D53 | **Job order: answer questions → what changed since I last looked → file branches into goals → judge progress → spot drift and overlap.** | Owner's agreement with the proposed ranking. The first two need no data that does not already exist, which is why the agent comes before the organising layer rather than after it. |
+
 ---
 
 ## 2. Carried over from the old documents

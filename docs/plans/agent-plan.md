@@ -161,17 +161,14 @@ Steps 1–4 are all engine. Only step 5 waits on the design files.
 
 ## Open questions
 
-**Q50 — "Natively within the browser": what do you mean?** My reading is that the work
-happens in the app rather than a terminal, with the agent running server-side and the
-browser as its surface. The alternatives — the agent running *in* the page, or the agent
-driving a real browser to click things — are very different products.
+**Q50 — "Natively": in the browser or in the program?** ✅ **Answered → D51.** Native to
+the *program*: server-side, reading and writing its own data easily, with the page as its
+surface. Not browser automation, not running in the page.
 
-**Q51 — Which jobs matter most?** J1–J5 above, ranked. I have guessed at the order.
+**Q51 — Which jobs matter most?** ✅ **Answered → D53.** The order above stands: J1 → J5.
 
-**Q52 — Should the agent write on its own, or propose?** Filing a hundred branches into
-goals is only a saving if you are not confirming each one. But an agent quietly
-mislabelling things is worse than no labels. My instinct: it writes freely, every write is
-visible and reversible, and there is a log of what it did.
+**Q52 — Should the agent write on its own, or propose?** ✅ **Answered → D52.** It writes
+on its own. Everything visible, everything reversible, with a log.
 
 **Q53 — One question at a time, or a continuing conversation?** Fresh context per question
 is simpler and always correct. A thread is nicer to use and risks staleness.
