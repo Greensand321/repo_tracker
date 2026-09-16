@@ -42,7 +42,7 @@ This is the part the old spec got wrong, and everything downstream depends on it
 | **Where work lands** | The owner merges to `main` manually, or in bulk via `.github/workflows/sync-branches.yml` when several branches finish together. |
 | **Terminal use** | Almost never. Only to debug something specific. |
 | **Machines** | Two, used daily, both regularly. |
-| **Scale** | ~8 repos tracked; 3–4 active at a time; ≤4 branches each actively moving; ~40 branches total is steady state. **[OPEN — confirm]** |
+| **Scale** | ~8 repos tracked; 3–4 active at a time. **~100 branches total**, all of which eventually enter the tool; **a few dozen stay relevant** and the rest simply go stale. Stale branches fold away in the UI — they are never deleted and never dropped from the data. |
 
 ### What this implies
 
@@ -71,17 +71,17 @@ solved to prove this is possible."*
 
 ### R2 — An organizing hierarchy the owner defines
 ```
-Milestone   — release-level. "A major marker of progress," like a version.
-  └─ Goal   — a body of work under a milestone. Has many tasks.
-       └─ Task — one task per branch.
-            └─ Branch — the literal git branch (the agent session's branch)
+Milestone      — release-level. "A major marker of progress," like a version.
+  └─ Goal      — a body of work under a milestone. Holds many branches.
+       └─ Branch — the literal git branch (one agent session). Exactly ONE goal per branch.
+            └─ Sub-task — may diverge from the branch's goal.
 ```
 - The owner authors milestones and goals **by hand**, in the GUI.
-- Tasks map one-to-one with branches.
-- A goal holds many tasks. A milestone holds many goals.
-- **[OPEN]** Can a branch serve more than one goal? Current reading: one task per branch,
-  one goal per task — but the owner said *"I want the option to assign as many branches to
-  however many tasks."* Needs settling before the schema is written.
+- **One goal per branch**, which keeps every view unambiguous.
+- **Sub-tasks live under a branch and may diverge from its goal** — this is where the
+  reality of a week-long session that wandered gets absorbed.
+- **The task is whatever the branch is doing now.** The LLM re-titles it as the branch
+  evolves; nothing is fixed at creation and left to rot.
 
 ### R3 — Tags
 Free-form tags on branches, so the owner can see which branches align with a theme
@@ -108,6 +108,17 @@ command.
 A comment tool next to anything the AI produced, so the owner can record what was good or
 bad about it and **tune prompts later**. This is a personal feedback log against LLM
 outputs, not repo content.
+
+### R11 — Change over time
+Track how branch, goal and milestone state changes, so the owner can measure *what* moved
+and *by how much*. This is why dated snapshots start being written in Stage 1 (D31) even
+though nothing reads them until later: **change history cannot be reconstructed
+retroactively.**
+
+### R12 — Talking to the LLM
+A conversational surface in the GUI is a **requirement**, not an optional extra. It is the
+one place the owner always types. Consequence: because an input surface exists anyway,
+notes (R6) become nearly free — "view-only for now" saves less than it appears to.
 
 ### R8 — Settings
 Thresholds and display options are editable in a settings screen. **Nothing hardcoded** —

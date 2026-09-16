@@ -2,9 +2,9 @@
 
 **Round 1:** asked 15 Sep 2026, **answered 15 Sep 2026**. Recorded in §1 below.
 **Round 2:** the conflicts those answers created (§2) and the decisions still needed (§3).
-**Q30, Q31 and C1 were answered 16 Sep** and became decisions D20–D23 — **nothing is
-blocking now.** Everything still open has a working default and can be settled while
-Stage 1 is built.
+**Round 2 closed 16 Sep 2026** → decisions D20–D36. **Everything is answered.** The single
+item worth one more look is **Q37** (an LLM-written title beside the branch name), which is
+re-explained below with an example and only matters once Stage 2 starts.
 
 Answers go inline. Anything that settles a design choice graduates to
 [`decision-log.md`](decision-log.md); anything that describes the product goes to
@@ -71,7 +71,7 @@ hand, which is exactly what you said you did not want.
 stay last, and I will move the organizing layer ahead of it — but then expect to file
 branches into goals manually until it arrives.
 
-### C2 — "Read-only" versus notes, tags, goals and comments
+### C2 — "Read-only" versus notes, tags, goals and comments ✅ **CONFIRMED → D1**
 
 Not really a conflict once split apart, but the old docs conflated it, so here it is
 explicitly. **Two planes:**
@@ -85,7 +85,7 @@ explicitly. **Two planes:**
 
 **Confirm this is what you meant.** Everything downstream assumes it.
 
-### C3 — Offline-first versus the cloud
+### C3 — Offline-first versus the cloud ✅ **CONFIRMED → D10**
 
 Every old document insists the tool does no networking and works fully offline. Your
 answers make it network-dependent by design: GitHub is the data source, and sync runs
@@ -94,20 +94,29 @@ through Supabase or Firebase.
 **Resolution I have written down:** network-first, with the local cache providing a
 degraded read-only offline view. Flag if you wanted stronger offline behaviour.
 
-### C4 — 8 repos × 4 branches, versus 40 branches
+### C4 — How many branches, really? ✅ **ANSWERED → D35**
+
+**Answer: ~100 branches.** All of them eventually enter the tool; a few dozen stay relevant and the rest go stale. Stale branches fold away in the UI — never deleted.
+
 
 Q6 says ~8 repos, 3–4 active at a time, ≤4 branches each — that is 12–16 active branches.
 Q10 says 40 is steady state. I have assumed **~40 branches exist across 8 repos, of which
 12–16 are actively moving at any time.** Confirm, because it decides whether the default
 view shows everything or only what is live.
 
-### C5 — "I don't care what time it was committed" versus "descriptions, time, etc."
+### C5 — Timestamps ✅ **ANSWERED**
+
+**Answer: relative time ("2 days ago") is a useful tidbit, not the focus.** Commit messages are the headline.
+
 
 Q25 says timestamps are noise; Q27 lists time as something you want shown. **I have assumed
 the commit message is the headline and time appears as a relative subtitle** ("2 days
 ago"), with exact timestamps and SHAs available but not prominent. Confirm.
 
-### C6 — Long evolving sessions versus one task per branch
+### C6 — Long evolving sessions versus one task per branch ✅ **ANSWERED → D30, D31**
+
+**Answer: the task is whatever the branch is doing now**, with change tracked over time so the owner can measure what moved and by how much. That second half is why dated snapshots start in Stage 1.
+
 
 You said a session can run a week or more and evolve as the work changes (Q1), but also
 that it is one task per branch (Q8). If a branch's work changes shape halfway through, its
@@ -188,7 +197,10 @@ not apply when agents did the work.
 
 ---
 
-### Q32 — Can a branch serve more than one goal?
+### Q32 — Can a branch serve more than one goal? ✅ **ANSWERED → D29**
+
+**Answer: one goal per branch. Sub-tasks live under the branch and may diverge from that goal.**
+
 
 You said one task per branch, goals have many tasks — but also *"I want the option to
 assign as many branches to however many tasks."* Those differ.
@@ -204,7 +216,10 @@ you the flexibility without the ambiguity.
 
 ---
 
-### Q33 — Supabase or Firebase?
+### Q33 — Supabase or Firebase? ✅ **ANSWERED → D28**
+
+**Answer: Supabase.**
+
 
 Only Plane B syncs — goals, tasks, tags, notes, comments, settings. Kilobytes of text.
 
@@ -216,7 +231,10 @@ editor. Firebase is document-oriented and would fit this hierarchy less naturall
 
 ---
 
-### Q34 — How should it authenticate to GitHub?
+### Q34 — How should it authenticate to GitHub? ✅ **ANSWERED → D27**
+
+**Answer: a fine-grained read-only token pasted into settings.**
+
 
 **Options:** (a) a personal access token you paste into settings once (simplest, works
 immediately, you control the scopes); (b) a GitHub App / OAuth flow (nicer, more setup,
@@ -230,7 +248,10 @@ never synced to the cloud.
 
 ---
 
-### Q35 — What happens when you click a branch? *(this was Q5, re-explained)*
+### Q35 — What happens when you click a branch? ✅ **ANSWERED → D26**
+
+**Answer: option (b)** — it expands to show the full commit history and detail, plus buttons that open the branch and its PR on GitHub. It never checks anything out.
+
 
 My original question was badly worded. Plainly: **when you click a branch on the screen,
 what do you want to happen?**
@@ -248,7 +269,10 @@ the action you actually want.
 
 ---
 
-### Q36 — Is it called "Bearing"? *(this was Q12, re-explained)*
+### Q36 — Is it called "Bearing"? ✅ **ANSWERED → D25**
+
+**Answer: yes, Bearing.** The repo stays `repo_tracker`; the app is Bearing.
+
 
 "Bearing" is the product name used throughout the spec and mockups you were given — it
 came from those documents, not from you, which is presumably why it did not land. The
@@ -262,20 +286,41 @@ later.
 
 ---
 
-### Q37 — Does the LLM get to write a human-readable title per branch?
+### Q37 — Does the LLM get to write a human-readable title per branch? ⚠️ **CONFIRM**
 
-The old spec locked "always literal git branch names, never invented ones." But the mockups
-show human titles ("the signup flow") and you want plain English over raw git.
+You said yes but flagged that the question was unclear. Concretely, this is the difference:
 
-**Proposal:** the literal branch name is always shown and always searchable; the LLM adds a
-generated one-line title *alongside* it, clearly marked as generated. Best of both — you
-can still find the branch, but you read English first.
+**Without it** — the card is headed by the branch name:
+```
+feat/stripe-webhook-retry-idempotency
+  ↑ 23 commits · CI passing · 2 days ago
+```
 
-**Answer:**
+**With it** — the LLM reads the commits and writes a short title, shown above the real name:
+```
+Stopping duplicate webhook charges          ← written by the LLM, marked as generated
+feat/stripe-webhook-retry-idempotency       ← always present, always searchable
+  ↑ 23 commits · CI passing · 2 days ago
+```
+
+The real branch name never disappears — you can always find and check out the thing. The
+generated line is there so you can scan twenty cards and know what each one *is* without
+decoding branch names.
+
+This is what the mockup means by `name: "the signup flow"` sitting next to
+`path: "feat-onboarding"`.
+
+**Cost of yes:** one extra sentence per LLM call, and occasionally a title that is slightly
+wrong until the branch moves again. **Cost of no:** you read branch names.
+
+**Answer: provisionally yes — confirm before Stage 2 renders one.**
 
 ---
 
-### Q38 — Which LLM, and who pays for the calls?
+### Q38 — Which LLM, and who pays for the calls? ✅ **ANSWERED → D32**
+
+**Answer: OpenCode Zen**, one API key pasted into settings. Revisit a cheaper pay-as-you-go option later, which would need spend safeguards first.
+
 
 Stage 2 needs a provider. The old build plan named OpenCode Zen; that was chosen for a
 different design. Options: the Anthropic API directly (a key in settings, pay per use),
@@ -288,7 +333,10 @@ be cents per day, not dollars.
 
 ---
 
-### Q39 — How fresh should the data be?
+### Q39 — How fresh should the data be? ✅ **ANSWERED → D34**
+
+**Answer: fresh on open, then live — constantly updating in the background.** Affordable at ~100 branches only because of the change-detection design in `plans/stage-1-plan.md` §5.
+
 
 **Options:** refresh when you open the app · refresh on a button · refresh in the
 background every N minutes.
@@ -300,7 +348,10 @@ Background refresh arrives with packaging (Stage 5).
 
 ---
 
-### Q40 — Does t3 code need different handling?
+### Q40 — Does t3 code need different handling? ✅ **ANSWERED → D36**
+
+**Answer: no.** Both agents push ordinary branches with ordinary commits.
+
 
 You mentioned agents are Claude Code *and sometimes t3 code*. If they name branches
 differently, or if one of them leaves metadata the other does not, the tool may need to

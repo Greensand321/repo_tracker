@@ -1,0 +1,20 @@
+[
+  {
+    "number": 41, "title": "Old attempt at webhook retries", "state": "closed",
+    "draft": false, "merged_at": null,
+    "html_url": "https://github.com/greensand321/harbor-api/pull/41",
+    "head": { "ref": "feat/stripe-webhook-retry" }, "updated_at": "2026-08-01T10:00:00Z"
+  },
+  {
+    "number": 52, "title": "Idempotent webhook handling", "state": "open",
+    "draft": false, "merged_at": null,
+    "html_url": "https://github.com/greensand321/harbor-api/pull/52",
+    "head": { "ref": "feat/stripe-webhook-retry" }, "updated_at": "2026-09-14T09:00:00Z"
+  },
+  {
+    "number": 48, "title": "Rotate the refresh secret", "state": "closed",
+    "draft": false, "merged_at": "2026-09-10T12:00:00Z",
+    "html_url": "https://github.com/greensand321/harbor-api/pull/48",
+    "head": { "ref": "fix/auth-refresh" }, "updated_at": "2026-09-10T12:00:00Z"
+  }
+]

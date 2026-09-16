@@ -1,0 +1,6 @@
+[
+  { "name": "main", "commit": { "sha": "aaa0000" } },
+  { "name": "feat/stripe-webhook-retry", "commit": { "sha": "bbb1111" } },
+  { "name": "fix/auth-refresh", "commit": { "sha": "ccc2222" } },
+  { "name": "chore/old-experiment", "commit": { "sha": "ddd3333" } }
+]

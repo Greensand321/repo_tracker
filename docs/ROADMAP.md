@@ -9,9 +9,9 @@ Ordered by the owner's stated priorities: **git history on screen in plain Engli
 > terminal CLI. See `requirements.md` §9. Stages 1–5 replace it, and
 > `plans/phase-0-plan.md` is superseded pending a rewrite.
 
-> ✅ **Unblocked 16 Sep 2026.** The stack is a **local program + browser UI in TypeScript**
-> (D20); the **LLM lands at Stage 2** (D21); the build target is
-> **`design/dashboard-concept.html`** (D22). Stage 1 is planned in
+> ✅ **All questions answered, 16 Sep 2026** (D20–D36). The stack is a **local program +
+> browser UI in TypeScript**; the **LLM lands at Stage 2**; the build target is
+> **`design/dashboard-concept.html`**; the app is called **Bearing**. Stage 1 is planned in
 > [`plans/stage-1-plan.md`](plans/stage-1-plan.md) and ready to build.
 
 ---
@@ -43,7 +43,7 @@ Three rules. The first two carry over from the old plan because they were right:
 
 ---
 
-## Stage 1 — The git history on screen  `← NEXT`
+## Stage 1 — The git history on screen  ✅ **BUILT**
 
 **The proof.** *"If exactly one thing worked a week from now it would be having the git
 logs show up in the mockups I created — all of the descriptions from the commits, time,
@@ -58,7 +58,8 @@ actually done — in the commit authors' own words, newest first, grouped by rep
 | 1.2 | List branches per repo with their PR state | `main` is the base, always |
 | 1.3 | **Commit history per branch** — message, body, author, date, SHA | The core of the stage |
 | 1.4 | PR state and CI status per branch | Cheap once you are already calling the API |
-| 1.5 | Local cache: instant reopen, incremental re-fetch, degraded offline mode | |
+| 1.5 | Local cache + ETag change detection + live background updates | ~100 branches; costs near zero when nothing moved |
+| 1.5b | **Dated snapshots written from day one** | D31 — change history cannot be backfilled |
 | 1.6 | Supporting metadata: ahead/behind `main`, last activity, diff size | Secondary display, never the headline |
 | 1.7 | Render into `design/dashboard-concept.html`'s layout | Board and Timeline light up; "Needs you" runs on CI + PR state; "Your notes" waits for Stage 3 |
 | 1.8 | Settings screen: repos, refresh interval, display caps, thresholds | R8 — nothing hardcoded |
@@ -70,18 +71,22 @@ every active thread is doing — without opening GitHub.
 
 ---
 
-## Stage 2 — LLM insight over the history
+## Stage 2 — LLM insight over the history  **engine built**
 
 **The payoff, and your #2 priority.** Everything here needs only Stage 1 data.
 
-| # | Feature | Notes |
+| # | Feature | Status |
 |---|---|---|
-| 2.1 | **Summarize a branch** from its commits — what this thread is actually doing, in a sentence or two | The thing that makes the screen look like the mockup |
-| 2.2 | **Judge state**: progressing · stalled · blocked · effectively done | R4 |
-| 2.3 | **"What changed since I last looked"** across everything | R5 |
-| 2.4 | Cache by branch head SHA — re-summarize only when the branch actually moves | Keeps cost near zero on idle branches |
-| 2.5 | **Comment tool on every LLM output**, stored locally for prompt-tuning | R7. Local storage now; Stage 4 syncs it. |
-| 2.6 | Every summary shows its evidence — which commits it came from | So a wrong summary is debuggable, not mysterious |
+| 2.1 | **Summarize a branch** from its commits — what this thread is actually doing | ✅ built |
+| 2.2 | **Judge state**: progressing · stalled · blocked · done | ✅ built |
+| 2.4 | Cache by head SHA + prompt version + model — idle branches cost nothing | ✅ built (D39) |
+| 2.6 | Every summary cites its commits, validated against the branch | ✅ built (D40) |
+| 2.3 | **"What changed since I last looked"** across everything | ⏸ a view, not an engine feature — waits for the new design |
+| 2.5 | **Comment tool on every LLM output**, for prompt-tuning | ⏸ waits for the interface redesign (R7) |
+| 2.7 | **Conversation surface** — talk to the LLM about what it is showing you | ⏸ waits for the interface redesign (R12) |
+
+The three paused items are all *surfaces*. They were left deliberately rather than built
+twice against a mockup that turned out to be superseded.
 
 **Exit:** you open it after two days away and it tells you what moved and what stalled,
 without you reading a single commit.
@@ -96,7 +101,7 @@ under milestones.
 | # | Feature | Notes |
 |---|---|---|
 | 3.1 | Author milestones and goals in the GUI | The one thing you maintain by hand |
-| 3.2 | Task per branch; tasks belong to goals | **[OPEN — cardinality, Q32]** |
+| 3.2 | One goal per branch; sub-tasks under a branch may diverge from it | D29 |
 | 3.3 | Tags on branches — free-form, many-to-many | R3 |
 | 3.4 | Notes on branches / tasks / goals, entered in the GUI | R6 |
 | 3.5 | Views: by goal, by milestone, by tag, plus the flat fleet view | |
@@ -115,7 +120,7 @@ This syncs Plane B only.
 
 | # | Feature | Notes |
 |---|---|---|
-| 4.1 | Choose and set up the backend | **[OPEN — Supabase or Firebase, Q33]** |
+| 4.1 | Set up Supabase | D28 |
 | 4.2 | Schema for Plane B: milestones, goals, tasks, tags, notes, comments, settings | Small |
 | 4.3 | Local-first writes, background push, last-write-wins per record | One user, two machines — conflicts are rare and cheap |
 | 4.4 | Local backup file alongside the cloud copy | You asked for both |
@@ -150,10 +155,9 @@ Dropped by your answers. Kept here so the reasoning is not lost.
 
 ## Nothing is blocked
 
-The gating decisions were answered on 16 Sep. **Stage 1 is ready to build** —
+Every question is answered (D20–D36). **Stage 1 is ready to build** —
 [`plans/stage-1-plan.md`](plans/stage-1-plan.md).
 
-What is still open has a working default and can be settled while Stage 1 is built:
-C4 (scale) · C5 (timestamp display) · C6 (evolving tasks) · Q32 (goal cardinality) ·
-Q33 (Supabase vs Firebase) · Q34 (GitHub auth) · Q36 (the product name) · Q37 (LLM titles
-alongside branch names) · Q38 (LLM provider) · Q39 (refresh cadence) · Q40 (t3 code).
+One item to confirm before Stage 2 renders it: **Q37**, whether the LLM may write a short
+plain-English title beside the literal branch name. Example in
+[`decisions/open-questions.md`](decisions/open-questions.md).

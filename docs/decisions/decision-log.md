@@ -37,6 +37,28 @@ open: [`open-questions.md`](open-questions.md).
 | D23 | **Vanilla TS on the front end, not a framework.** | The mockup is vanilla HTML/CSS/JS, so it transplants directly rather than being reimplemented — and Stage 1 is exactly "make the mockup show real data." Revisit at Stage 3 if the UI gets painful; contained, because everything renders one data structure. |
 | D24 | **Only commits *ahead of* `main` are shown**, via the GitHub `compare` endpoint. | A branch's full history is mostly `main`'s and says nothing about the thread. One call returns the branch's own commits, ahead/behind, and diff size together. |
 
+| D25 | **The product is called Bearing.** | Confirmed by the owner. The repo stays `repo_tracker`; the app is Bearing. |
+| D26 | **Clicking a branch expands its detail and offers links out to GitHub** — the branch and its PR. It never checks anything out. | Follows from D1. The work happens on GitHub, so jumping to the PR is the action actually wanted. |
+| D27 | **GitHub auth: a fine-grained, read-only token pasted into settings.** Stored in `data/`, gitignored, never synced to the cloud. Each machine gets its own. | Simplest thing that works, scopes controlled by the owner, no OAuth flow to build. |
+| D28 | **Supabase for Plane B.** | The data is relational (milestone → goal → branch → sub-task); it is plain Postgres you can inspect and repair yourself; the free tier covers kilobytes of text comfortably. |
+| D29 | **Hierarchy: Milestone → Goal → Branch → Sub-task.** Exactly one goal per branch. Sub-tasks live under a branch and **may diverge from its goal**. | The owner's structure. One goal per branch keeps every view unambiguous; sub-tasks absorb the reality that a long session wanders. |
+| D30 | **The task is whatever the branch is doing *now*.** The LLM re-titles it as the branch evolves. | Sessions run a week or more and change shape. A task fixed at creation would drift out of date and need manual upkeep — exactly what the owner does not want. |
+| D31 | **Store dated snapshots of branch state from Stage 1 onward**, even though nothing reads them yet. | The owner wants to measure what changed and by how much. Change over time cannot be reconstructed retroactively — if the history is not being written now, that feature is impossible later. Cheap now, impossible to backfill. |
+| D32 | **LLM provider: OpenCode Zen**, one API key pasted into settings (OpenAI-compatible). | The owner's choice. Revisit if volume stays low enough to justify a cheaper pay-as-you-go option, which would need more spend safeguards. |
+| D33 | **Talking to the LLM is a requirement, not an optional surface.** The GUI has a text input from Stage 2 onward. | Stated directly. It also means notes (R6) become nearly free once an input surface exists, so "view-only for now" is a smaller saving than it looks. |
+| D34 | **Refresh on open, then keep updating in the background** using conditional requests. | The owner wants it live. ETags make unchanged responses cost nothing against the rate limit, so continuous polling is affordable — see `plans/stage-1-plan.md` §5. |
+| D35 | **~100 branches, of which a few dozen stay relevant.** Stale branches fold away in the UI; they are never hidden from the data and never deleted. | The owner's actual scale. Staleness is a display concern, not a hygiene feature (D7). |
+| D36 | **t3 code needs no special handling.** Both agents push ordinary branches with ordinary commits. | Confirmed by the owner. |
+
+| D37 | **Talk to the provider over its OpenAI-compatible HTTP API, not a vendor SDK.** | The endpoint is deliberately swappable — the same code reaches any OpenAI-compatible provider by changing one setting. A vendor SDK would weld the choice in. |
+| D38 | **Do not send `response_format: json_object`.** Ask for JSON in the prompt and parse tolerantly (fences and chatter allowed). | OpenCode Zen fronts 100+ models of varying capability, and the ones that reject that parameter fail the entire request. Tolerance costs a few lines; a hard failure costs the feature. |
+| D39 | **Summaries are cached on `headSha` + `promptVersion` + `model`.** | A branch that has not moved is never summarised twice — that is what makes ~100 branches cost pennies. Including the prompt version means editing the prompt regenerates everything rather than leaving a silent mix of old and new. |
+| D40 | **Every commit the model cites is checked against the branch's own commits.** Invented SHAs are dropped. | A summary you cannot trace back to commits is just a claim. This is the cheapest possible hallucination guard and it costs nothing at runtime. |
+| D41 | **Enrichment never blocks the snapshot.** Cached summaries apply synchronously before serving; new ones are fetched in the background and pushed to the page as they land. | A provider that is slow, down, or out of credit must cost you the summaries and nothing else. Everything that makes the page useful is already there without the LLM. |
+| D42 | **A fatal provider error stops the run immediately.** | A rejected key or an empty balance fails identically for every branch; discovering that ninety-nine more times is pure waste. |
+| D43 | **`BEARING_DATA_DIR` overrides where the tool's data lives.** | Lets the second machine put it elsewhere, and keeps tests out of the real data directory. |
+| D44 | **A debug CLI exists (`npm run brief` / `models` / `config`) and is explicitly not a product surface.** | CLAUDE.md rule 2 already allows a debug entry point. It lets the engine be exercised and read while the interface is redesigned. No feature may be shaped around it. |
+
 ---
 
 ## 2. Carried over from the old documents
@@ -79,8 +101,9 @@ Kept because the arguments still explain how the current design was reached.
 
 See [`open-questions.md`](open-questions.md) §2 (conflicts C1–C6) and §3 (decisions Q30–Q40).
 
-**Nothing is blocking.** Q30, Q31 and C1 were answered on 16 Sep (→ D20–D23). What remains
-is smaller: C4 (scale), C5 (timestamp display), C6 (evolving tasks), Q32 (goal cardinality),
-Q33 (Supabase vs Firebase), Q34 (GitHub auth), Q36 (the product name), Q37 (LLM titles),
-Q38 (LLM provider), Q39 (refresh cadence), Q40 (t3 code). Each has a working default and is
-answerable while Stage 1 is built.
+**All questions are answered.** Round 2 closed on 16 Sep 2026 → D20–D36.
+
+The only item still genuinely open is **Q37** — whether the LLM may write a short
+plain-English title to sit beside the literal branch name. The owner said yes but noted the
+question was unclear, so it is re-explained in `open-questions.md` with an example and
+should be confirmed before Stage 2 renders one.

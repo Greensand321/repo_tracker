@@ -32,7 +32,8 @@ repos shows its real commit history in the authors' own words. No LLM yet.
 | Server | **Hono** | Tiny, properly typed, trivially replaced. Serves the UI and the API. |
 | GitHub | **Octokit** (`@octokit/rest`) | Official and typed; handles pagination and rate limits so we do not |
 | Front end | **Vite + vanilla TS** | The mockup is already vanilla HTML/CSS/JS — it lifts across almost directly, which is the fastest path to "it looks like the mockup". See the note in §7. |
-| Cache | **JSON files on disk** | Inspectable, deletable, zero setup. Plane B gets a real database in Stage 4. |
+| Cache | **JSON files on disk** | Inspectable, deletable, zero setup. Plane B gets Supabase in Stage 4 (D28). |
+| Live updates | **Server-sent events** | One-way server → page, which is all this needs. No websocket machinery. |
 
 **Why a program behind the page rather than a plain HTML file:** only a program can hold a
 GitHub token safely, write a local backup, and call the API without the browser's
@@ -109,6 +110,8 @@ type Branch = {
   pr: { number: number; title: string; state: 'open'|'merged'|'closed'; draft: boolean; url: string } | null
   ci: { state: 'passing'|'failing'|'pending'|'none'; url: string | null }
 
+  relevance: 'active' | 'quiet'   // quiet branches fold away in the UI — never deleted (D35)
+
   // Stage 2 fills these. Null in Stage 1 — the UI must render correctly with them absent.
   title: string | null         // LLM one-liner, shown ALONGSIDE `name`, marked as generated
   summary: string | null
@@ -176,13 +179,47 @@ Per branch:
 `compare` is the key call — one request returns the commits unique to the branch, the
 ahead/behind counts, and the diff size. Nothing else is needed for the commit trail.
 
-**Budget.** 8 repos × ~5 branches ≈ 96 requests for a cold run, against an authenticated
-limit of 5,000/hour. Warm runs are far cheaper: branch head SHAs are compared against the
-cache, and only changed branches are re-fetched. ETags make unchanged responses return 304,
-which does not count against the limit at all.
+**Budget at real scale — ~100 branches across 8 repos.**
+
+| Run | Cost | Why |
+|---|---|---|
+| Cold, first ever | ~216 requests | 8 branch lists + 8 PR lists + (100 × compare) + (100 × check-runs) |
+| Poll, nothing changed | **~0 against the limit** | 8 conditional branch-list requests return `304 Not Modified`, and GitHub does not count 304s against the primary rate limit |
+| Poll, 3 branches moved | ~14 | 8 branch lists (mostly 304) + 3 compares + 3 check-runs |
+
+Authenticated limit is 5,000 requests/hour, so this is comfortable — but only because of
+the change-detection design below. Polling 100 branches directly every minute would not be.
+
+### Refresh strategy — "fresh on open, then keep updating"
+
+1. **The branch list is the change detector.** `GET /branches` returns every branch's head
+   SHA in one call per repo. Send it with the stored `ETag`; an unchanged repo answers
+   `304` and costs nothing.
+2. **Only fetch detail for branches whose head SHA moved.** Everything else is served from
+   cache. A branch that has not moved in three weeks is never re-fetched.
+3. **Tier by relevance.** Active branches are polled on the normal interval; branches that
+   have gone quiet drop to a slow tier. With ~100 branches and a few dozen relevant (D35),
+   this keeps steady-state cost near zero.
+4. **Push changes to the open page** so it updates without a manual refresh. Server-sent
+   events are the simple choice; the page opens one `EventSource` and re-renders when a
+   snapshot changes.
+5. **Back off on `403`/`429`** and surface remaining quota in the UI. Never silently hammer.
+
+Interval is a setting (D11), default 60s, and pauses while the window is not focused.
 
 **Never crash on a repo.** A repo that 404s or errors produces a `warnings[]` entry and is
 skipped. One unreachable repo must not cost you the other seven.
+
+### Dated snapshots — start now, read later (D31)
+
+Every time a snapshot is built, append a compact record per branch to
+`data/history/<yyyy-mm>.jsonl`: date, repo, branch, head SHA, commit count, ahead/behind,
+CI state, PR state.
+
+Nothing in Stage 1 reads this. It exists because R11 — *measure what changed and by how
+much* — **cannot be reconstructed retroactively.** If the history is not being written from
+the first run, that feature is impossible later rather than merely unbuilt. It costs a few
+lines and a few kilobytes a month.
 
 ---
 
@@ -203,9 +240,12 @@ Each step ends somewhere visible.
 6. **Lift the mockup.** Copy `dashboard-concept.html` into `web/`, strip its sample data,
    keep its markup and CSS exactly.
 7. **Render the Board view** from the Snapshot. **This is the moment the proof lands.**
-8. **Timeline view**, then a Needs-you view driven by CI and PR state.
-9. **Cache + incremental refresh.** Instant reopen; refresh button; "as of" timestamp.
-10. **Second machine.** Clone, paste the token, confirm it works. Nothing to sync yet —
+8. **Branch detail.** Clicking a branch expands its full commit history, with links out to
+   the branch and its PR on GitHub (D26). It never checks anything out.
+9. **Timeline view**, then a Needs-you view driven by CI and PR state.
+10. **Cache, change detection, live updates.** ETag polling, the quiet/active tier, server-sent
+    events to the open page, an "as of" timestamp, and the dated history file (D31).
+11. **Second machine.** Clone, paste the token, confirm it works. Nothing to sync yet —
     all of this comes from GitHub.
 
 **Step 7 is the milestone.** Everything after it is improvement; everything before it is
@@ -226,12 +266,15 @@ plumbing.
   branch's own work.
 - **Token in `data/`, gitignored, never synced to the cloud.** Each machine gets its own.
 
-## 8. Still open — none of these block step 1
+## 8. Settled since the first draft
 
-- **Q34 — auth method.** Proceeding with a pasted personal access token (fine-grained,
-  read-only, scoped to your repos). Say if you want a GitHub App instead.
-- **Q36 — the product name.** `repo_tracker` in the repo, "Bearing" in the old documents.
-  Only affects window titles and the header.
-- **C4 — scale.** Assuming ~40 branches across 8 repos, 12–16 moving at once. Only affects
-  default display caps.
-- **C5 — timestamps.** Assuming relative ("2 days ago") as the default, exact on hover.
+- **Name:** Bearing (D25). The repo stays `repo_tracker`.
+- **Auth:** a fine-grained read-only token pasted into settings (D27).
+- **Scale:** ~100 branches, a few dozen relevant — drives the change-detection design in §5.
+- **Timestamps:** relative ("2 days ago"), small, never the focus.
+- **Clicking a branch:** expands detail, links out to GitHub, checks out nothing (D26).
+- **Refresh:** fresh on open, then live in the background (D34).
+
+**One item still worth confirming before Stage 2:** whether the LLM may write a short
+plain-English title beside the literal branch name — `open-questions.md` Q37, now with an
+example.

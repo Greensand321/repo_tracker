@@ -1,0 +1,29 @@
+{
+  "name": "bearing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A personal reference dashboard over every branch in every repo.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false server/main.ts",
+    "start": "tsx server/main.ts",
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "brief": "tsx server/cli.ts brief",
+    "models": "tsx server/cli.ts models",
+    "config": "tsx server/cli.ts config"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "esbuild": "^0.28.2",
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
