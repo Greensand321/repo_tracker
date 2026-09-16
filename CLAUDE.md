@@ -52,6 +52,11 @@ Revisit at Stage 3 if the UI gets painful.
    title may sit alongside it, clearly marked — never instead of it.
 7. **Nothing hardcoded.** Thresholds and display caps belong in settings.
 8. **Windows-first.** Two machines, used daily. Paths with spaces must work.
+9. **Write dated snapshots of branch state from day one** (D31). Nothing reads them yet.
+   They exist because "what changed and by how much" cannot be reconstructed after the
+   fact — skip this and the feature becomes impossible, not merely unbuilt.
+10. **Stale branches fold away; they are never deleted or dropped from the data** (D35).
+   ~100 branches exist, a few dozen matter at any time.
 
 ## Before adding anything
 

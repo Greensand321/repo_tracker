@@ -23,6 +23,7 @@ The four gating decisions were answered on 16 Sep:
 | **Stack** | A local program + a browser UI, in **TypeScript**. Node 22+, Hono, Octokit, Vite + vanilla TS. You click `start.bat`. |
 | **LLM** | **Stage 2** — right after the git history lands, not last. |
 | **Layout** | Build from `design/dashboard-concept.html`. |
+| **Scale** | ~100 branches; a few dozen relevant. Live background refresh via ETag change detection. |
 | **Front end** | Vanilla TS, not a framework — the mockup transplants directly. |
 
 ## The next concrete action
@@ -54,13 +55,15 @@ ages, commit counts, CI state, PR titles and the activity strip. Its invented br
 when the LLM arrives. Your notes are **Stage 3**. Field-by-field map:
 `plans/stage-1-plan.md` §4.
 
-## Still open — none of it blocks anything
+## Everything is answered
 
-Each has a working default: C4 (scale) · C5 (timestamp display) · C6 (evolving tasks) ·
-Q32 (goal cardinality) · Q33 (Supabase vs Firebase) · Q34 (GitHub auth — proceeding with a
-pasted read-only token) · Q36 (the product name) · Q37 (LLM titles alongside branch names) ·
-Q38 (LLM provider) · Q39 (refresh cadence) · Q40 (t3 code).
-See [`decisions/open-questions.md`](decisions/open-questions.md).
+Round 2 closed 16 Sep → D20–D36. The app is **Bearing**. Auth is a pasted read-only token.
+Sync is **Supabase**. The LLM is **OpenCode Zen**. One goal per branch, sub-tasks may
+diverge. Refresh is live. ~100 branches, a few dozen relevant.
+
+One item to confirm before Stage 2 renders it: **Q37** — may the LLM write a short
+plain-English title beside the literal branch name? Example in
+[`decisions/open-questions.md`](decisions/open-questions.md).
 
 ## Log
 
@@ -71,3 +74,4 @@ See [`decisions/open-questions.md`](decisions/open-questions.md).
 | 15 Sep 2026 | `sync-branches.yml` → `.github/workflows/`; 29 questions raised |
 | 15 Sep 2026 | **Owner answered. Product redefined.** `requirements.md` written; roadmap rebuilt as Stages 1–5; both old plans superseded; 6 conflicts + 11 questions raised |
 | 16 Sep 2026 | **Gating decisions made (D20–D24).** Stage 1 planned; Python skeleton deleted; nothing blocking |
+| 16 Sep 2026 | **All remaining questions answered (D25–D36).** Name, auth, Supabase, OpenCode Zen, one-goal-per-branch, live refresh, ~100 branches. Stage 1 plan revised for scale, change detection and dated history |
