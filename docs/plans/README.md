@@ -2,7 +2,8 @@
 
 | File | Scope | Status |
 |---|---|---|
-| **`stage-1-plan.md`** | **Stage 1 — the git history on screen** | ✅ **Current. Ready to build.** |
+| **`agent-plan.md`** | **Making the advisor agent-native** — tools, context, the loop | 📝 **Draft, not agreed.** Open questions Q50–Q55. |
+| `stage-1-plan.md` | Stage 1 — the git history on screen | ✅ Built |
 | `phase-0-plan.md` | A local-first CLI "Brief engine" | ⛔ Superseded 15 Sep 2026. Do not implement from it. |
 | `build-plan-v0.2.md` | Whole-product architecture and milestones M0–M7 | ⛔ Largely superseded. Mine it for patterns, not for plans. |
 
