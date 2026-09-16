@@ -1,8 +1,16 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { LlmError, complete, extractText, forgetProtocols, guessProtocol } from '../server/advise/client.ts';
 import { DEFAULT_SETTINGS, type Settings } from '../shared/types.ts';
+
+// One test below reaches through the insight store, which writes to disk. Point it at a
+// temp dir before anything imports paths.ts, so `npm test` never touches real data.
+process.env['BEARING_DATA_DIR'] = mkdtempSync(join(tmpdir(), 'bearing-client-'));
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -223,4 +231,87 @@ test('an empty-balance error points at the Go endpoint', async () => {
     assert.match(err.message, /zen\/go\/v1/, 'should name the Go endpoint');
     return true;
   });
+});
+
+// --- the session header OpenCode Go requires (400 without it since 6 Sep 2026) ---
+
+import { isOpenCode } from '../server/advise/client.ts';
+
+/** Captures the headers of every request. */
+function captureHeaders(body: unknown): { headers: Headers[] } {
+  const headers: Headers[] = [];
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    headers.push(new Headers(init.headers));
+    return new Response(JSON.stringify(body), { status: 200 });
+  }) as typeof fetch;
+  return { headers };
+}
+
+test('the session header is sent to OpenCode', async () => {
+  const { headers } = captureHeaders({ choices: [{ message: { content: 'ok' } }] });
+  const config: Settings = { ...settings('kimi-k3'), llmBaseUrl: 'https://opencode.ai/zen/go/v1' };
+
+  await complete(config, { ...request, sessionId: 'abc-123' });
+  assert.equal(headers[0]!.get('x-opencode-session'), 'abc-123');
+});
+
+test('it is not sent to other providers, which may reject unknown headers', async () => {
+  const { headers } = captureHeaders({ choices: [{ message: { content: 'ok' } }] });
+  const config: Settings = { ...settings('some-model'), llmBaseUrl: 'https://api.example.com/v1' };
+
+  await complete(config, { ...request, sessionId: 'abc-123' });
+  assert.equal(headers[0]!.get('x-opencode-session'), null);
+});
+
+test('OpenCode hosts are recognised, and lookalikes are not', () => {
+  assert.equal(isOpenCode('https://opencode.ai/zen/go/v1'), true);
+  assert.equal(isOpenCode('https://opencode.ai/zen/v1'), true);
+  assert.equal(isOpenCode('https://api.opencode.ai/v1'), true);
+  assert.equal(isOpenCode('https://api.openai.com/v1'), false);
+  assert.equal(isOpenCode('https://evil.com/opencode.ai/v1'), false);
+});
+
+test('every branch in one run shares a session, and runs differ', async () => {
+  // The system prompt is identical for every branch, so routing a run together is
+  // exactly what the header is for.
+  const seen: string[] = [];
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    seen.push(new Headers(init.headers).get('x-opencode-session') ?? '');
+    return new Response(
+      JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({ title: 'T', summary: 'S.', progress: 'done', evidence: [] }) } }],
+      }),
+      { status: 200 },
+    );
+  }) as typeof fetch;
+
+  const advise = await import('../server/advise/enrich.ts');
+  const makeSnapshot = () => ({
+    generatedAt: '2026-09-16T12:00:00Z', repos: [], warnings: [], rateLimit: null,
+    llm: { enabled: false, pending: 0, errors: [] },
+    branches: ['a', 'b'].map((name) => ({
+      repoKey: 'o/r', name, headSha: `sha-${name}-${Math.random()}`, url: 'u',
+      commits: [{ sha: 'abc1234', message: 'work', body: '', author: 'claude', authoredAt: '2026-09-15T00:00:00Z', url: 'c' }],
+      ahead: 1, behind: 0, lastActivity: '2026-09-15T00:00:00Z',
+      diff: { files: 1, additions: 1, deletions: 0 }, activity: ['2026-09-15'],
+      pr: null, ci: { state: 'none' as const, url: null }, relevance: 'active' as const,
+      isBase: false, title: null, summary: null, progress: null, insight: null,
+    })),
+  });
+
+  const config: Settings = { ...settings('kimi-k3'), llmBaseUrl: 'https://opencode.ai/zen/go/v1' };
+
+  const first = makeSnapshot();
+  advise.applyCached(first, config);
+  await advise.enrich(first, config);
+  const runOne = seen.splice(0);
+
+  const second = makeSnapshot();
+  advise.applyCached(second, config);
+  await advise.enrich(second, config);
+  const runTwo = seen.splice(0);
+
+  assert.equal(runOne.length, 2);
+  assert.ok(runOne[0] && runOne[0] === runOne[1], 'one session across the run');
+  assert.notEqual(runOne[0], runTwo[0], 'a later run is a different session');
 });
