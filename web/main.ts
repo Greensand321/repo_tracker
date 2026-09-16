@@ -8,6 +8,7 @@
 
 import type { Branch, SafeSettings, SnapshotResponse } from '../shared/types.ts';
 import { esc, relativeTime } from './format.ts';
+import { createPicker, type Picker } from './components/picker.ts';
 import { branchKey, needsAttention, renderBoard } from './views/board.ts';
 import { renderLegend, renderTimeline } from './views/timeline.ts';
 
@@ -210,6 +211,36 @@ function renderFirstRun(data: SnapshotResponse | null): void {
 // Settings
 // ---------------------------------------------------------------------------
 
+/** Built lazily so the picker exists before any settings load writes into it. */
+let modelPicker: Picker | null = null;
+
+function ensureModelPicker(): Picker {
+  modelPicker ??= createPicker({
+    mount: $('#modelPicker'),
+    placeholder: 'No model chosen',
+    emptyText: 'Save an API key, then load the list.',
+  });
+  return modelPicker;
+}
+
+/**
+ * The endpoint is a choice between two known plans, not a URL to remember. Getting it
+ * wrong reports "Insufficient balance", which reads like an empty wallet rather than
+ * the wrong plan (D48).
+ */
+function applyProviderChoice(): void {
+  const choice = $<HTMLSelectElement>('#llmProvider').value;
+  const custom = choice === 'custom';
+  $('#llmBaseUrl').classList.toggle('hidden', !custom);
+  if (!custom) $<HTMLInputElement>('#llmBaseUrl').value = choice;
+
+  $('#providerHint').innerHTML = custom
+    ? 'Any endpoint speaking the OpenAI, Anthropic or Responses API.'
+    : choice.includes('/go/')
+      ? 'Your Go subscription. Billed separately from Zen credit — a Zen balance is not used or needed.'
+      : 'Pay as you go. Needs credit on your Zen balance; a Go subscription does <b>not</b> apply here.';
+}
+
 async function openSettings(): Promise<void> {
   const settings = (await (await fetch('/api/settings')).json()) as SafeSettings;
   $<HTMLTextAreaElement>('#repos').value = settings.repos.join('\n');
@@ -220,8 +251,15 @@ async function openSettings(): Promise<void> {
   $<HTMLInputElement>('#token').placeholder = settings.hasToken
     ? 'a token is saved — leave blank to keep it'
     : 'github_pat_…';
+  const provider = $<HTMLSelectElement>('#llmProvider');
+  const known = [...provider.options].some((option) => option.value === settings.llmBaseUrl);
+  provider.value = known ? settings.llmBaseUrl : 'custom';
   $<HTMLInputElement>('#llmBaseUrl').value = settings.llmBaseUrl;
-  $<HTMLInputElement>('#llmModel').value = settings.llmModel;
+  applyProviderChoice();
+
+  const picker = ensureModelPicker();
+  picker.setValue(settings.llmModel);
+  if (!settings.llmModel) picker.setStatus(settings.hasLlmKey ? 'No model chosen' : 'Add a key first');
   $<HTMLInputElement>('#llmMaxPerRun').value = String(settings.llmMaxPerRun);
   $<HTMLInputElement>('#llmApiKey').value = '';
   $<HTMLInputElement>('#llmApiKey').placeholder = settings.hasLlmKey
@@ -252,7 +290,7 @@ async function saveSettings(): Promise<void> {
   if (token) body['token'] = token;
 
   body['llmBaseUrl'] = $<HTMLInputElement>('#llmBaseUrl').value.trim();
-  body['llmModel'] = $<HTMLInputElement>('#llmModel').value.trim();
+  body['llmModel'] = ensureModelPicker().getValue().trim();
   body['llmMaxPerRun'] = Number($<HTMLInputElement>('#llmMaxPerRun').value);
   const llmKey = $<HTMLInputElement>('#llmApiKey').value.trim();
   if (llmKey) body['llmApiKey'] = llmKey;
@@ -343,17 +381,29 @@ function wire(): void {
         $('#settingsErr').textContent = payload.error ?? 'could not load models';
         return;
       }
-      // value is the ID that gets sent; the label is only a hint. Showing the pretty
-      // name as the value is how a display name ended up being sent as a model once.
-      $('#modelList').innerHTML = (payload.models as { id: string; name?: string }[])
-        .map((model) => `<option value="${esc(model.id)}"${model.name ? ` label="${esc(model.name)}"` : ''}></option>`)
-        .join('');
-      link.textContent = `${payload.models.length} models — click the box`;
+      // The ID is what gets sent; the name is only shown. Conflating the two is how a
+      // display name once ended up being sent as a model.
+      ensureModelPicker().setOptions(
+        (payload.models as { id: string; name?: string }[]).map((model) => ({
+          value: model.id,
+          ...(model.name ? { label: model.name } : {}),
+        })),
+      );
+      link.textContent = `${payload.models.length} models loaded`;
       return;
     } catch (err) {
       $('#settingsErr').textContent = err instanceof Error ? err.message : String(err);
     }
     link.textContent = before;
+  });
+
+  $('#llmProvider').addEventListener('change', () => {
+    applyProviderChoice();
+    // The model list belongs to the old endpoint; keeping it would offer models the new
+    // plan may not serve.
+    ensureModelPicker().setOptions([]);
+    ensureModelPicker().setStatus('Load the list for this provider');
+    $('#loadModels').textContent = 'Load the list';
   });
 
   $('#openSettings').addEventListener('click', () => void openSettings());

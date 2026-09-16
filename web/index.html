@@ -132,21 +132,23 @@
     <input id="llmApiKey" type="password" autocomplete="off" spellcheck="false">
     <div class="hint">Stored on this machine only, next to the GitHub token.</div>
 
-    <div class="row">
-      <div>
-        <label for="llmBaseUrl">Provider endpoint</label>
-        <input id="llmBaseUrl" spellcheck="false">
+    <label for="llmProvider">Provider</label>
+    <select id="llmProvider">
+      <option value="https://opencode.ai/zen/go/v1">OpenCode Go — $10/month subscription</option>
+      <option value="https://opencode.ai/zen/v1">OpenCode Zen — pay as you go</option>
+      <option value="custom">Other OpenAI-compatible endpoint…</option>
+    </select>
+    <div class="hint" id="providerHint"></div>
+    <input id="llmBaseUrl" spellcheck="false" placeholder="https://…/v1" class="hidden">
+
+    <div class="row" style="align-items:flex-end">
+      <div style="flex:2">
+        <label>Model</label>
+        <div id="modelPicker"></div>
         <div class="hint">
-          Zen pay-as-you-go: <code>https://opencode.ai/zen/v1</code><br>
-          <b>OpenCode Go subscription: <code>https://opencode.ai/zen/go/v1</code></b> — Go is
-          billed separately, so the Zen URL will report an empty balance even with an active Go plan.
+          <a href="#" id="loadModels">Load the list</a> once the key is saved.
+          A model your plan cannot reach will say so when it is first used.
         </div>
-      </div>
-      <div>
-        <label for="llmModel">Model</label>
-        <input id="llmModel" list="modelList" spellcheck="false" placeholder="pick one">
-        <datalist id="modelList"></datalist>
-        <div class="hint"><a href="#" id="loadModels">Load the list</a> once a key is saved.</div>
       </div>
       <div>
         <label for="llmMaxPerRun">Max summaries per refresh</label>
