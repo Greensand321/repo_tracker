@@ -52,11 +52,18 @@ export function forgetProtocols(): void {
   learned.clear();
 }
 
+/** The OpenCode Go subscription endpoint, which is plain chat-completions for everything. */
+export const isGoEndpoint = (baseUrl: string): boolean => /\/zen\/go(\/|$)/.test(baseUrl);
+
 /**
  * First guess from the model ID. Wrong guesses are recovered from, so this only has to
  * be right often enough to save a request.
+ *
+ * The Go endpoint is the exception worth special-casing: it serves every model over
+ * `/chat/completions`, so guessing by family there would waste a request on each model.
  */
-export function guessProtocol(model: string): Protocol {
+export function guessProtocol(model: string, baseUrl = ''): Protocol {
+  if (isGoEndpoint(baseUrl)) return 'chat';
   const id = model.toLowerCase();
   if (/(^|\/)(claude|qwen|union)/.test(id)) return 'messages';
   if (/(^|\/)(gpt|grok|muse|o[0-9])/.test(id)) return 'responses';
@@ -71,7 +78,8 @@ export async function complete(settings: Settings, request: CompletionRequest): 
 
   const model = settings.llmModel;
   const known = learned.get(model);
-  const order = known ? [known] : [guessProtocol(model), ...ALL.filter((p) => p !== guessProtocol(model))];
+  const first = guessProtocol(model, settings.llmBaseUrl);
+  const order = known ? [known] : [first, ...ALL.filter((p) => p !== first)];
 
   const tried: string[] = [];
   let lastError: LlmError | null = null;
@@ -326,10 +334,19 @@ async function describeFailure(res: Response): Promise<string> {
     // Body already consumed or unreadable; the status alone will have to do.
   }
 
+  // A subscription plan billed through a different endpoint looks exactly like an empty
+  // wallet, so say so rather than sending someone to add credit they do not need.
+  const wrongPlanHint = /insufficient balance|no credit|add funds/i.test(detail)
+    ? ' — if you are on the OpenCode Go subscription, set the provider endpoint to' +
+      ' https://opencode.ai/zen/go/v1 instead; Go is billed separately from Zen credit'
+    : '';
+
   if (res.status === 401 || res.status === 403) {
-    return `the provider rejected the API key${detail ? ` — ${detail}` : ''}`;
+    return `the provider rejected the API key${detail ? ` — ${detail}` : ''}${wrongPlanHint}`;
   }
   if (res.status === 429) return `rate limited by the provider${detail ? ` — ${detail}` : ''}`;
-  if (res.status === 402) return `billing problem at the provider${detail ? ` — ${detail}` : ''}`;
-  return `provider returned ${res.status}${detail ? ` — ${detail}` : ''}`;
+  if (res.status === 402) {
+    return `billing problem at the provider${detail ? ` — ${detail}` : ''}${wrongPlanHint}`;
+  }
+  return `provider returned ${res.status}${detail ? ` — ${detail}` : ''}${wrongPlanHint}`;
 }
