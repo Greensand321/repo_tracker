@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   GitHubError,
   fetchBranches,
-  fetchCheckRuns,
+  fetchCi,
   getRateLimit,
   parseNextLink,
   splitRepoKey,
@@ -108,9 +108,35 @@ test('a 404 names the repo it could not see', async () => {
   });
 });
 
-test('a repo with checks disabled reports no CI rather than failing the branch', async () => {
+test('CI comes from Actions first, in one request', async () => {
+  const { calls } = stub({ status: 200, body: { workflow_runs: [{ status: 'completed', conclusion: 'success', html_url: 'u' }] } });
+  const ci = await fetchCi('o/r', 't', 'deadbee');
+
+  assert.equal(ci.runs?.workflow_runs.length, 1);
+  assert.equal(calls.length, 1, 'commit statuses should not be needed when Actions answered');
+  assert.match(calls[0]!.url, /\/actions\/runs\?head_sha=deadbee/);
+});
+
+test('with no Actions runs it also asks the commit-status API', async () => {
+  const { calls } = stub(
+    { status: 200, body: { workflow_runs: [] } },
+    { status: 200, body: { state: 'success', total_count: 1, statuses: [] } },
+  );
+  const ci = await fetchCi('o/r', 't', 'deadbee');
+
+  assert.equal(ci.status?.state, 'success');
+  assert.equal(calls.length, 2);
+  assert.match(calls[1]!.url, /\/commits\/deadbee\/status/);
+});
+
+test('a token lacking the CI permissions loses the CI column, not the branch', async () => {
+  // Fine-grained tokens cannot read check runs at all, and a user may well decline
+  // Actions too. Neither may fail the branch.
   stub({ status: 403, headers: { 'x-ratelimit-remaining': '4990' } });
-  assert.equal(await fetchCheckRuns('o/r', 't', 'sha'), null);
+  const ci = await fetchCi('o/r', 't', 'sha');
+
+  assert.equal(ci.runs, null);
+  assert.equal(ci.status, null);
 });
 
 // --- plumbing ---
@@ -135,4 +161,39 @@ test('branch names with slashes survive the round trip into a URL', async () => 
   await fetchCompare('o/r', 't', 'main', 'claude/kind-meitner-cpis9v');
 
   assert.match(calls[0]!.url, /main\.\.\.claude%2Fkind-meitner-cpis9v/);
+});
+
+// --- token checking (the first thing anyone does, so it must not reject a good token) ---
+
+test('a token is checked against a configured repo, not GET /user', async () => {
+  // A fine-grained token with no Account permissions can be refused at /user while
+  // being perfectly good for every call this tool makes. Checking a real repo proves
+  // both that the token works and that it can see the work.
+  const { calls } = stub({
+    status: 200,
+    body: { name: 'repo_tracker', owner: { login: 'greensand321' }, default_branch: 'main', html_url: 'u' },
+  });
+  const result = await verifyToken('t', ['greensand321/repo_tracker']);
+
+  assert.equal(result.repo, 'greensand321/repo_tracker');
+  assert.equal(result.login, 'greensand321');
+  assert.match(calls[0]!.url, /\/repos\/greensand321\/repo_tracker$/);
+  assert.doesNotMatch(calls[0]!.url, /\/user$/);
+});
+
+test('with no repos configured yet it falls back to GET /user', async () => {
+  const { calls } = stub({ status: 200, body: { login: 'greensand321' } });
+  const result = await verifyToken('t', []);
+
+  assert.equal(result.login, 'greensand321');
+  assert.equal(result.repo, null);
+  assert.match(calls[0]!.url, /\/user$/);
+});
+
+test('a token that cannot see the repo is rejected with the repo named', async () => {
+  stub({ status: 404 });
+  await assert.rejects(verifyToken('t', ['greensand321/private-thing']), (err: GitHubError) => {
+    assert.equal(err.repo, 'greensand321/private-thing');
+    return true;
+  });
 });

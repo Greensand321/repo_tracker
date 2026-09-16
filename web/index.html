@@ -93,9 +93,11 @@
     <label for="token">GitHub token</label>
     <input id="token" type="password" placeholder="github_pat_… — leave blank to keep the current one" autocomplete="off" spellcheck="false">
     <div class="hint">
-      A <b>fine-grained</b> token with <b>read-only</b> access to the repos below is enough —
-      Contents: Read, Pull requests: Read, Checks: Read.
+      A <b>fine-grained</b> token, <b>read-only</b>. Under <b>Repository permissions</b> set
+      <b>Metadata</b>, <b>Contents</b>, <b>Pull requests</b> and <b>Actions</b> to Read-only —
+      plus <b>Commit statuses</b> if your CI is not GitHub Actions. Nothing under <i>Account</i>.
       <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer noopener">Create one</a>.
+      <br>There is no <b>Checks</b> option — GitHub does not offer it to fine-grained tokens.
       It is stored in <code>data/settings.json</code> on this machine and never sent anywhere but GitHub.
     </div>
 

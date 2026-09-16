@@ -7,7 +7,7 @@
  * than the convenience of a wrapper.
  */
 
-import type { GhBranch, GhCheckRuns, GhCompare, GhPull, GhRepo } from './gh-types.ts';
+import type { GhBranch, GhCi, GhCombinedStatus, GhCompare, GhPull, GhRepo, GhWorkflowRuns } from './gh-types.ts';
 import type { RateLimit } from '../shared/types.ts';
 
 const API = 'https://api.github.com';
@@ -186,28 +186,69 @@ export async function fetchCompare(
   return (await res.json()) as GhCompare;
 }
 
-export async function fetchCheckRuns(
-  key: string,
-  token: string,
-  sha: string,
-): Promise<GhCheckRuns | null> {
+/**
+ * CI state for one commit.
+ *
+ * Deliberately does NOT use `/check-runs`: GitHub does not offer the `Checks` permission
+ * to fine-grained personal access tokens — it was withdrawn and is GitHub-App-only. A
+ * token created the way this tool asks for one would 403 on every single call and every
+ * branch would silently read "no CI".
+ *
+ * Workflow runs come first because GitHub Actions is the common case, and answer in one
+ * request. The older commit-status API is only consulted when Actions has nothing to say,
+ * which keeps this at one call per changed branch for anyone on Actions.
+ */
+export async function fetchCi(key: string, token: string, sha: string): Promise<GhCi> {
   const { owner, name } = splitRepoKey(key);
+
+  const runs = await optional<GhWorkflowRuns>(
+    `/repos/${owner}/${name}/actions/runs?head_sha=${encodeURIComponent(sha)}&per_page=50`,
+    { token, repo: key },
+  );
+  if (runs && runs.workflow_runs.length > 0) return { runs, status: null };
+
+  const status = await optional<GhCombinedStatus>(
+    `/repos/${owner}/${name}/commits/${sha}/status?per_page=100`,
+    { token, repo: key },
+  );
+  return { runs, status };
+}
+
+/**
+ * For data that improves the page but must never cost you a branch. A token without the
+ * permission, or a repo with the feature switched off, reads as "not available" rather
+ * than as a failure.
+ */
+async function optional<T>(path: string, opts: RequestOptions): Promise<T | null> {
   try {
-    const res = await request(`/repos/${owner}/${name}/commits/${sha}/check-runs?per_page=100`, {
-      token,
-      repo: key,
-    });
-    return (await res.json()) as GhCheckRuns;
+    const res = await request(path, opts);
+    return (await res.json()) as T;
   } catch (err) {
-    // CI state is a nice-to-have. A repo with checks disabled must not fail the branch.
     if (err instanceof GitHubError && (err.status === 404 || err.status === 403)) return null;
     throw err;
   }
 }
 
-/** Used by the settings screen to verify a pasted token before saving it. */
-export async function verifyToken(token: string): Promise<{ login: string }> {
+export type TokenCheck = { login: string | null; repo: string | null };
+
+/**
+ * Checks a pasted token before it is saved.
+ *
+ * Prefers checking against a repo you actually configured, because that proves two
+ * things at once: the token works, AND it can see your work. `GET /user` proves only
+ * the first — and a fine-grained token with no *Account* permissions (which is exactly
+ * what Bearing asks you to create) can legitimately be refused there while being
+ * perfectly good for everything this tool does. Verifying via `/user` alone would
+ * reject a working token at the door.
+ */
+export async function verifyToken(token: string, repos: string[] = []): Promise<TokenCheck> {
+  const first = repos.find((repo) => repo.trim());
+  if (first) {
+    const repo = await fetchRepo(first.trim(), token);
+    return { login: repo.owner.login, repo: first.trim() };
+  }
+
   const res = await request('/user', { token });
-  const user = (await res.json()) as { login: string };
-  return { login: user.login };
+  const user = (await res.json()) as { login?: string };
+  return { login: user.login ?? null, repo: null };
 }

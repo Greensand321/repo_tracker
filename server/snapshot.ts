@@ -3,7 +3,7 @@
  * `now` is passed in so relevance is deterministic and testable (CLAUDE.md rule 5).
  */
 
-import type { GhBranch, GhCheckRuns, GhCommit, GhCompare, GhPull, GhRepo } from './gh-types.ts';
+import type { GhBranch, GhCi, GhCommit, GhCompare, GhPull, GhRepo } from './gh-types.ts';
 import type {
   Branch,
   CiState,
@@ -27,7 +27,7 @@ export type RepoBundle = {
 
 export type BranchDetail = {
   compare: GhCompare;
-  checks: GhCheckRuns | null;
+  ci: GhCi | null;
 };
 
 export type BuildOptions = {
@@ -96,7 +96,7 @@ function toBranch(bundle: RepoBundle, ghBranch: GhBranch, opts: BuildOptions): B
     diff: toDiffstat(detail?.compare),
     activity: activityDates(commits),
     pr: pr?.pr ?? null,
-    ci: toCiState(detail?.checks ?? null),
+    ci: toCiState(detail?.ci ?? null),
     relevance: isQuiet(lastActivity, opts) ? 'quiet' : 'active',
     isBase: ghBranch.name === bundle.repo.default_branch,
     title: null,
@@ -184,33 +184,45 @@ export function pickPull(
 }
 
 /**
- * Worst-wins: one failing check makes the branch red regardless of what else passed.
+ * Worst-wins: one failure makes the branch red regardless of what else passed.
  * `neutral` and `skipped` are not failures and must not turn a green branch red.
+ *
+ * Reads GitHub Actions runs first, then the older commit-status API — the two sources a
+ * fine-grained token can actually see (see github.ts `fetchCi`).
  */
-export function toCiState(checks: GhCheckRuns | null): CiState {
-  const runs = checks?.check_runs ?? [];
-  if (runs.length === 0) return { state: 'none', url: null };
+export function toCiState(ci: GhCi | null): CiState {
+  const runs = ci?.runs?.workflow_runs ?? [];
 
-  let pending = false;
-  let url: string | null = null;
+  if (runs.length > 0) {
+    let pending = false;
+    let url: string | null = null;
 
-  for (const run of runs) {
-    if (run.status !== 'completed') {
-      pending = true;
-      url ??= run.html_url;
-      continue;
+    for (const run of runs) {
+      if (run.status !== 'completed') {
+        pending = true;
+        url ??= run.html_url;
+        continue;
+      }
+      if (run.conclusion === 'failure' || run.conclusion === 'timed_out' || run.conclusion === 'cancelled') {
+        return { state: 'failing', url: run.html_url ?? url };
+      }
+      if (run.conclusion === 'action_required') {
+        pending = true;
+        url ??= run.html_url;
+      }
     }
-    if (run.conclusion === 'failure' || run.conclusion === 'timed_out' || run.conclusion === 'cancelled') {
-      return { state: 'failing', url: run.html_url ?? url };
-    }
-    if (run.conclusion === 'action_required') {
-      pending = true;
-      url ??= run.html_url;
-    }
+    if (pending) return { state: 'pending', url };
+    return { state: 'passing', url: runs[0]?.html_url ?? null };
   }
 
-  if (pending) return { state: 'pending', url };
-  return { state: 'passing', url: runs[0]?.html_url ?? null };
+  const combined = ci?.status;
+  if (!combined || combined.total_count === 0) return { state: 'none', url: null };
+
+  const url = combined.statuses.find((s) => s.target_url)?.target_url ?? null;
+  if (combined.state === 'failure' || combined.state === 'error') return { state: 'failing', url };
+  if (combined.state === 'pending') return { state: 'pending', url };
+  if (combined.state === 'success') return { state: 'passing', url };
+  return { state: 'none', url: null };
 }
 
 function isQuiet(lastActivity: string | null, opts: BuildOptions): boolean {

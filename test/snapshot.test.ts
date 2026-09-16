@@ -11,7 +11,7 @@ import {
   toIsoUtc,
   type RepoBundle,
 } from '../server/snapshot.ts';
-import type { GhBranch, GhCheckRuns, GhCommit, GhPull, GhRepo } from '../server/gh-types.ts';
+import type { GhBranch, GhCi, GhCommit, GhPull, GhRepo } from '../server/gh-types.ts';
 
 const fixture = <T>(name: string): T =>
   JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf8')) as T;
@@ -49,17 +49,17 @@ function bundle(overrides: Partial<RepoBundle> = {}): RepoBundle {
             { additions: 12, deletions: 0 },
           ],
         },
-        checks: null,
+        ci: null,
       },
       'fix/auth-refresh': {
         compare: { ahead_by: 1, behind_by: 0, commits: [ghCommit('d1', 'Rotate the secret', '2026-09-10T11:00:00Z')], files: [] },
-        checks: null,
+        ci: null,
       },
       'chore/old-experiment': {
         compare: { ahead_by: 1, behind_by: 40, commits: [ghCommit('e1', 'Spike', '2026-06-01T09:00:00Z')], files: [] },
-        checks: null,
+        ci: null,
       },
-      main: { compare: { ahead_by: 0, behind_by: 0, commits: [], files: [] }, checks: null },
+      main: { compare: { ahead_by: 0, behind_by: 0, commits: [], files: [] }, ci: null },
     },
     ...overrides,
   };
@@ -176,29 +176,55 @@ test('a branch with no PR is not a failure', () => {
   assert.equal(pickPull(fixture<GhPull[]>('pulls'), 'chore/old-experiment'), null);
 });
 
-// --- CI ------------------------------------------------------------------------
+// --- CI ---------------------------------------------------------------------
 
-const runs = (...rs: GhCheckRuns['check_runs']): GhCheckRuns => ({ check_runs: rs });
-const done = (conclusion: string) => ({ status: 'completed' as const, conclusion, html_url: 'u' });
+/**
+ * Fine-grained tokens cannot read check runs at all — GitHub withdrew that permission
+ * and it is GitHub-App-only. These cover the two sources such a token CAN see.
+ */
+const actions = (...rs: NonNullable<GhCi['runs']>['workflow_runs']): GhCi => ({
+  runs: { workflow_runs: rs },
+  status: null,
+});
+const done = (conclusion: string) => ({ status: 'completed', conclusion, html_url: 'u' });
 
-test('one failing check makes the branch red, whatever else passed', () => {
-  assert.equal(toCiState(runs(done('success'), done('failure'))).state, 'failing');
+test('one failing Actions run makes the branch red, whatever else passed', () => {
+  assert.equal(toCiState(actions(done('success'), done('failure'))).state, 'failing');
 });
 
-test('neutral and skipped checks do not turn a green branch red', () => {
-  assert.equal(toCiState(runs(done('success'), done('neutral'), done('skipped'))).state, 'passing');
+test('neutral and skipped runs do not turn a green branch red', () => {
+  assert.equal(toCiState(actions(done('success'), done('neutral'), done('skipped'))).state, 'passing');
 });
 
-test('an unfinished check reads as pending', () => {
+test('an unfinished Actions run reads as pending', () => {
   assert.equal(
-    toCiState(runs(done('success'), { status: 'in_progress', conclusion: null, html_url: 'u' })).state,
+    toCiState(actions(done('success'), { status: 'in_progress', conclusion: null, html_url: 'u' })).state,
     'pending',
   );
 });
 
-test('no checks at all is "none", not a failure', () => {
+test('with no Actions runs it falls back to the commit-status API', () => {
+  const viaStatus = (state: string): GhCi => ({
+    runs: { workflow_runs: [] },
+    status: { state, total_count: 1, statuses: [{ state, target_url: 'https://ci.example/1' }] },
+  });
+  assert.equal(toCiState(viaStatus('failure')).state, 'failing');
+  assert.equal(toCiState(viaStatus('error')).state, 'failing');
+  assert.equal(toCiState(viaStatus('pending')).state, 'pending');
+  assert.equal(toCiState(viaStatus('success')).state, 'passing');
+  assert.equal(toCiState(viaStatus('success')).url, 'https://ci.example/1');
+});
+
+test('no CI at all is "none", not a failure', () => {
   assert.equal(toCiState(null).state, 'none');
-  assert.equal(toCiState(runs()).state, 'none');
+  assert.equal(toCiState({ runs: null, status: null }).state, 'none');
+  assert.equal(toCiState({ runs: { workflow_runs: [] }, status: { state: 'pending', total_count: 0, statuses: [] } }).state, 'none');
+});
+
+test('a token without Actions or Commit statuses permission degrades to "none"', () => {
+  // fetchCi returns nulls on 403 rather than throwing, so a missing permission costs
+  // you the CI column and nothing else.
+  assert.equal(toCiState({ runs: null, status: null }).state, 'none');
 });
 
 // --- normalisation -------------------------------------------------------------

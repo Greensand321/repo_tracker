@@ -24,18 +24,7 @@ api.put('/settings', async (c) => {
   const body = (await c.req.json()) as Partial<Settings> & { token?: string };
   const patch: Partial<Settings> = {};
 
-  if (typeof body.token === 'string' && body.token.trim()) {
-    const token = body.token.trim();
-    try {
-      await verifyToken(token);
-    } catch (err) {
-      // Reject a bad token at the door rather than storing it and failing later in a
-      // way that looks like the repos are broken.
-      return c.json({ error: describe(err) }, 400);
-    }
-    patch.token = token;
-  }
-
+  // Repos are parsed first so the token check below can verify against one of them.
   if (Array.isArray(body.repos)) {
     const bad: string[] = [];
     for (const repo of body.repos) {
@@ -49,6 +38,23 @@ api.put('/settings', async (c) => {
       return c.json({ error: `not in owner/repo form: ${bad.join(', ')}` }, 400);
     }
     patch.repos = body.repos.map(String);
+  }
+
+  if (typeof body.token === 'string' && body.token.trim()) {
+    const token = body.token.trim();
+    const against = patch.repos ?? loadSettings().repos;
+    try {
+      await verifyToken(token, against);
+    } catch (err) {
+      // Reject a bad token at the door rather than storing it and failing later in a
+      // way that looks like the repos are broken.
+      const hint =
+        err instanceof GitHubError && err.status === 404
+          ? ' — check the token\'s Repository access covers it, and that Contents is Read-only'
+          : '';
+      return c.json({ error: `${describe(err)}${hint}` }, 400);
+    }
+    patch.token = token;
   }
 
   for (const key of ['refreshSeconds', 'quietAfterDays', 'commitsPerBranch', 'llmMaxPerRun'] as const) {

@@ -174,7 +174,11 @@ Per branch:
 | Purpose | Endpoint |
 |---|---|
 | **Commits ahead of main, plus ahead/behind, plus diff totals** | `GET /repos/{owner}/{repo}/compare/main...{branch}` |
-| CI state | `GET /repos/{owner}/{repo}/commits/{headSha}/check-runs` |
+| CI state | `GET /repos/{owner}/{repo}/actions/runs?head_sha={headSha}` — and only if that is empty, `GET /commits/{headSha}/status` |
+
+**Not check runs.** GitHub does not offer the `Checks` permission to fine-grained personal
+access tokens; it was withdrawn and is GitHub-App-only. A token created the way this tool
+asks for one would 403 on every call and every branch would silently read "no CI".
 
 `compare` is the key call — one request returns the commits unique to the branch, the
 ahead/behind counts, and the diff size. Nothing else is needed for the commit trail.
@@ -183,9 +187,9 @@ ahead/behind counts, and the diff size. Nothing else is needed for the commit tr
 
 | Run | Cost | Why |
 |---|---|---|
-| Cold, first ever | ~216 requests | 8 branch lists + 8 PR lists + (100 × compare) + (100 × check-runs) |
+| Cold, first ever | ~216 requests | 8 branch lists + 8 PR lists + (100 × compare) + (100 × CI) |
 | Poll, nothing changed | **~0 against the limit** | 8 conditional branch-list requests return `304 Not Modified`, and GitHub does not count 304s against the primary rate limit |
-| Poll, 3 branches moved | ~14 | 8 branch lists (mostly 304) + 3 compares + 3 check-runs |
+| Poll, 3 branches moved | ~14 | 8 branch lists (mostly 304) + 3 compares + 3 CI |
 
 Authenticated limit is 5,000 requests/hour, so this is comfortable — but only because of
 the change-detection design below. Polling 100 branches directly every minute would not be.
