@@ -50,6 +50,15 @@ open: [`open-questions.md`](open-questions.md).
 | D35 | **~100 branches, of which a few dozen stay relevant.** Stale branches fold away in the UI; they are never hidden from the data and never deleted. | The owner's actual scale. Staleness is a display concern, not a hygiene feature (D7). |
 | D36 | **t3 code needs no special handling.** Both agents push ordinary branches with ordinary commits. | Confirmed by the owner. |
 
+| D37 | **Talk to the provider over its OpenAI-compatible HTTP API, not a vendor SDK.** | The endpoint is deliberately swappable — the same code reaches any OpenAI-compatible provider by changing one setting. A vendor SDK would weld the choice in. |
+| D38 | **Do not send `response_format: json_object`.** Ask for JSON in the prompt and parse tolerantly (fences and chatter allowed). | OpenCode Zen fronts 100+ models of varying capability, and the ones that reject that parameter fail the entire request. Tolerance costs a few lines; a hard failure costs the feature. |
+| D39 | **Summaries are cached on `headSha` + `promptVersion` + `model`.** | A branch that has not moved is never summarised twice — that is what makes ~100 branches cost pennies. Including the prompt version means editing the prompt regenerates everything rather than leaving a silent mix of old and new. |
+| D40 | **Every commit the model cites is checked against the branch's own commits.** Invented SHAs are dropped. | A summary you cannot trace back to commits is just a claim. This is the cheapest possible hallucination guard and it costs nothing at runtime. |
+| D41 | **Enrichment never blocks the snapshot.** Cached summaries apply synchronously before serving; new ones are fetched in the background and pushed to the page as they land. | A provider that is slow, down, or out of credit must cost you the summaries and nothing else. Everything that makes the page useful is already there without the LLM. |
+| D42 | **A fatal provider error stops the run immediately.** | A rejected key or an empty balance fails identically for every branch; discovering that ninety-nine more times is pure waste. |
+| D43 | **`BEARING_DATA_DIR` overrides where the tool's data lives.** | Lets the second machine put it elsewhere, and keeps tests out of the real data directory. |
+| D44 | **A debug CLI exists (`npm run brief` / `models` / `config`) and is explicitly not a product surface.** | CLAUDE.md rule 2 already allows a debug entry point. It lets the engine be exercised and read while the interface is redesigned. No feature may be shaped around it. |
+
 ---
 
 ## 2. Carried over from the old documents

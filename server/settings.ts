@@ -22,10 +22,10 @@ export function saveSettings(patch: Partial<Settings>): Settings {
   return next;
 }
 
-/** Everything the browser is allowed to know. The token is never included. */
+/** Everything the browser is allowed to know. No secret ever crosses this line. */
 export function toSafe(settings: Settings): SafeSettings {
-  const { token, ...rest } = settings;
-  return { ...rest, hasToken: token.length > 0 };
+  const { token, llmApiKey, ...rest } = settings;
+  return { ...rest, hasToken: token.length > 0, hasLlmKey: llmApiKey.length > 0 };
 }
 
 function sanitise(settings: Settings): Settings {
@@ -35,6 +35,11 @@ function sanitise(settings: Settings): Settings {
     refreshSeconds: clamp(settings.refreshSeconds, 0, 3600, DEFAULT_SETTINGS.refreshSeconds),
     quietAfterDays: clamp(settings.quietAfterDays, 1, 365, DEFAULT_SETTINGS.quietAfterDays),
     commitsPerBranch: clamp(settings.commitsPerBranch, 1, 300, DEFAULT_SETTINGS.commitsPerBranch),
+    llmApiKey: settings.llmApiKey.trim(),
+    llmBaseUrl: (settings.llmBaseUrl || DEFAULT_SETTINGS.llmBaseUrl).trim().replace(/\/+$/, ''),
+    llmModel: settings.llmModel.trim(),
+    llmEnabled: settings.llmEnabled !== false,
+    llmMaxPerRun: clamp(settings.llmMaxPerRun, 0, 500, DEFAULT_SETTINGS.llmMaxPerRun),
   };
 }
 

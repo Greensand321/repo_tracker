@@ -71,19 +71,22 @@ every active thread is doing — without opening GitHub.
 
 ---
 
-## Stage 2 — LLM insight over the history  `← NEXT`
+## Stage 2 — LLM insight over the history  **engine built**
 
 **The payoff, and your #2 priority.** Everything here needs only Stage 1 data.
 
-| # | Feature | Notes |
+| # | Feature | Status |
 |---|---|---|
-| 2.1 | **Summarize a branch** from its commits — what this thread is actually doing, in a sentence or two | The thing that makes the screen look like the mockup |
-| 2.2 | **Judge state**: progressing · stalled · blocked · effectively done | R4 |
-| 2.3 | **"What changed since I last looked"** across everything | R5 |
-| 2.4 | Cache by branch head SHA — re-summarize only when the branch actually moves | Keeps cost near zero on idle branches |
-| 2.5 | **Comment tool on every LLM output**, stored locally for prompt-tuning | R7. Local storage now; Stage 4 syncs it. |
-| 2.7 | **Conversation surface** — talk to the LLM about what it is showing you | R12, a requirement. Provider: OpenCode Zen (D32). |
-| 2.6 | Every summary shows its evidence — which commits it came from | So a wrong summary is debuggable, not mysterious |
+| 2.1 | **Summarize a branch** from its commits — what this thread is actually doing | ✅ built |
+| 2.2 | **Judge state**: progressing · stalled · blocked · done | ✅ built |
+| 2.4 | Cache by head SHA + prompt version + model — idle branches cost nothing | ✅ built (D39) |
+| 2.6 | Every summary cites its commits, validated against the branch | ✅ built (D40) |
+| 2.3 | **"What changed since I last looked"** across everything | ⏸ a view, not an engine feature — waits for the new design |
+| 2.5 | **Comment tool on every LLM output**, for prompt-tuning | ⏸ waits for the interface redesign (R7) |
+| 2.7 | **Conversation surface** — talk to the LLM about what it is showing you | ⏸ waits for the interface redesign (R12) |
+
+The three paused items are all *surfaces*. They were left deliberately rather than built
+twice against a mockup that turned out to be superseded.
 
 **Exit:** you open it after two days away and it tells you what moved and what stalled,
 without you reading a single commit.

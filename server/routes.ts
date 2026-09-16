@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 
 import type { Settings } from '../shared/types.ts';
+import { LlmError, listModels } from './advise/client.ts';
 import { GitHubError, splitRepoKey, verifyToken } from './github.ts';
 import { loadSettings, saveSettings, toSafe } from './settings.ts';
 import { currentResponse, refresh, startPolling, subscribe } from './state.ts';
@@ -50,8 +51,15 @@ api.put('/settings', async (c) => {
     patch.repos = body.repos.map(String);
   }
 
-  for (const key of ['refreshSeconds', 'quietAfterDays', 'commitsPerBranch'] as const) {
+  for (const key of ['refreshSeconds', 'quietAfterDays', 'commitsPerBranch', 'llmMaxPerRun'] as const) {
     if (body[key] !== undefined) patch[key] = Number(body[key]);
+  }
+  for (const key of ['llmBaseUrl', 'llmModel'] as const) {
+    if (typeof body[key] === 'string') patch[key] = body[key];
+  }
+  if (typeof body.llmEnabled === 'boolean') patch.llmEnabled = body.llmEnabled;
+  if (typeof body.llmApiKey === 'string' && body.llmApiKey.trim()) {
+    patch.llmApiKey = body.llmApiKey.trim();
   }
 
   const saved = saveSettings(patch);
@@ -62,6 +70,16 @@ api.put('/settings', async (c) => {
 });
 
 api.delete('/settings/token', (c) => c.json(toSafe(saveSettings({ token: '' }))));
+api.delete('/settings/llm-key', (c) => c.json(toSafe(saveSettings({ llmApiKey: '' }))));
+
+/** The provider's own model list, so nobody has to guess a model ID. */
+api.get('/llm/models', async (c) => {
+  try {
+    return c.json({ models: await listModels(loadSettings()) });
+  } catch (err) {
+    return c.json({ error: describe(err) }, 400);
+  }
+});
 
 /** The page opens one of these and re-renders whenever the server says something moved. */
 api.get('/events', (c) =>
@@ -103,7 +121,7 @@ api.get('/events', (c) =>
 );
 
 function describe(err: unknown): string {
-  if (err instanceof GitHubError) return err.message;
+  if (err instanceof GitHubError || err instanceof LlmError) return err.message;
   if (err instanceof Error) return err.message;
   return String(err);
 }

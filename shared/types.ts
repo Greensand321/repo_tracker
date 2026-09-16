@@ -9,6 +9,15 @@ export type Snapshot = {
   branches: Branch[];
   warnings: string[]; // one unreachable repo must never cost you the others
   rateLimit: RateLimit | null;
+  llm: LlmStatus;
+};
+
+export type LlmStatus = {
+  enabled: boolean;
+  /** Branches still waiting on a summary. The page can show progress honestly. */
+  pending: number;
+  /** Non-fatal: the deterministic snapshot is unaffected. */
+  errors: string[];
 };
 
 export type Repo = {
@@ -45,11 +54,25 @@ export type Branch = {
   /** True when this is the repo's base branch, which is a reference point, not a thread. */
   isBase: boolean;
 
-  // --- Stage 2 fills these. Null until then; every view must render without them. ---
+  // --- Stage 2. Null until the LLM has read this branch; every view renders without them. ---
   /** LLM-written title, shown ALONGSIDE `name` and marked as generated. Never instead of it. */
   title: string | null;
   summary: string | null;
-  progress: 'progressing' | 'stalled' | 'blocked' | 'done' | null;
+  progress: Progress | null;
+  /** Where the summary came from, so a wrong one is debuggable rather than mysterious. */
+  insight: InsightMeta | null;
+};
+
+export type Progress = 'progressing' | 'stalled' | 'blocked' | 'done';
+
+export type InsightMeta = {
+  /** Short SHAs the model cited. Validated against the branch's own commits. */
+  evidence: string[];
+  model: string;
+  promptVersion: string;
+  generatedAt: string;
+  /** The head SHA this insight describes. Stale the moment the branch moves. */
+  headSha: string;
 };
 
 export type Commit = {
@@ -102,10 +125,23 @@ export type Settings = {
   quietAfterDays: number;
   /** Commits kept per branch in the snapshot. */
   commitsPerBranch: number;
+
+  // --- Stage 2: the advisor. Disabled until a key and a model are set. ---
+  llmApiKey: string;
+  /** OpenAI-compatible endpoint. OpenCode Zen by default (D32). */
+  llmBaseUrl: string;
+  /** Left empty on purpose — pick one from the provider's own model list. */
+  llmModel: string;
+  llmEnabled: boolean;
+  /** Ceiling on summaries per refresh, so a first run cannot surprise you with a bill. */
+  llmMaxPerRun: number;
 };
 
-/** What the settings screen is allowed to see: everything except the token itself. */
-export type SafeSettings = Omit<Settings, 'token'> & { hasToken: boolean };
+/** What the settings screen is allowed to see: never a secret, only whether one is set. */
+export type SafeSettings = Omit<Settings, 'token' | 'llmApiKey'> & {
+  hasToken: boolean;
+  hasLlmKey: boolean;
+};
 
 export const DEFAULT_SETTINGS: Settings = {
   token: '',
@@ -113,6 +149,11 @@ export const DEFAULT_SETTINGS: Settings = {
   refreshSeconds: 60,
   quietAfterDays: 14,
   commitsPerBranch: 50,
+  llmApiKey: '',
+  llmBaseUrl: 'https://opencode.ai/zen/v1',
+  llmModel: '',
+  llmEnabled: true,
+  llmMaxPerRun: 40,
 };
 
 // ---------------------------------------------------------------------------

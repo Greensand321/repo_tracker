@@ -59,6 +59,8 @@ function cardHtml(branch: Branch, repoKeys: string[], openKey: string | null): s
     <div class="b-main">
       <div class="b-left">
         <h3 class="b-name${headline ? '' : ' none'}">${esc(headline ?? 'No commits of its own yet')}</h3>
+        ${branch.title ? '<div class="gen-mark">written from the commits</div>' : ''}
+        ${branch.summary ? `<p class="b-summary">${esc(branch.summary)}</p>` : ''}
         <div class="b-feature">${tagsHtml(branch)}${esc(branch.pr?.title ?? '')}</div>
         <div class="b-activity">
           <div class="heat">${heatHtml(branch, colour)}</div>
@@ -83,6 +85,7 @@ function cardHtml(branch: Branch, repoKeys: string[], openKey: string | null): s
         <div>
           <div class="ex-h">Where it stands</div>
           <ul class="facts">${factsHtml(branch)}</ul>
+          ${evidenceHtml(branch)}
         </div>
       </div>
       <div class="ex-actions">
@@ -97,6 +100,9 @@ function cardHtml(branch: Branch, repoKeys: string[], openKey: string | null): s
 /** Only ever shows state we actually fetched — never a guess. */
 function tagsHtml(branch: Branch): string {
   const tags: string[] = [];
+  if (branch.progress) {
+    tags.push(`<span class="tag prog-${esc(branch.progress)}">${esc(branch.progress)}</span>`);
+  }
   if (branch.ci.state !== 'none') {
     tags.push(`<span class="tag ci-${branch.ci.state}">CI ${branch.ci.state}</span>`);
   }
@@ -147,6 +153,16 @@ function commitsHtml(branch: Branch): string {
     rows.push(`<li><span class="when"></span><span class="msg more">and ${plural(rest, 'earlier commit')}</span></li>`);
   }
   return rows.join('');
+}
+
+/** A summary you cannot trace back to commits is just a claim. */
+function evidenceHtml(branch: Branch): string {
+  if (!branch.insight) return '';
+  const { evidence, model, generatedAt } = branch.insight;
+  const from = evidence.length > 0 ? `from ${evidence.map(esc).join(', ')}` : 'no commits cited';
+  return `<div class="evidence" title="${esc(exactTime(generatedAt))}">
+    Summary ${esc(from)} &middot; ${esc(model)} &middot; ${esc(relativeTime(generatedAt))}
+  </div>`;
 }
 
 function factsHtml(branch: Branch): string {

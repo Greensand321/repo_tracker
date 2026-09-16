@@ -182,7 +182,15 @@ function renderStatus(): void {
   warnEl.title = warnings.join('\n');
 
   const rate = snapshot?.rateLimit;
-  $('#statusRate').textContent = rate ? `GitHub ${rate.remaining}/${rate.limit}` : '';
+  const bits: string[] = [];
+  if (snapshot?.llm.enabled && snapshot.llm.pending > 0) {
+    bits.push(`summarising ${snapshot.llm.pending}`);
+  }
+  if (snapshot?.llm.errors.length) bits.push(`advisor: ${snapshot.llm.errors.length} failed`);
+  if (rate) bits.push(`GitHub ${rate.remaining}/${rate.limit}`);
+  const rateEl = $('#statusRate');
+  rateEl.textContent = bits.join('  ·  ');
+  rateEl.title = snapshot?.llm.errors.join('\n') ?? '';
 }
 
 function renderFirstRun(data: SnapshotResponse | null): void {
@@ -212,6 +220,13 @@ async function openSettings(): Promise<void> {
   $<HTMLInputElement>('#token').placeholder = settings.hasToken
     ? 'a token is saved — leave blank to keep it'
     : 'github_pat_…';
+  $<HTMLInputElement>('#llmBaseUrl').value = settings.llmBaseUrl;
+  $<HTMLInputElement>('#llmModel').value = settings.llmModel;
+  $<HTMLInputElement>('#llmMaxPerRun').value = String(settings.llmMaxPerRun);
+  $<HTMLInputElement>('#llmApiKey').value = '';
+  $<HTMLInputElement>('#llmApiKey').placeholder = settings.hasLlmKey
+    ? 'a key is saved — leave blank to keep it'
+    : 'leave blank for no summaries';
   $('#settingsErr').textContent = '';
   $('#settingsSheet').classList.remove('hidden');
 }
@@ -235,6 +250,12 @@ async function saveSettings(): Promise<void> {
   };
   const token = $<HTMLInputElement>('#token').value.trim();
   if (token) body['token'] = token;
+
+  body['llmBaseUrl'] = $<HTMLInputElement>('#llmBaseUrl').value.trim();
+  body['llmModel'] = $<HTMLInputElement>('#llmModel').value.trim();
+  body['llmMaxPerRun'] = Number($<HTMLInputElement>('#llmMaxPerRun').value);
+  const llmKey = $<HTMLInputElement>('#llmApiKey').value.trim();
+  if (llmKey) body['llmApiKey'] = llmKey;
 
   try {
     const res = await fetch('/api/settings', {
@@ -307,6 +328,30 @@ function wire(): void {
       $('#settingsSheet').classList.add('hidden');
       if (document.activeElement === search) search.blur();
     }
+  });
+
+  // The provider's own model list, so nobody has to guess an ID.
+  $('#loadModels').addEventListener('click', async (event) => {
+    event.preventDefault();
+    const link = event.target as HTMLElement;
+    const before = link.textContent;
+    link.textContent = 'loading…';
+    try {
+      const res = await fetch('/api/llm/models');
+      const payload = (await res.json()) as { models?: { id: string }[]; error?: string };
+      if (!res.ok || !payload.models) {
+        $('#settingsErr').textContent = payload.error ?? 'could not load models';
+        return;
+      }
+      $('#modelList').innerHTML = payload.models
+        .map((model) => `<option value="${esc(model.id)}"></option>`)
+        .join('');
+      link.textContent = `${payload.models.length} models — click the box`;
+      return;
+    } catch (err) {
+      $('#settingsErr').textContent = err instanceof Error ? err.message : String(err);
+    }
+    link.textContent = before;
   });
 
   $('#openSettings').addEventListener('click', () => void openSettings());

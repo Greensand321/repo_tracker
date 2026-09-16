@@ -5,7 +5,12 @@ import { dirname, join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-export const DATA_DIR = join(ROOT, 'data');
+
+/**
+ * Where the tool's own data lives. Overridable so a second machine can point at a
+ * different location — and so tests never write into the real one.
+ */
+export const DATA_DIR = process.env['BEARING_DATA_DIR'] ?? join(ROOT, 'data');
 export const CACHE_DIR = join(DATA_DIR, 'cache');
 export const HISTORY_DIR = join(DATA_DIR, 'history');
 export const WEB_DIR = join(ROOT, 'web');

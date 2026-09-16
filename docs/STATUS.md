@@ -1,74 +1,80 @@
 # Status — where the project stands
 
-**Updated:** 16 Sep 2026 · **Stage 1: built** · **Branch:** `claude/kind-meitner-cpis9v`
+**Updated:** 16 Sep 2026 · **Stage 1 built · Stage 2 engine built** · **Branch:** `claude/kind-meitner-cpis9v`
 
 > Keep this short and current. It is the first thing to read after any time away.
 
 ---
 
+## ⚠️ The interface is being replaced
+
+The mockup Stage 1 was built against (`docs/design/dashboard-concept.html`) turned out to
+be a **throwaway superseded by a better design** the owner has at home. The current
+`web/` is a working placeholder, not the target.
+
+**What that costs:** `web/app.css`, `web/index.html`, `views/board.ts`, `views/timeline.ts`
+— roughly 700 lines. **What it does not touch:** everything in `server/`, `shared/types.ts`,
+and 58 of the 63 tests. The data/view separation (CLAUDE.md rule 4) is what makes this
+cheap.
+
+**Do not polish `web/`.** Keep it working so the engine can be verified, and swap it when
+the real design arrives.
+
 ## Where we are
-
-**Stage 1 works.** Bearing reads every branch across your GitHub repos and shows its real
-commit history in the mockup's layout.
-
-Run it: double-click `start.bat` (or `./start.sh`, or Run → *Run Bearing* in VS Code).
-First run asks for a read-only GitHub token and your repo list.
 
 | | |
 |---|---|
-| Stack | Node 22 + TypeScript. Hono server, plain `fetch` for GitHub, esbuild + vanilla TS for the page. |
-| Tests | 39, no network — recorded fixtures and a stubbed `fetch`. |
-| Views | **Board** and **Timeline** render live data. **Needs you** runs on CI + PR state. **Your notes** is an honest empty state until Stage 3. |
+| **Stage 1** | Built. Every branch across your repos, with its real commit history, PR and CI state. ETag change detection; a repo that has not moved costs nothing. |
+| **Stage 2 engine** | Built. Per-branch plain-English title, summary, and progress judgement, cached so an idle branch is never re-summarised. |
+| **Stage 2 surfaces** | Deliberately not built — the comment tool, the chat panel, and "what changed since I last looked" all wait for the real design. |
+| Tests | 63, no network. Recorded GitHub fixtures and a stubbed provider. |
 
-### What the screen shows
+## Try it without the GUI
 
-The card headline is **the newest commit message** — real plain English, available today —
-with the literal branch name above it. Expanding a card shows the full commit trail on the
-left and the hard facts on the right, plus links out to the branch and PR on GitHub.
-Nothing is checked out, ever.
+The interface is a placeholder, so there is a debug CLI (D44 — **not** a product surface):
 
-### What it deliberately does not show yet
+```
+npm run config     # what is configured, secrets redacted
+npm run models     # the models your provider actually offers — pick one
+npm run brief      # collect, summarise, and print every branch
+npm run brief -- --no-llm    # deterministic only, no provider calls
+```
 
-LLM titles, the recall/blocker/next prose and the step checklists from the mockup — those
-are Stage 2. Notes, goals and milestones are Stage 3. No placeholder was invented for any
-of them.
+Settings live in `data/settings.json` and can be hand-edited: `llmApiKey`, `llmBaseUrl`
+(defaults to `https://opencode.ai/zen/v1`), `llmModel`, `llmMaxPerRun`.
+
+**`llmModel` is empty on purpose.** Run `npm run models` and pick one — a guessed model ID
+would fail at the worst moment.
 
 ## The next concrete action
 
-**Stage 2 — the LLM layer.** See [`ROADMAP.md`](ROADMAP.md).
+**Wait for the real design files**, then rebuild `web/` against them.
 
-1. Summarise a branch from its commits: what this thread is actually doing.
-2. Judge state: progressing · stalled · blocked · done.
-3. "What changed since I last looked."
-4. Cache by head SHA so idle branches cost nothing.
-5. A comment tool on every LLM output, for prompt-tuning.
-6. The conversation surface (R12).
+When they arrive, the useful question is not "what does it look like" but **what data does
+it need that the Snapshot does not already carry.** Likely additions: per-commit file
+lists, review comments and reviewer state, which CI job failed, linked issues. All are
+additive — `collect.ts` widens, nothing restructures.
 
-The `Branch` type already carries `title`, `summary` and `progress` as nulls, and the UI
-renders correctly without them — so Stage 2 fills fields rather than reshaping anything.
-
-**Confirm first:** Q37 — may the LLM write a short plain-English title beside the literal
-branch name? Provisionally yes; the example is in
-[`decisions/open-questions.md`](decisions/open-questions.md).
-
-Provider is OpenCode Zen (D32); the key goes in settings like the GitHub one.
+After that, Stage 3: milestones → goals → branches → sub-tasks, plus notes.
 
 ## Worth knowing
 
-- **Cost control is the design.** A repo where nothing moved answers `304` and costs
-  nothing against the rate limit. Only branches whose head SHA changed get fetched. CI is
-  re-checked when it was still running, because a build finishing is a change no SHA
-  reflects.
-- **`data/history/*.jsonl` is being written from day one** and nothing reads it yet. That
-  is deliberate (D31) — change over time cannot be backfilled.
-- **`data/` is gitignored** and holds your token. Each machine gets its own.
+- **Summaries are cached on head SHA + prompt version + model.** Editing the prompt in
+  `server/advise/prompt.ts` bumps `PROMPT_VERSION` and regenerates everything — otherwise
+  you would get a silent mix of old and new.
+- **Every cited commit is checked against the branch.** An invented SHA is dropped rather
+  than rendered as a link.
+- **A fatal provider error stops the run** rather than failing identically 99 more times.
+- **`data/history/*.jsonl`** has been accumulating since the first run and nothing reads it
+  yet. That is deliberate (D31).
+- **`BEARING_DATA_DIR`** relocates everything the tool stores.
 
 ## Log
 
 | Date | What happened |
 |---|---|
 | 13 Sep 2026 | Spec v0.1 → v0.3; build plan v0.2; Phase 0 plan; mockups explored |
-| 15 Sep 2026 | Repo reorganized; `sync-branches.yml` → `.github/workflows/`; 29 questions raised |
-| 15 Sep 2026 | **Owner answered. Product redefined.** `requirements.md` written; roadmap rebuilt as Stages 1–5; both old plans superseded |
-| 16 Sep 2026 | All questions closed (D20–D36); Stage 1 planned |
-| 16 Sep 2026 | **Stage 1 built.** Server, GitHub layer, snapshot transform, cache, history, and the Board / Timeline / Needs views. 39 tests passing. |
+| 15 Sep 2026 | Repo reorganized; 29 questions raised; **product redefined** — agents on GitHub, not a developer at a keyboard |
+| 16 Sep 2026 | All questions closed (D20–D36); Stage 1 planned and **built** |
+| 16 Sep 2026 | **The design files were the wrong ones.** Interface marked as placeholder pending the real ones |
+| 16 Sep 2026 | **Stage 2 engine built** (D37–D44): provider client, prompt, parser with a hallucination guard, SHA-keyed cache, background enrichment, and a debug CLI |

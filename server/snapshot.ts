@@ -69,6 +69,8 @@ export function buildSnapshot(
     branches,
     warnings,
     rateLimit,
+    // Filled by the advisor after the snapshot is already serveable (advise/enrich.ts).
+    llm: { enabled: false, pending: 0, errors: [] },
   };
 }
 
@@ -100,6 +102,7 @@ function toBranch(bundle: RepoBundle, ghBranch: GhBranch, opts: BuildOptions): B
     title: null,
     summary: null,
     progress: null,
+    insight: null,
   };
 }
 

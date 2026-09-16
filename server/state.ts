@@ -7,6 +7,7 @@
  */
 
 import type { SnapshotResponse, Snapshot } from '../shared/types.ts';
+import { applyCached, enrich, llmReady } from './advise/enrich.ts';
 import { collect } from './collect.ts';
 import { recordHistory } from './history.ts';
 import { loadSettings } from './settings.ts';
@@ -60,10 +61,15 @@ export async function refresh(): Promise<void> {
   refreshing = true;
   announce('state');
   try {
-    snapshot = await collect(settings);
+    const next = await collect(settings);
+
+    // Summaries already on disk cost nothing, so they go on before anyone sees this.
+    applyCached(next, settings);
+
+    snapshot = next;
     lastError = null;
     try {
-      recordHistory(snapshot);
+      recordHistory(next);
     } catch (err) {
       // Failing to write history must never cost you the snapshot you just fetched.
       console.error('could not write history:', message(err));
@@ -74,6 +80,31 @@ export async function refresh(): Promise<void> {
   } finally {
     refreshing = false;
     announce('snapshot');
+  }
+
+  // The paid pass runs after the snapshot is already being served. Deliberately not
+  // awaited: nothing on screen should wait for a model.
+  if (snapshot && llmReady(loadSettings())) void enrichInBackground(snapshot);
+}
+
+let enriching = false;
+
+async function enrichInBackground(target: Snapshot): Promise<void> {
+  if (enriching) return;
+  enriching = true;
+  try {
+    const result = await enrich(target, loadSettings(), () => {
+      // Only announce for the snapshot still on screen; a refresh may have replaced it.
+      if (snapshot === target) announce('snapshot');
+    });
+    if (result.failed > 0) {
+      console.error(`advisor: ${result.failed} branch(es) failed`, result.errors.join('; '));
+    }
+  } catch (err) {
+    console.error('advisor failed:', message(err));
+  } finally {
+    enriching = false;
+    if (snapshot === target) announce('snapshot');
   }
 }
 

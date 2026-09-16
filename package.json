@@ -11,7 +11,10 @@
     "dev": "tsx watch --clear-screen=false server/main.ts",
     "start": "tsx server/main.ts",
     "test": "node --test --experimental-strip-types test/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "brief": "tsx server/cli.ts brief",
+    "models": "tsx server/cli.ts models",
+    "config": "tsx server/cli.ts config"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",

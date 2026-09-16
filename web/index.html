@@ -120,6 +120,33 @@
       </div>
     </div>
 
+    <hr style="border:0;border-top:1px solid var(--line);margin:24px 0 4px">
+    <p class="lede" style="margin:14px 0 0">
+      <b>The advisor</b> — reads each branch's commits and writes a plain-English summary.
+      Optional: leave it blank and everything above still works.
+    </p>
+
+    <label for="llmApiKey">Provider API key</label>
+    <input id="llmApiKey" type="password" autocomplete="off" spellcheck="false">
+    <div class="hint">Stored on this machine only, next to the GitHub token.</div>
+
+    <div class="row">
+      <div>
+        <label for="llmBaseUrl">Provider endpoint</label>
+        <input id="llmBaseUrl" spellcheck="false">
+      </div>
+      <div>
+        <label for="llmModel">Model</label>
+        <input id="llmModel" list="modelList" spellcheck="false" placeholder="pick one">
+        <datalist id="modelList"></datalist>
+        <div class="hint"><a href="#" id="loadModels">Load the list</a> once a key is saved.</div>
+      </div>
+      <div>
+        <label for="llmMaxPerRun">Max summaries per refresh</label>
+        <input id="llmMaxPerRun" type="number" min="0" max="500">
+      </div>
+    </div>
+
     <div class="err" id="settingsErr"></div>
     <div class="actions">
       <button class="btn primary" id="saveSettings">Save and refresh</button>
