@@ -43,7 +43,7 @@ Three rules. The first two carry over from the old plan because they were right:
 
 ---
 
-## Stage 1 — The git history on screen  `← NEXT`
+## Stage 1 — The git history on screen  ✅ **BUILT**
 
 **The proof.** *"If exactly one thing worked a week from now it would be having the git
 logs show up in the mockups I created — all of the descriptions from the commits, time,
@@ -71,7 +71,7 @@ every active thread is doing — without opening GitHub.
 
 ---
 
-## Stage 2 — LLM insight over the history
+## Stage 2 — LLM insight over the history  `← NEXT`
 
 **The payoff, and your #2 priority.** Everything here needs only Stage 1 data.
 

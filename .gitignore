@@ -1,26 +1,15 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-build/
-dist/
-.venv/
-venv/
+# Dependencies
+node_modules/
 
-# Tooling
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
+# Bearing's own data: your GitHub token, the cache, and the history file.
+# Never commit this — the token lives here.
+data/
 
-# Bearing's own output and scratch state
-*.local.toml
-/scratch/
-brief.html
-brief.json
-
-# OS
+# Editors and OS
 .DS_Store
 Thumbs.db
 desktop.ini
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
+*.log
