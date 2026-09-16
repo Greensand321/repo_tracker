@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 
 import type { Settings } from '../shared/types.ts';
-import { LlmError, listModels } from './advise/client.ts';
+import { LlmError, fetchModelsRaw, listModels } from './advise/client.ts';
 import { GitHubError, splitRepoKey, verifyToken } from './github.ts';
 import { loadSettings, saveSettings, toSafe } from './settings.ts';
 import { currentResponse, refresh, startPolling, subscribe } from './state.ts';
@@ -81,7 +81,11 @@ api.delete('/settings/llm-key', (c) => c.json(toSafe(saveSettings({ llmApiKey: '
 /** The provider's own model list, so nobody has to guess a model ID. */
 api.get('/llm/models', async (c) => {
   try {
-    return c.json({ models: await listModels(loadSettings()) });
+    const settings = loadSettings();
+    // ?raw=1 returns the untouched upstream payload. Open it in a browser when a model
+    // is rejected — it shows exactly which key holds the real ID.
+    if (c.req.query('raw')) return c.json(await fetchModelsRaw(settings));
+    return c.json({ models: await listModels(settings) });
   } catch (err) {
     return c.json({ error: describe(err) }, 400);
   }
