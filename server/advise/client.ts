@@ -225,11 +225,8 @@ export function extractText(payload: Record<string, unknown>): string | null {
 
 export type ModelInfo = { id: string; name?: string };
 
-/**
- * The provider's own model list. This exists so nobody — including me — has to guess a
- * model ID: the settings screen and the debug CLI both offer what actually exists.
- */
-export async function listModels(settings: Settings): Promise<ModelInfo[]> {
+/** Raw upstream payload, for working out why a model was rejected. */
+export async function fetchModelsRaw(settings: Settings): Promise<unknown> {
   if (!settings.llmApiKey) throw new LlmError('no API key set');
 
   const res = await withTimeout((signal) =>
@@ -239,29 +236,61 @@ export async function listModels(settings: Settings): Promise<ModelInfo[]> {
     }),
   );
   if (!res.ok) throw new LlmError(await describeFailure(res), res.status);
+  return res.json();
+}
 
-  const payload = (await res.json()) as { data?: unknown; models?: unknown };
-  const rows = Array.isArray(payload.data)
-    ? payload.data
-    : Array.isArray(payload.models)
-      ? payload.models
-      : [];
+/**
+ * The provider's own model list, so nobody — including me — has to guess a model ID.
+ *
+ * Getting the ID out is the fiddly part and it has already gone wrong once: an earlier
+ * version fell back to the display name when there was no `id` key, so the settings
+ * screen offered "DeepSeek V4.1 Flash", that got sent as the model, and the provider
+ * answered "Model is unavailable" — an error that points nowhere near the cause.
+ *
+ * So: look through the keys providers actually use, and **prefer a value that looks
+ * like an identifier** (no spaces). A display name is only used as an ID when there is
+ * genuinely nothing else, and even then it is flagged rather than sent silently.
+ */
+export async function listModels(settings: Settings): Promise<ModelInfo[]> {
+  const payload = (await fetchModelsRaw(settings)) as Record<string, unknown>;
 
+  const rows = ['data', 'models', 'items'].reduce<unknown[]>((found, key) => {
+    if (found.length > 0) return found;
+    const value = payload[key];
+    return Array.isArray(value) ? value : found;
+  }, Array.isArray(payload) ? (payload as unknown[]) : []);
+
+  const seen = new Set<string>();
   return rows
-    .map((row): ModelInfo | null => {
-      if (typeof row === 'string') return { id: row };
-      if (typeof row === 'object' && row !== null) {
-        const record = row as Record<string, unknown>;
-        const id = record['id'] ?? record['name'];
-        if (typeof id === 'string') {
-          const name = record['name'];
-          return typeof name === 'string' && name !== id ? { id, name } : { id };
-        }
-      }
-      return null;
-    })
+    .map(toModelInfo)
     .filter((model): model is ModelInfo => model !== null)
+    .filter((model) => (seen.has(model.id) ? false : seen.add(model.id)))
     .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/** Keys seen across OpenAI-compatible gateways, most authoritative first. */
+const ID_KEYS = ['id', 'model', 'model_id', 'modelId', 'slug', 'canonical_slug', 'name'];
+const NAME_KEYS = ['name', 'display_name', 'displayName', 'label', 'title'];
+
+/** An identifier has no spaces. "DeepSeek V4.1 Flash" is a label; "deepseek-v4.1" is an ID. */
+const looksLikeId = (value: string): boolean => value.trim().length > 0 && !/\s/.test(value);
+
+export function toModelInfo(row: unknown): ModelInfo | null {
+  if (typeof row === 'string') return row.trim() ? { id: row.trim() } : null;
+  if (typeof row !== 'object' || row === null) return null;
+
+  const record = row as Record<string, unknown>;
+  const candidates = ID_KEYS.map((key) => record[key]).filter(
+    (value): value is string => typeof value === 'string' && value.trim().length > 0,
+  );
+  // An id-shaped value always beats a prettier one, whatever key it came under.
+  const id = (candidates.find(looksLikeId) ?? candidates[0])?.trim();
+  if (!id) return null;
+
+  const name = NAME_KEYS.map((key) => record[key]).find(
+    (value): value is string => typeof value === 'string' && value.trim() !== '' && value.trim() !== id,
+  );
+  return name ? { id, name: name.trim() } : { id };
 }
 
 const baseUrl = (settings: Settings): string => settings.llmBaseUrl.replace(/\/+$/, '');

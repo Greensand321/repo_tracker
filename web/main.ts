@@ -343,8 +343,10 @@ function wire(): void {
         $('#settingsErr').textContent = payload.error ?? 'could not load models';
         return;
       }
-      $('#modelList').innerHTML = payload.models
-        .map((model) => `<option value="${esc(model.id)}"></option>`)
+      // value is the ID that gets sent; the label is only a hint. Showing the pretty
+      // name as the value is how a display name ended up being sent as a model once.
+      $('#modelList').innerHTML = (payload.models as { id: string; name?: string }[])
+        .map((model) => `<option value="${esc(model.id)}"${model.name ? ` label="${esc(model.name)}"` : ''}></option>`)
         .join('');
       link.textContent = `${payload.models.length} models — click the box`;
       return;

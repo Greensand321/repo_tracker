@@ -143,3 +143,39 @@ test('the protocol guess covers the families Zen actually splits on', () => {
     assert.equal(guessProtocol(model), 'chat', model);
   }
 });
+
+// --- getting the model ID right, which has already gone wrong once ---
+
+import { toModelInfo } from '../server/advise/client.ts';
+
+test('an id-shaped value wins over a prettier one, whatever key it came under', () => {
+  // The bug: falling back to the display name meant "DeepSeek V4.1 Flash" was sent as
+  // the model, and the provider answered "Model is unavailable".
+  assert.deepEqual(
+    toModelInfo({ name: 'DeepSeek V4.1 Flash', model: 'deepseek-v4.1-flash' }),
+    { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash' },
+  );
+  assert.deepEqual(
+    toModelInfo({ id: 'big-pickle', display_name: 'Big Pickle' }),
+    { id: 'big-pickle', name: 'Big Pickle' },
+  );
+  assert.deepEqual(
+    toModelInfo({ label: 'Claude Opus 5', slug: 'claude-opus-5' }),
+    { id: 'claude-opus-5', name: 'Claude Opus 5' },
+  );
+});
+
+test('the standard OpenAI shape still works', () => {
+  assert.deepEqual(toModelInfo({ id: 'gpt-5.5', object: 'model' }), { id: 'gpt-5.5' });
+  assert.deepEqual(toModelInfo('kimi-k3'), { id: 'kimi-k3' });
+});
+
+test('a display name is only used as an ID when there is nothing else', () => {
+  assert.deepEqual(toModelInfo({ name: 'Only A Label' }), { id: 'Only A Label' });
+});
+
+test('junk rows are dropped rather than becoming a broken model choice', () => {
+  for (const row of [null, 42, {}, { object: 'model' }, '', '   ']) {
+    assert.equal(toModelInfo(row), null, JSON.stringify(row));
+  }
+});
