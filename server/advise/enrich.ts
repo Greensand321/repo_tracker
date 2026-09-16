@@ -151,8 +151,9 @@ function assign(branch: Branch, stored: StoredInsight): void {
   branch.insight = stored.meta;
 }
 
-/** Auth, billing and a missing model are settings problems; retrying cannot fix them. */
+/** Auth, billing and a bad model are settings problems; retrying cannot fix them. */
 function isFatal(err: LlmError): boolean {
   if (err.status === 401 || err.status === 402 || err.status === 403) return true;
-  return /no API key|no model chosen/i.test(err.message);
+  // A model that answers on no known endpoint will fail identically for every branch.
+  return /no API key|no model chosen|did not answer on any known endpoint/i.test(err.message);
 }
