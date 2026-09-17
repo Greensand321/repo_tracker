@@ -53,8 +53,9 @@ last thing standing between the current single-turn advisor (D60) and the tool-c
 agent in `docs/plans/agent-plan.md`. Everything else in Stage 2 is now built.
 
 There is also a **plan waiting for review**: [`docs/plans/agent-memory-plan.md`](plans/agent-memory-plan.md)
-— what the agent remembers between instances, and how it knows what to work on. Its stage A
-(standing orders from feedback, R7) needs no tool calling and could start before the probe.
+— the assistant that answers "what goals are done, what still needs doing, what work is going
+on". Its stage A (goal judgement with evidence, plus the brief) needs no tool calling and can
+start before the probe.
 
 After that, in order:
 
