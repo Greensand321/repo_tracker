@@ -377,3 +377,19 @@ test('the chip form of a verdict is never truncated into nonsense', () => {
     assert.ok(verdictChip(v).length <= 11, `${v}: ${verdictChip(v)}`);
   }
 });
+
+test('the paid pass shares one budget rather than one per step', async () => {
+  // Drafting was capped and assessing was not, so a read that had just been given forty
+  // visions would then assess all forty — past the ceiling that exists so a first run
+  // cannot surprise you with a bill.
+  const src = await import('node:fs').then((fs) =>
+    fs.readFileSync(new URL('../server/advise/assist.ts', import.meta.url), 'utf8'),
+  );
+  assert.match(src, /let budget = settings\.llmMaxPerRun/, 'one budget');
+  assert.equal(
+    (src.match(/slice\(0, settings\.llmMaxPerRun\)/g) ?? []).length,
+    0,
+    'no step slices its own cap out from under the shared budget',
+  );
+  assert.equal((src.match(/!spend\(\)/g) ?? []).length, 2, 'both paid per-branch steps draw on it');
+});

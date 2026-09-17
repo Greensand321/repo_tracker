@@ -19,6 +19,10 @@ doing and what is going on. Under the register, **Waiting on you** carries the q
 capped and answerable in place. Drift always offers both its causes (D62), and a goal is
 never silently marked done (D64).
 
+**How it works, end to end:** [`design/ai-map.html`](design/ai-map.html) — every path from
+the clock firing to what gets written, all six prompts with what each one sees, decides and
+may not do, and where to change each. Open it from disk.
+
 Plan: [`plans/vision-ux.md`](plans/vision-ux.md) (the walkthrough) and
 [`plans/agent-memory-plan.md`](plans/agent-memory-plan.md) (stage A of the build order).
 Decisions D61–D65.
@@ -101,6 +105,8 @@ After that, in order:
   announce goal changes, but only while the event stream is up, and it reconnects on a
   three-second timer — leaning on it alone meant a click in that window silently did nothing.
 - **Fonts are served from `web/fonts/`**, not Google Fonts (D56).
+- **One budget per read, not one per step.** `llmMaxPerRun` is spent across summarising,
+  drafting and assessing together. It used to cap the first two and not the third.
 - **The assistant costs almost nothing on an unchanged fleet.** An assessment is cached on
   head SHA + vision text; the brief and every goal judgement share one cache key hashed over
   every branch, vision and verdict. Nothing moves, nothing is spent.
