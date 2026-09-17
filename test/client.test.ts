@@ -287,7 +287,7 @@ test('every branch in one run shares a session, and runs differ', async () => {
 
   const advise = await import('../server/advise/enrich.ts');
   const makeSnapshot = () => ({
-    generatedAt: '2026-09-16T12:00:00Z', repos: [], warnings: [], rateLimit: null,
+    generatedAt: '2026-09-16T12:00:00Z', repos: [], warnings: [], rateLimit: null, goals: [],
     llm: { enabled: false, pending: 0, errors: [] },
     branches: ['a', 'b'].map((name) => ({
       repoKey: 'o/r', name, headSha: `sha-${name}-${Math.random()}`, url: 'u',
@@ -295,7 +295,7 @@ test('every branch in one run shares a session, and runs differ', async () => {
       ahead: 1, behind: 0, lastActivity: '2026-09-15T00:00:00Z',
       diff: { files: 1, additions: 1, deletions: 0 }, activity: ['2026-09-15'],
       pr: null, ci: { state: 'none' as const, url: null }, relevance: 'active' as const,
-      isBase: false, title: null, summary: null, progress: null, insight: null,
+      isBase: false, goalId: null, title: null, summary: null, progress: null, insight: null,
     })),
   });
 

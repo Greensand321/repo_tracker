@@ -6,9 +6,10 @@
  * on top of the GitHub one.
  */
 
-import type { SnapshotResponse, Snapshot } from '../shared/types.ts';
+import { refKey, type Snapshot, type SnapshotResponse } from '../shared/types.ts';
 import { applyCached, enrich, llmReady } from './advise/enrich.ts';
 import { collect } from './collect.ts';
+import { applyGoals, pruneGoals } from './goals.ts';
 import { recordHistory } from './history.ts';
 import { loadSettings } from './settings.ts';
 
@@ -63,7 +64,12 @@ export async function refresh(): Promise<void> {
   try {
     const next = await collect(settings);
 
-    // Summaries already on disk cost nothing, so they go on before anyone sees this.
+    // Both of these are free and local, so they go on before anyone sees the snapshot:
+    // goals are the owner's own filing, summaries are already paid for and on disk.
+    // A branch that no longer exists should not sit in a goal forever. The goal is
+    // kept either way — it is the owner's, not GitHub's.
+    pruneGoals(new Set(next.branches.map((b) => refKey(b.repoKey, b.name))));
+    applyGoals(next);
     applyCached(next, settings);
 
     snapshot = next;
@@ -106,6 +112,19 @@ async function enrichInBackground(target: Snapshot): Promise<void> {
     enriching = false;
     if (snapshot === target) announce('snapshot');
   }
+}
+
+/**
+ * Re-merge Plane B into the snapshot already on screen and tell the pages.
+ *
+ * Filing a branch under a goal is the owner's own data — it must not cost a GitHub
+ * call, and it must not wait for the next poll to appear. This is the whole reason
+ * goals are merged at the edge rather than fetched with everything else.
+ */
+export function reapplyGoals(): void {
+  if (!snapshot) return;
+  applyGoals(snapshot);
+  announce('snapshot');
 }
 
 /** Fresh on open, then keep going. `refreshSeconds: 0` turns polling off. */

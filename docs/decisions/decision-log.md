@@ -111,6 +111,63 @@ The explorations ship `fonts/` (Fraunces, Inter, JetBrains Mono, latin subset, ~
 when the network is down is not local-first, and typography carries the whole hierarchy
 here (D54) — falling back to system faces is not a cosmetic loss.
 
+### D57 — The interface is the Broadsheet (exploration D4), with the register grouped by goal
+
+The owner chose D4 over the recommended D6, and the reasons are worth keeping because
+they are about how the tool gets used, not about how it looks:
+
+- **The standing column on the right.** The single biggest reason. The ask box sits at the
+  top of it and the register sits below, so a question and the thing it is a question
+  about are in the same field of view.
+- **“Happening now” at the top of the centre column.** Called "one big selling point".
+- **The register grouped by goal**, not a flat branch list: *"the stuff below is mostly
+  what the agent would organize itself, I can just comb through and see if it did it
+  correctly."* The register is a checking surface, and goals are what is being checked.
+
+D6's one genuinely better idea survives as the centre column's control: the same branches
+can be read **by goal** or **by branch**, chosen from a dropdown (the owner asked for a
+dropdown over a toggle). It is one grouping of one structure, not two views.
+
+### D58 — Goals are Plane B, merged into the Snapshot at the edge
+
+A goal groups the branches working toward it. One branch has at most one goal; assigning
+a branch that already has one moves it. **Unfiled is normal, not a backlog** — most
+branches start there and some never need a goal, so the unfiled group sorts last and is
+labelled rather than flagged.
+
+Goals live in `data/goals.json` and are attached to the snapshot by `applyGoals` beside
+`applyCached`, not fetched with everything else. Two consequences, both deliberate:
+`buildSnapshot` stays a pure transform of GitHub data (rule 5), and **filing a branch
+costs no GitHub call** — the server re-merges the snapshot already in memory and pushes.
+
+Deleting a goal unfiles its branches and touches nothing in the repo; a branch that
+disappears from GitHub is pruned out of its goal, but the goal itself is kept. Plane A is
+never ours to lose and Plane B is never GitHub's to delete.
+
+### D59 — No diffstats in the dashboard
+
+The owner: *"Seeing how many lines of code is committed is not relevant information for
+this view."* `+1802 −310` is still collected and still in the Snapshot, because a later
+surface — the "what changed and by how much" one that D31's dated snapshots exist for —
+is exactly where it belongs. It is simply not rendered here. Ahead/behind stays: it is a
+count of commits, which is navigational rather than volumetric, and it stays small (rule 3).
+
+### D60 — The advisor answers one question in one turn, with no tools
+
+`server/advise/ask.ts` writes the current snapshot into the prompt and asks the model
+once. It is not the tool-calling agent in `docs/plans/agent-plan.md`, and it is not a
+placeholder for it either — it is the floor that plan names, and the floor works anywhere.
+
+The reason it is not the agent yet is that `npm run probe` has still not been run against
+the owner's plan, so "this model can reliably call a tool" remains an assumption. Five
+provider gates in a row were caused by building on exactly that kind of assumption. When
+the probe comes back, this becomes the fallback path rather than being thrown away.
+
+What the model is shown is capped by `askBranchCap` (default 60, in settings) because the
+prompt — and the cost of every question — grows with the register. Every answer carries
+how many branches and goals it actually saw, so a wrong answer is debuggable rather than
+mysterious.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.
@@ -145,6 +202,7 @@ Kept because the arguments still explain how the current design was reached.
 | ~~Performance budget: < 5 s across 4 repos, ≤ 3 git calls per branch~~ | — | Written for local subprocess calls. A network-bound budget needs rewriting once the stack is chosen. |
 | ~~`safe-to-delete` is list-only, permanently~~ | Still true, but deprioritized | Follows from D1. Just no longer a feature anyone is waiting for. |
 | ~~Build the dashboard from `dashboard-concept.html`~~ (D22) | **D54** | Wrong file. The three-variant prototype was in `docs/design/prototype/` the whole time; variant C is the design language. Cards are out. |
+| ~~Board / Needs you / Timeline / Your notes as four views~~ | **D57** | One column, one list, one grouping control. The four tabs were four filters pretending to be places. |
 
 ---
 

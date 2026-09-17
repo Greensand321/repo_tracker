@@ -69,7 +69,9 @@ export function buildSnapshot(
     branches,
     warnings,
     rateLimit,
-    // Filled by the advisor after the snapshot is already serveable (advise/enrich.ts).
+    // Both filled at the edge once the snapshot exists: goals by server/goals.ts
+    // (free, Plane B), the rest by the advisor (advise/enrich.ts).
+    goals: [],
     llm: { enabled: false, pending: 0, errors: [] },
   };
 }
@@ -97,6 +99,7 @@ function toBranch(bundle: RepoBundle, ghBranch: GhBranch, opts: BuildOptions): B
     activity: activityDates(commits),
     pr: pr?.pr ?? null,
     ci: toCiState(detail?.ci ?? null),
+    goalId: null, // Plane B; attached by applyGoals once the snapshot is built.
     relevance: isQuiet(lastActivity, opts) ? 'quiet' : 'active',
     isBase: ghBranch.name === bundle.repo.default_branch,
     title: null,

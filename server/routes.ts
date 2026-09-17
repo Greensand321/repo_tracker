@@ -4,10 +4,12 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 
 import type { Settings } from '../shared/types.ts';
+import { ask } from './advise/ask.ts';
 import { LlmError, fetchModelsRaw, listModels } from './advise/client.ts';
 import { GitHubError, splitRepoKey, verifyToken } from './github.ts';
+import { GoalError, assignBranch, createGoal, deleteGoal, listGoals, updateGoal } from './goals.ts';
 import { loadSettings, saveSettings, toSafe } from './settings.ts';
-import { currentResponse, refresh, startPolling, subscribe } from './state.ts';
+import { currentResponse, reapplyGoals, refresh, startPolling, subscribe } from './state.ts';
 
 export const api = new Hono();
 
@@ -57,7 +59,7 @@ api.put('/settings', async (c) => {
     patch.token = token;
   }
 
-  for (const key of ['refreshSeconds', 'quietAfterDays', 'commitsPerBranch', 'llmMaxPerRun'] as const) {
+  for (const key of ['refreshSeconds', 'quietAfterDays', 'commitsPerBranch', 'llmMaxPerRun', 'askBranchCap'] as const) {
     if (body[key] !== undefined) patch[key] = Number(body[key]);
   }
   for (const key of ['llmBaseUrl', 'llmModel'] as const) {
@@ -75,8 +77,86 @@ api.put('/settings', async (c) => {
   return c.json(toSafe(saved));
 });
 
+// ---------------------------------------------------------------------------
+// Goals — Plane B. Written freely; the repos are never touched by any of this.
+// ---------------------------------------------------------------------------
+
+api.get('/goals', (c) => c.json({ goals: listGoals() }));
+
+api.post('/goals', async (c) => {
+  try {
+    const body = (await c.req.json()) as { title?: unknown; note?: unknown; milestone?: unknown };
+    const goal = createGoal({
+      title: String(body.title ?? ''),
+      note: typeof body.note === 'string' ? body.note : undefined,
+      milestone: typeof body.milestone === 'string' ? body.milestone : undefined,
+    });
+    reapplyGoals();
+    return c.json({ goal, goals: listGoals() });
+  } catch (err) {
+    return c.json({ error: describe(err) }, 400);
+  }
+});
+
+api.patch('/goals/:id', async (c) => {
+  try {
+    const body = (await c.req.json()) as Record<string, unknown>;
+    const patch: Parameters<typeof updateGoal>[1] = {};
+    for (const key of ['title', 'note', 'milestone'] as const) {
+      if (typeof body[key] === 'string') patch[key] = body[key];
+    }
+    if (typeof body['done'] === 'boolean') patch.done = body['done'];
+    const goal = updateGoal(c.req.param('id'), patch);
+    reapplyGoals();
+    return c.json({ goal, goals: listGoals() });
+  } catch (err) {
+    return c.json({ error: describe(err) }, 400);
+  }
+});
+
+api.delete('/goals/:id', async (c) => {
+  try {
+    deleteGoal(c.req.param('id'));
+    reapplyGoals();
+    return c.json({ goals: listGoals() });
+  } catch (err) {
+    return c.json({ error: describe(err) }, 400);
+  }
+});
+
+/** Move one branch into a goal, or out of every goal with `goalId: null`. */
+api.put('/goals/assign', async (c) => {
+  try {
+    const body = (await c.req.json()) as { repoKey?: unknown; branch?: unknown; goalId?: unknown };
+    if (typeof body.repoKey !== 'string' || typeof body.branch !== 'string') {
+      return c.json({ error: 'repoKey and branch are required' }, 400);
+    }
+    const goalId = body.goalId === null || body.goalId === undefined ? null : String(body.goalId);
+    assignBranch({ repoKey: body.repoKey, branch: body.branch }, goalId);
+    reapplyGoals();
+    return c.json({ goals: listGoals() });
+  } catch (err) {
+    return c.json({ error: describe(err) }, 400);
+  }
+});
+
 api.delete('/settings/token', (c) => c.json(toSafe(saveSettings({ token: '' }))));
 api.delete('/settings/llm-key', (c) => c.json(toSafe(saveSettings({ llmApiKey: '' }))));
+
+/**
+ * One question about the snapshot on screen. Single turn, no tools — see advise/ask.ts
+ * for why that is deliberate rather than unfinished.
+ */
+api.post('/ask', async (c) => {
+  const snapshot = currentResponse().snapshot;
+  if (!snapshot) return c.json({ error: 'nothing has been read from GitHub yet' }, 400);
+  try {
+    const body = (await c.req.json()) as { question?: unknown };
+    return c.json({ answer: await ask(snapshot, String(body.question ?? ''), loadSettings()) });
+  } catch (err) {
+    return c.json({ error: describe(err) }, 400);
+  }
+});
 
 /** The provider's own model list, so nobody has to guess a model ID. */
 api.get('/llm/models', async (c) => {
@@ -131,7 +211,7 @@ api.get('/events', (c) =>
 );
 
 function describe(err: unknown): string {
-  if (err instanceof GitHubError || err instanceof LlmError) return err.message;
+  if (err instanceof GitHubError || err instanceof LlmError || err instanceof GoalError) return err.message;
   if (err instanceof Error) return err.message;
   return String(err);
 }

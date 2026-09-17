@@ -45,6 +45,7 @@ function branch(overrides: Partial<Branch> = {}): Branch {
     ci: { state: 'failing', url: 'c' },
     relevance: 'active',
     isBase: false,
+    goalId: null,
     title: null,
     summary: null,
     progress: null,

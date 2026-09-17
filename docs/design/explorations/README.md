@@ -1,5 +1,11 @@
 # Design explorations — the ledger language
 
+> **Chosen: D4, The Broadsheet** (17 Sep 2026). The owner picked it over the D6 recommended
+> below, for the standing column on the right, "happening now" at the top, and the placement
+> of the ask box. It is built and running in `web/`, with the register grouped by **goal**
+> and D6's grouping control carried across. See **D57** in the decision log.
+> Everything below is the exploration as it stood before that call, kept as reasoning.
+
 Six full interfaces for Bearing, all built from the design language of the prototype's
 **variant C, "The Logbook"** (`../prototype/bearing-prototype.html?variant=C`).
 
@@ -40,7 +46,7 @@ the Snapshot does not carry, that is noted below rather than faked.
 
 | | Design | In one line | Verdict |
 |---|---|---|---|
-| **D6** | **[The Ledger](d6.html)** ★ | One ledger, two spines — the same rows read **by thread** or **by day** — with the command line always visible and answers filed into the ledger as dated entries. | **Build this.** |
+| D6 | [The Ledger](d6.html) | One ledger, two spines — the same rows read **by thread** or **by day** — with the command line always visible and answers filed into the ledger as dated entries. | Recommended at the time; not chosen. |
 | D1 | [The Register](d1.html) | One continuous table of every branch, rows opening in place. | Purest ledger; fastest scan. No sense of time. |
 | D2 | [The Day Book](d2.html) | Days descending, every repo interleaved. | Closest to the prototype. Answers "what moved while I was away" perfectly, "what is this branch doing" badly. |
 | D3 | [The Split Ledger](d3.html) | Repos ǀ register ǀ dossier. | Deepest per branch, keeps your place — but three panes is the shape that felt over-used. |

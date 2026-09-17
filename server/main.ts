@@ -41,6 +41,23 @@ async function main(): Promise<void> {
   app.get('/app.js', (c) =>
     c.body(clientJs, 200, { 'content-type': 'text/javascript; charset=utf-8', ...NO_STORE }),
   );
+  /**
+   * Fonts are self-hosted (D56). They are content-addressed by name and never change
+   * without a filename change, so unlike the bundle they are safe — and worth — caching.
+   */
+  app.get('/fonts/:file', (c) => {
+    const file = c.req.param('file');
+    if (!/^[A-Za-z]+-[a-z]+-\d+\.woff2$/.test(file)) return c.notFound();
+    try {
+      return c.body(new Uint8Array(readFileSync(join(WEB_DIR, 'fonts', file))), 200, {
+        'content-type': 'font/woff2',
+        'cache-control': 'public, max-age=31536000, immutable',
+      });
+    } catch {
+      return c.notFound();
+    }
+  });
+
   app.get('/app.css', (c) =>
     c.body(readFileSync(join(WEB_DIR, 'app.css'), 'utf8'), 200, {
       'content-type': 'text/css; charset=utf-8',
