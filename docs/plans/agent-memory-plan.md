@@ -1,7 +1,7 @@
 # The assistant — memory, judgement and work
 
-**Drafted:** 17 Sep 2026 · **Revised:** 17 Sep 2026 · **Status:** draft, not agreed.
-Open questions at the end.
+**Drafted:** 17 Sep 2026 · **Revised:** 17 Sep 2026 · **Status:** **stage A built** (D61–D65).
+Stages B–D not agreed. Open questions at the end.
 
 Follows [`agent-plan.md`](agent-plan.md), which covered *what the agent does* and *what
 tools it holds*. This covers what it knows, what it decides, and how it keeps track.
@@ -287,7 +287,7 @@ because the probe has still not run.
 
 | | Stage | What lands | Needs |
 |---|---|---|---|
-| **A** | **Vision, assessment, brief** | Branch visions (drafted, confirmed, edited); vision-vs-reality assessment; goal judgement built on it; the brief | Nothing new — same single-turn shape as the advisor today (D60) |
+| **A** ✅ | **Vision, assessment, brief** | Branch visions (drafted, confirmed, edited); vision-vs-reality assessment; goal judgement built on it; the brief | Nothing new — same single-turn shape as the advisor today (D60) |
 | **B** | **The docket** | Derived work in two columns, dispositions, "what's waiting on you" | Stage A |
 | **C** | **Learning** | Feedback → standing orders (R7); the assistant asking when it lacks context | Stage B |
 | **D** | **Many hands** | Packets, one instance per task, run log | The probe |

@@ -50,6 +50,8 @@ function normalise(raw: Partial<Goal>): Goal {
           .map((b) => ({ repoKey: b.repoKey, branch: b.branch }))
       : [],
     done: raw.done === true,
+    // Written by the assistant's fleet pass, not stored here — see advise/assist.ts.
+    judgement: null,
     createdAt: String(raw.createdAt ?? now),
     updatedAt: String(raw.updatedAt ?? now),
   };
@@ -77,6 +79,7 @@ export function createGoal(input: { title: string; note?: string; milestone?: st
     milestone: (input.milestone ?? '').trim(),
     branches: [],
     done: false,
+    judgement: null,
     createdAt: now,
     updatedAt: now,
   };

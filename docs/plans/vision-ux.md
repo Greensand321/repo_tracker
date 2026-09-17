@@ -1,6 +1,7 @@
 # Vision — what it looks like to use
 
-**Drafted:** 17 Sep 2026 · **Status:** draft for review. **No implementation yet.**
+**Drafted:** 17 Sep 2026 · **Status:** agreed and **built** (17 Sep). Decisions D61–D65.
+Routes 1, 2 and 3 are in; route 4 (inherit from the goal) and §8's deferred items are not.
 
 This is a walkthrough, not a spec. It describes what the owner sees and does, moment by
 moment. Schema, storage and prompts are deliberately absent — get the experience agreed

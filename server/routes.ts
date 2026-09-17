@@ -5,11 +5,13 @@ import { streamSSE } from 'hono/streaming';
 
 import type { Settings } from '../shared/types.ts';
 import { ask } from './advise/ask.ts';
+import { distributeVisions } from './advise/vision.ts';
 import { LlmError, fetchModelsRaw, listModels } from './advise/client.ts';
 import { GitHubError, splitRepoKey, verifyToken } from './github.ts';
 import { GoalError, assignBranch, createGoal, deleteGoal, listGoals, updateGoal } from './goals.ts';
+import { VisionError, clearVision, confirmVision, setVision } from './vision.ts';
 import { loadSettings, saveSettings, toSafe } from './settings.ts';
-import { currentResponse, reapplyGoals, refresh, startPolling, subscribe } from './state.ts';
+import { currentResponse, reapplyGoals, reapplyVisions, refresh, startPolling, subscribe } from './state.ts';
 
 export const api = new Hono();
 
@@ -59,13 +61,21 @@ api.put('/settings', async (c) => {
     patch.token = token;
   }
 
-  for (const key of ['refreshSeconds', 'quietAfterDays', 'commitsPerBranch', 'llmMaxPerRun', 'askBranchCap'] as const) {
+  for (const key of [
+    'refreshSeconds',
+    'quietAfterDays',
+    'commitsPerBranch',
+    'llmMaxPerRun',
+    'askBranchCap',
+    'maxOpenQuestions',
+  ] as const) {
     if (body[key] !== undefined) patch[key] = Number(body[key]);
   }
   for (const key of ['llmBaseUrl', 'llmModel'] as const) {
     if (typeof body[key] === 'string') patch[key] = body[key];
   }
   if (typeof body.llmEnabled === 'boolean') patch.llmEnabled = body.llmEnabled;
+  if (typeof body.visionAutoDraft === 'boolean') patch.visionAutoDraft = body.visionAutoDraft;
   if (typeof body.llmApiKey === 'string' && body.llmApiKey.trim()) {
     patch.llmApiKey = body.llmApiKey.trim();
   }
@@ -135,6 +145,85 @@ api.put('/goals/assign', async (c) => {
     assignBranch({ repoKey: body.repoKey, branch: body.branch }, goalId);
     reapplyGoals();
     return c.json({ goals: listGoals() });
+  } catch (err) {
+    return c.json({ error: describe(err) }, 400);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Vision — what a branch is FOR. Plane B. See docs/plans/vision-ux.md.
+// ---------------------------------------------------------------------------
+
+function refOf(body: Record<string, unknown>): { repoKey: string; branch: string } {
+  if (typeof body['repoKey'] !== 'string' || typeof body['branch'] !== 'string') {
+    throw new VisionError('repoKey and branch are required');
+  }
+  return { repoKey: body['repoKey'], branch: body['branch'] };
+}
+
+/**
+ * Writing a vision. `state` says whose words these are, and it is not cosmetic: a
+ * proposal the owner has not looked at must never be treated as their intent.
+ *
+ *   yours      the owner typed it
+ *   confirmed  the owner accepted a draft unchanged
+ */
+api.put('/vision', async (c) => {
+  try {
+    const body = (await c.req.json()) as Record<string, unknown>;
+    const ref = refOf(body);
+    const text = String(body['text'] ?? '');
+    const state = body['state'] === 'confirmed' ? 'confirmed' : 'yours';
+    const vision = setVision(ref, text, state);
+    reapplyVisions();
+    return c.json({ vision });
+  } catch (err) {
+    return c.json({ error: describe(err) }, 400);
+  }
+});
+
+/** Accepting a draft as it stands. The words do not change, so the assessment survives. */
+api.post('/vision/confirm', async (c) => {
+  try {
+    const vision = confirmVision(refOf((await c.req.json()) as Record<string, unknown>));
+    reapplyVisions();
+    return c.json({ vision });
+  } catch (err) {
+    return c.json({ error: describe(err) }, 400);
+  }
+});
+
+/** "I do not want to say" is a real answer, and better than a vision nobody believes. */
+api.delete('/vision', async (c) => {
+  try {
+    clearVision(refOf((await c.req.json()) as Record<string, unknown>));
+    reapplyVisions();
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ error: describe(err) }, 400);
+  }
+});
+
+/**
+ * One paragraph about several branches, split into one vision each.
+ *
+ * Returns proposals only — nothing is written. The owner confirms what they meant, which
+ * is the whole point of talking in paragraphs rather than filling in a form per branch.
+ */
+api.post('/vision/distribute', async (c) => {
+  const snapshot = currentResponse().snapshot;
+  if (!snapshot) return c.json({ error: 'nothing has been read from GitHub yet' }, 400);
+  try {
+    const body = (await c.req.json()) as { text?: unknown };
+    const paragraph = String(body.text ?? '').trim();
+    if (!paragraph) return c.json({ error: 'say something first' }, 400);
+
+    const proposals = await distributeVisions(
+      paragraph,
+      snapshot.branches.filter((b) => !b.isBase),
+      loadSettings(),
+    );
+    return c.json({ proposals });
   } catch (err) {
     return c.json({ error: describe(err) }, 400);
   }
@@ -211,7 +300,14 @@ api.get('/events', (c) =>
 );
 
 function describe(err: unknown): string {
-  if (err instanceof GitHubError || err instanceof LlmError || err instanceof GoalError) return err.message;
+  if (
+    err instanceof GitHubError ||
+    err instanceof LlmError ||
+    err instanceof GoalError ||
+    err instanceof VisionError
+  ) {
+    return err.message;
+  }
   if (err instanceof Error) return err.message;
   return String(err);
 }

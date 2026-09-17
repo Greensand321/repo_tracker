@@ -7,6 +7,7 @@
  */
 
 import { refKey, type Snapshot, type SnapshotResponse } from '../shared/types.ts';
+import { applyAssist, assist } from './advise/assist.ts';
 import { applyCached, enrich, llmReady } from './advise/enrich.ts';
 import { collect } from './collect.ts';
 import { applyGoals, pruneGoals } from './goals.ts';
@@ -71,6 +72,8 @@ export async function refresh(): Promise<void> {
     pruneGoals(new Set(next.branches.map((b) => refKey(b.repoKey, b.name))));
     applyGoals(next);
     applyCached(next, settings);
+    // Visions, assessments, judgements and the brief that are already on disk. Free.
+    applyAssist(next, settings);
 
     snapshot = next;
     lastError = null;
@@ -99,12 +102,22 @@ async function enrichInBackground(target: Snapshot): Promise<void> {
   if (enriching) return;
   enriching = true;
   try {
-    const result = await enrich(target, loadSettings(), () => {
+    const announceIfCurrent = (): void => {
       // Only announce for the snapshot still on screen; a refresh may have replaced it.
       if (snapshot === target) announce('snapshot');
-    });
+    };
+
+    const result = await enrich(target, loadSettings(), announceIfCurrent);
     if (result.failed > 0) {
       console.error(`advisor: ${result.failed} branch(es) failed`, result.errors.join('; '));
+    }
+
+    // Summaries first, then the assistant: drafting a vision reads better with a summary
+    // already in hand, and the brief reads everything.
+    const assisted = await assist(target, loadSettings(), announceIfCurrent);
+    if (assisted.failed > 0) {
+      console.error(`assistant: ${assisted.failed} failure(s)`, assisted.errors.join('; '));
+      target.llm.errors = [...target.llm.errors, ...assisted.errors];
     }
   } catch (err) {
     console.error('advisor failed:', message(err));
@@ -124,6 +137,20 @@ async function enrichInBackground(target: Snapshot): Promise<void> {
 export function reapplyGoals(): void {
   if (!snapshot) return;
   applyGoals(snapshot);
+  applyAssist(snapshot, loadSettings());
+  announce('snapshot');
+}
+
+/**
+ * Re-merge a vision edit into the snapshot on screen and tell the pages.
+ *
+ * Saying what a branch is for is the owner's own data and must not cost a GitHub call,
+ * or wait for the next poll to appear. The assessment it invalidates is re-run by the
+ * next paid pass; until then the page honestly shows no comparison rather than the old one.
+ */
+export function reapplyVisions(): void {
+  if (!snapshot) return;
+  applyAssist(snapshot, loadSettings());
   announce('snapshot');
 }
 
