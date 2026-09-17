@@ -19,6 +19,10 @@ doing and what is going on. Under the register, **Waiting on you** carries the q
 capped and answerable in place. Drift always offers both its causes (D62), and a goal is
 never silently marked done (D64).
 
+**Where it could go next:** [`design/agent-shapes.html`](design/agent-shapes.html) — five
+shapes the assistant could take, which turn out to be layers rather than alternatives, plus
+the answer to "how does the program know when an agent is done". Nothing in it is built.
+
 **How it works, end to end:** [`design/ai-map.html`](design/ai-map.html) — every path from
 the clock firing to what gets written, all six prompts with what each one sees, decides and
 may not do, and where to change each. Open it from disk.

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<!--
+  FIVE SHAPES THE ASSISTANT COULD TAKE — a thing to argue with, not a plan.
+
+  Written in answer to: "how does the program know when an AI is done with its tasks?",
+  "these models are capable of so much more", and "a room full of agents".
+
+  The five are LAYERS, not alternatives. That is the main finding.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bearing — shapes the assistant could take</title>
+<link rel="stylesheet" href="explorations/fonts.css">
+<style>
+  :root{
+    --bg:#0e1216;--panel:#101519;--panel-2:#141b21;
+    --line:#1d232b;--line-2:#232c35;--line-3:#2c3742;
+    --text:#d7dde3;--text-hi:#eef6f4;--body:#b9c2cd;
+    --dim:#8b93a8;--muted:#57616b;--faint:#3d4650;
+    --now:#62c9c0;--warn:#f2c976;--bad:#e2705f;--good:#63c08a;--done:#a98bdb;--note:#d8c8a8;
+    --serif:"Fraunces",Georgia,serif;--sans:"Inter",system-ui,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0;padding:0}
+  body{font-family:var(--sans);font-size:14px;line-height:1.55;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(1000px 500px at 85% -8%,rgba(98,201,192,.055),transparent 60%)}
+  .sheet{max-width:1080px;margin:0 auto;padding:0 40px 140px;position:relative}
+
+  .masthead{text-align:center;padding:34px 0 12px;border-bottom:3px double var(--line-3)}
+  .masthead .word{font-family:var(--serif);font-style:italic;font-size:40px;line-height:1}
+  .masthead .sub{font-family:var(--mono);font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted);margin-top:9px}
+  .dateline{font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:9px 0 26px;border-bottom:1px solid var(--line-2);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+  h2{font-family:var(--serif);font-size:26px;font-weight:600;margin:48px 0 8px;letter-spacing:-.01em}
+  h3{font-family:var(--serif);font-size:19px;font-weight:600;margin:28px 0 6px}
+  .lede{color:var(--body);max-width:76ch;margin:0 0 16px}
+  .big{font-family:var(--serif);font-size:19px;line-height:1.5;color:var(--text-hi);max-width:64ch;margin:14px 0}
+  code{font-family:var(--mono);font-size:12px;color:var(--dim)}
+  em.q{font-family:var(--serif);font-style:italic;color:var(--note);font-size:14px}
+
+  svg{display:block;max-width:100%;height:auto;margin:14px 0 6px}
+  .bx{fill:var(--panel-2);stroke:var(--line-3)}
+  .bx-c{fill:#141b21;stroke:#62c9c055}
+  .bx-y{fill:#141b21;stroke:#f2c97644}
+  .bx-b{fill:#12181e;stroke:#2c3742}
+  .t{font-family:var(--sans);font-size:12px;fill:var(--text-hi)}
+  .s{font-family:var(--mono);font-size:9.5px;fill:var(--muted)}
+  .e{stroke:var(--line-3);stroke-width:1.3;fill:none}
+  .e-t{stroke:#62c9c066;stroke-width:1.2;fill:none;stroke-dasharray:3 3}
+  .el{font-family:var(--mono);font-size:9px;fill:var(--muted)}
+
+  .opt{padding:26px 0 8px;border-bottom:1px solid var(--line)}
+  .opt .hd{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .opt .no{font-family:var(--mono);font-size:12px;color:var(--now);flex:none}
+  .opt h3{margin:0}
+  .opt .tag{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--faint)}
+  .opt.best{background:linear-gradient(90deg,#62c9c008,transparent 60%);margin:0 -20px;padding:26px 20px 8px}
+  .verdict{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;margin-top:14px}
+  .verdict div{font-size:12.5px;padding:3px 0 3px 16px;position:relative}
+  .verdict .y{color:var(--good)} .verdict .n{color:var(--dim)}
+  .verdict .y::before{content:"+";position:absolute;left:0;font-family:var(--mono)}
+  .verdict .n::before{content:"−";position:absolute;left:0;font-family:var(--mono);color:var(--muted)}
+
+  table{width:100%;border-collapse:collapse;margin-top:16px}
+  th{text-align:left;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 14px 8px 0;border-bottom:1px solid var(--line-2)}
+  td{padding:10px 14px 10px 0;border-bottom:1px solid var(--line);vertical-align:top;font-size:13px;color:var(--body)}
+  td.m{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+  .note-box{border-left:2px solid var(--warn);padding:2px 0 2px 18px;margin:18px 0;color:var(--body);max-width:78ch}
+  .note-box b{color:var(--warn);font-weight:500}
+  .bad-box{border-left:2px solid var(--bad);padding:2px 0 2px 18px;margin:18px 0;color:var(--body);max-width:78ch}
+  .bad-box b{color:var(--bad);font-weight:500}
+  ul{padding-left:20px;max-width:78ch} li{margin:6px 0}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="masthead">
+    <div class="word">Shapes it could take</div>
+    <div class="sub">five layers · not five alternatives</div>
+  </div>
+  <div class="dateline">
+    <span>17 Sep 2026 · nothing here is built</span>
+    <span>a thing to argue with</span>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>First: how does it know when it is done?</h2>
+  <p class="lede">
+    Today the question does not exist. One request, one reply — done is <i>the response
+    arrived</i>. And yes: if you want a summary, it reads twenty-five commit messages and writes
+    a paragraph. It cannot look anything up, so there is nothing to finish.
+  </p>
+  <p class="lede">
+    The moment a worker can use tools, "done" becomes real, and there are three possible
+    answers. <b>The right design uses all three, layered</b> — each one catches what the
+    previous one misses.
+  </p>
+
+  <svg viewBox="0 0 1000 340" role="img" aria-label="The life of one worker, from dispatch to a checked result">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#2c3742"/></marker>
+      <marker id="at" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#3d8f88"/></marker>
+    </defs>
+
+    <rect class="bx" x="20" y="60" width="150" height="54" rx="8"/>
+    <text class="t" x="34" y="82">A job, dispatched</text>
+    <text class="s" x="34" y="99">one subject · one doneWhen</text>
+    <path class="e" d="M170 87 L214 87" marker-end="url(#a)"/>
+
+    <rect class="bx-c" x="216" y="46" width="200" height="82" rx="8"/>
+    <text class="t" x="232" y="70">A fresh worker</text>
+    <text class="s" x="232" y="87">no memory of any other job</text>
+    <text class="s" x="232" y="101">thinks · calls a tool · thinks</text>
+    <text class="s" x="232" y="115">…and says it is finished</text>
+    <path class="e-t" d="M316 128 C 316 168, 250 168, 250 150 L 250 140" marker-end="url(#at)"/>
+    <rect class="bx-b" x="180" y="176" width="272" height="42" rx="8" stroke="#3d8f88"/>
+    <text class="s" x="196" y="196" fill="#62c9c0">TOOLS — read a diff, a sibling branch,</text>
+    <text class="s" x="196" y="210" fill="#62c9c0">last week's state, the repo's README</text>
+
+    <path class="e" d="M416 87 L462 87" marker-end="url(#a)"/>
+
+    <rect class="bx" x="464" y="46" width="186" height="82" rx="8" stroke="#f2c97655"/>
+    <text class="t" x="480" y="70">Is it actually done?</text>
+    <text class="s" x="480" y="87">the predicate is checked</text>
+    <text class="s" x="480" y="101">against the snapshot —</text>
+    <text class="s" x="480" y="115">not against its word</text>
+
+    <path class="e" d="M650 74 L716 74" marker-end="url(#a)"/>
+    <rect class="bx" x="718" y="52" width="180" height="44" rx="8" stroke="#63c08a55"/>
+    <text class="t" x="734" y="72">Written</text>
+    <text class="s" x="734" y="87">and it appears on the page</text>
+
+    <path class="e" d="M650 104 L716 126" marker-end="url(#a)"/>
+    <rect class="bx" x="718" y="106" width="180" height="58" rx="8" stroke="#e2705f55"/>
+    <text class="t" x="734" y="128">It was wrong</text>
+    <text class="s" x="734" y="145">retried once, then parked</text>
+    <text class="s" x="734" y="158">as something waiting on you</text>
+
+    <line x1="20" y1="256" x2="980" y2="256" stroke="#232c35"/>
+    <text class="s" x="20" y="278" fill="#8b93a8">THREE STOPPING CONDITIONS, AND YOU NEED ALL THREE</text>
+    <text class="s" x="20" y="300">① the worker says so — it stops asking for tools. Can stop too early, or never.</text>
+    <text class="s" x="20" y="316">② the predicate agrees — the summary really does exist at this head. Free to check, cannot be faked.</text>
+    <text class="s" x="20" y="332">③ the budget runs out — N tool calls, N tokens, N seconds. The backstop that always holds.</text>
+  </svg>
+
+  <div class="note-box">
+    <b>The thing that makes a room of agents workable here:</b> almost every job Bearing has
+    <i>has a predicate.</i> "Summarise this branch" is done when a summary exists at this head
+    SHA. "File this branch" is done when it has a goal. That is unusual — most agent systems
+    have to take the model's word for it. Here we almost never do.
+    <br><br>
+    The exception is judgement — <i>is this goal done?</i> — which has no predicate and is why
+    it stays a proposal you accept (D64).
+  </div>
+
+  <div class="bad-box">
+    <b>The number that tells you whether any of this is working:</b> how often a worker claims
+    done and the predicate disagrees. Log it from the first day. If it climbs, the tools are
+    wrong or the job is too big — and you will not notice any other way.
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>Five shapes</h2>
+  <p class="lede">
+    They stack. Each one adds a capability to the one above and keeps everything it had. You can
+    stop at any level, and the level you stop at is a real decision rather than a compromise.
+  </p>
+
+  <!-- O1 -->
+  <div class="opt">
+    <div class="hd"><span class="no">①</span><h3>The assembly line</h3><span class="tag">what is built today</span></div>
+    <p class="lede">
+      Fixed stations in a fixed order. Each is one prompt with everything it needs already written
+      into it. Nothing decides anything about what to do next.
+    </p>
+    <svg viewBox="0 0 1000 120">
+      <rect class="bx" x="20" y="30" width="150" height="46" rx="8"/><text class="t" x="34" y="50">Snapshot</text><text class="s" x="34" y="66">no model</text>
+      <path class="e" d="M170 53 L204 53" marker-end="url(#a)"/>
+      <rect class="bx-c" x="206" y="30" width="146" height="46" rx="8"/><text class="t" x="220" y="50">① summarise</text><text class="s" x="220" y="66">per branch</text>
+      <path class="e" d="M352 53 L386 53" marker-end="url(#a)"/>
+      <rect class="bx-c" x="388" y="30" width="146" height="46" rx="8"/><text class="t" x="402" y="50">② draft vision</text><text class="s" x="402" y="66">per branch</text>
+      <path class="e" d="M534 53 L568 53" marker-end="url(#a)"/>
+      <rect class="bx-c" x="570" y="30" width="146" height="46" rx="8"/><text class="t" x="584" y="50">③ assess</text><text class="s" x="584" y="66">per branch</text>
+      <path class="e" d="M716 53 L750 53" marker-end="url(#a)"/>
+      <rect class="bx-c" x="752" y="30" width="146" height="46" rx="8"/><text class="t" x="766" y="50">④ the brief</text><text class="s" x="766" y="66">once</text>
+      <text class="s" x="20" y="102">Done = the reply arrived. No tools. No decisions. Every path is known before it runs.</text>
+    </svg>
+    <div class="verdict">
+      <div class="y">Impossible to surprise you — and cheap</div>
+      <div class="n">Sees only what we thought to send it</div>
+      <div class="y">Every failure is one prompt, one fix</div>
+      <div class="n">Cannot check a hunch, so it hedges instead</div>
+    </div>
+  </div>
+
+  <!-- O2 -->
+  <div class="opt">
+    <div class="hd"><span class="no">②</span><h3>Stations with tools</h3><span class="tag">smallest real upgrade</span></div>
+    <p class="lede">
+      The same line, but a station can ask for what it needs. This is where <i>"these models are
+      capable of so much more"</i> actually cashes out — not in orchestration, in evidence.
+    </p>
+    <svg viewBox="0 0 1000 180">
+      <rect class="bx-c" x="180" y="30" width="180" height="52" rx="8"/><text class="t" x="196" y="52">② draft vision</text><text class="s" x="196" y="69">thinks · asks · thinks</text>
+      <path class="e-t" d="M270 82 L270 112" marker-end="url(#at)"/>
+      <path class="e-t" d="M300 112 C 340 112, 340 82, 356 60" marker-end="url(#at)"/>
+      <rect class="bx-b" x="140" y="114" width="300" height="46" rx="8" stroke="#3d8f88"/>
+      <text class="s" x="156" y="134" fill="#62c9c0">read the repo's README · the files this commit</text>
+      <text class="s" x="156" y="148" fill="#62c9c0">touched · what the sibling branches are for</text>
+
+      <text class="t" x="500" y="52">Same shape. Better answers.</text>
+      <text class="s" x="500" y="74">A vision drafted from a README and a file list is a</text>
+      <text class="s" x="500" y="90">different thing from one drafted from commit subjects.</text>
+      <text class="s" x="500" y="114" fill="#f2c976">Done = it stops asking, capped at N calls.</text>
+      <text class="s" x="500" y="130" fill="#f2c976">Still no predicate — that arrives with ③.</text>
+    </svg>
+    <div class="verdict">
+      <div class="y">The biggest quality jump for the least structure</div>
+      <div class="n">Needs tool calling to work on your provider</div>
+      <div class="y">Reads the dated history that nothing has read yet</div>
+      <div class="n">Slower and dearer per branch; needs a cap</div>
+    </div>
+  </div>
+
+  <!-- O3 -->
+  <div class="opt best">
+    <div class="hd"><span class="no">③</span><h3>The job board — the room</h3><span class="tag">★ the one I would build</span></div>
+    <p class="lede">
+      Work is <b>derived</b> onto a board every read. Workers claim jobs and run in parallel. Each
+      is a fresh instance with tools, and every job carries the predicate that decides whether it
+      worked. No one is in charge, because the board is the coordination.
+    </p>
+    <svg viewBox="0 0 1000 250">
+      <rect class="bx" x="20" y="34" width="210" height="164" rx="8"/>
+      <text class="t" x="36" y="56">The board</text>
+      <text class="s" x="36" y="73">derived every read · never stored</text>
+      <rect class="bx-b" x="36" y="84" width="178" height="24" rx="5"/><text class="s" x="48" y="100">summarise · 3 branches</text>
+      <rect class="bx-b" x="36" y="112" width="178" height="24" rx="5"/><text class="s" x="48" y="128">draft vision · 2 branches</text>
+      <rect class="bx-b" x="36" y="140" width="178" height="24" rx="5"/><text class="s" x="48" y="156">assess · 5 branches</text>
+      <rect class="bx-b" x="36" y="168" width="178" height="24" rx="5" stroke="#f2c97644"/><text class="s" x="48" y="184" fill="#f2c976">needs you · 2</text>
+
+      <path class="e" d="M230 100 C 280 100, 280 76, 316 76" marker-end="url(#a)"/>
+      <path class="e" d="M230 126 C 280 126, 280 126, 316 126" marker-end="url(#a)"/>
+      <path class="e" d="M230 152 C 280 152, 280 176, 316 176" marker-end="url(#a)"/>
+
+      <rect class="bx-c" x="318" y="56" width="164" height="40" rx="8"/><text class="t" x="332" y="80">worker · fresh</text>
+      <rect class="bx-c" x="318" y="106" width="164" height="40" rx="8"/><text class="t" x="332" y="130">worker · fresh</text>
+      <rect class="bx-c" x="318" y="156" width="164" height="40" rx="8"/><text class="t" x="332" y="180">worker · fresh</text>
+
+      <path class="e" d="M482 76 C 520 76, 520 116, 556 116" marker-end="url(#a)"/>
+      <path class="e" d="M482 126 L556 126" marker-end="url(#a)"/>
+      <path class="e" d="M482 176 C 520 176, 520 136, 556 136" marker-end="url(#a)"/>
+
+      <rect class="bx" x="558" y="94" width="168" height="64" rx="8" stroke="#f2c97555"/>
+      <text class="t" x="574" y="118">doneWhen?</text>
+      <text class="s" x="574" y="135">checked against the</text>
+      <text class="s" x="574" y="149">snapshot, not its word</text>
+
+      <path class="e" d="M726 112 L774 100" marker-end="url(#a)"/>
+      <rect class="bx" x="776" y="76" width="200" height="44" rx="8" stroke="#63c08a55"/>
+      <text class="t" x="792" y="96">Plane B · the page</text><text class="s" x="792" y="111">updates as each lands</text>
+
+      <path class="e" d="M726 140 C 750 150, 750 178, 690 178" marker-end="url(#a)"/>
+      <path class="e" d="M660 178 L250 202" stroke-dasharray="3 3" marker-end="url(#a)"/>
+      <text class="el" x="430" y="216">failed twice → back on the board as “needs you”</text>
+
+      <text class="s" x="20" y="234">The loop that was a for-loop becomes a dispatcher. That is most of the change.</text>
+    </svg>
+    <div class="verdict">
+      <div class="y">Every job carries its own proof of completion</div>
+      <div class="n">Parallelism buys latency, not capability, at your size</div>
+      <div class="y">Adding a job type is adding a row, not a pipeline stage</div>
+      <div class="n">A dispatcher, a claim, and a retry rule to get right</div>
+      <div class="y">Failures park as questions instead of vanishing</div>
+      <div class="n">Concurrent writes to Plane B need a lock</div>
+    </div>
+    <div class="note-box" style="margin-top:18px">
+      <b>Most of this already exists.</b> <code>assist()</code> already derives "branches needing a
+      summary / a vision / an assessment" on every pass — that <i>is</i> a job board. It is just
+      consumed by a <code>for</code> loop instead of by workers. Swapping the loop for a dispatcher
+      and giving each worker tools is a smaller change than the diagram suggests.
+    </div>
+  </div>
+
+  <!-- O4 -->
+  <div class="opt">
+    <div class="hd"><span class="no">④</span><h3>The foreman</h3><span class="tag">I would skip this</span></div>
+    <p class="lede">
+      An agent reads the board and decides what matters and in what order, then dispatches.
+      Adds judgement about priority that the board does not have on its own.
+    </p>
+    <svg viewBox="0 0 1000 130">
+      <rect class="bx" x="20" y="34" width="150" height="46" rx="8"/><text class="t" x="34" y="54">The board</text><text class="s" x="34" y="70">everything possible</text>
+      <path class="e" d="M170 57 L214 57" marker-end="url(#a)"/>
+      <rect class="bx-c" x="216" y="30" width="200" height="54" rx="8"/><text class="t" x="232" y="52">The foreman</text><text class="s" x="232" y="69">decides what is worth doing now</text>
+      <path class="e" d="M416 46 L470 40" marker-end="url(#a)"/>
+      <path class="e" d="M416 57 L470 68" marker-end="url(#a)"/>
+      <rect class="bx-c" x="472" y="22" width="150" height="34" rx="8"/><text class="t" x="486" y="43">worker</text>
+      <rect class="bx-c" x="472" y="62" width="150" height="34" rx="8"/><text class="t" x="486" y="83">worker</text>
+      <text class="s" x="660" y="44" fill="#e2705f">One model call to decide what an</text>
+      <text class="s" x="660" y="60" fill="#e2705f">ORDER BY could decide — and now</text>
+      <text class="s" x="660" y="76" fill="#e2705f">"why did it skip that?" is a mystery.</text>
+    </svg>
+    <div class="verdict">
+      <div class="y">Genuinely useful once the board is long and mixed</div>
+      <div class="n">An LLM deciding what plain code could decide</div>
+      <div class="y">Could weigh cost against value per job</div>
+      <div class="n">Its reasoning is invisible, so skipped work is a mystery</div>
+    </div>
+  </div>
+
+  <!-- O5 -->
+  <div class="opt best">
+    <div class="hd"><span class="no">⑤</span><h3>The desk — the advisor that can act</h3><span class="tag">★ on top of ③</span></div>
+    <p class="lede">
+      Your idea, and it is a good one. You talk to the advisor. It answers straight away from what
+      it can already see — and when something needs doing, it <b>puts a job on the board</b> rather
+      than doing it while you wait. One way out, never blocking.
+    </p>
+    <svg viewBox="0 0 1000 230">
+      <rect class="bx-y" x="20" y="40" width="130" height="50" rx="8"/><text class="t" x="34" y="62">You</text><text class="s" x="34" y="78">ask anything</text>
+      <path class="e" d="M150 58 L194 58" marker-end="url(#a)"/>
+      <path class="e" d="M194 78 L150 78" marker-end="url(#a)"/>
+      <rect class="bx-c" x="196" y="30" width="200" height="72" rx="8"/>
+      <text class="t" x="212" y="52">The advisor</text>
+      <text class="s" x="212" y="69">answers in seconds, from</text>
+      <text class="s" x="212" y="83">what is already on disk</text>
+      <text class="s" x="212" y="97" fill="#62c9c0">and can dispatch</text>
+
+      <path class="e" d="M396 66 L458 66" marker-end="url(#a)"/>
+      <text class="el" x="404" y="58">one way</text>
+      <rect class="bx" x="460" y="40" width="170" height="52" rx="8"/>
+      <text class="t" x="476" y="62">The board</text><text class="s" x="476" y="78">③, unchanged</text>
+      <path class="e" d="M630 66 L684 66" marker-end="url(#a)"/>
+      <rect class="bx-c" x="686" y="40" width="150" height="52" rx="8"/><text class="t" x="700" y="62">workers</text><text class="s" x="700" y="78">in the background</text>
+
+      <path class="e" d="M761 92 C 761 136, 300 132, 240 164" marker-end="url(#a)"/>
+      <rect class="bx" x="20" y="166" width="386" height="50" rx="8" stroke="#63c08a55"/>
+      <text class="t" x="36" y="188">The result lands where it belongs</text>
+      <text class="s" x="36" y="205">on the branch, in the brief, in the register</text>
+
+      <text class="s" x="440" y="180" fill="#f2c976">A fresh advisor reads the transcript and the board</text>
+      <text class="s" x="440" y="196" fill="#f2c976">next time you speak, so it knows what it set going.</text>
+    </svg>
+    <div class="verdict">
+      <div class="y">Keeps the two-second answer — work never blocks the reply</div>
+      <div class="n">"I've started that" is not the same as "it's done"</div>
+      <div class="y">Every question stays cheap; only dispatched work costs</div>
+      <div class="n">Needs a way to see what you set going, and cancel it</div>
+      <div class="y">Fresh advisor each turn — it cannot drift over a long chat</div>
+      <div class="n">The transcript is memory, and memory rots if unbounded</div>
+    </div>
+    <div class="note-box" style="margin-top:18px">
+      <b>On the relay you described</b> — one agent works, a fresh one reads the chat and carries on.
+      That is exactly right, with one correction: <i>the chat should not be the handoff.</i> The
+      board and Plane B are. The transcript is only how <b>you</b> follow along. Otherwise the
+      conversation becomes the database, and a conversation is the worst database there is.
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>What tools would actually buy</h2>
+  <p class="lede">
+    Concrete, because "more tools" is easy to say. Each of these changes an answer that is
+    currently a guess into one that is checked.
+  </p>
+  <table>
+    <thead><tr><th style="width:24%">Tool</th><th style="width:26%">Costs</th><th>What it fixes</th></tr></thead>
+    <tbody>
+      <tr><td class="m">repo_readme(repo)</td><td class="m">one GitHub call, ever</td><td>Grounds every vision in what the software <i>is</i>. Read once per repo and cached forever — the single cheapest quality win here.</td></tr>
+      <tr><td class="m">commit_files(sha)</td><td class="m">one GitHub call</td><td>“Drifted” stops being a guess from commit subjects. Which files changed says more about intent than any message.</td></tr>
+      <tr><td class="m">what_changed(since)</td><td class="m">free — reads disk</td><td>The dated history has been accumulating since Stage 1 and <b>nothing has ever read it.</b> This is what it was written for.</td></tr>
+      <tr><td class="m">sibling_branches(goal)</td><td class="m">free — in memory</td><td>Lets a worker see the branches next to it, which is what filing and overtaken-detection really need.</td></tr>
+      <tr><td class="m">pr_reviews(repo, n)</td><td class="m">one GitHub call</td><td>“Blocked” currently means red CI. A reviewer asking for changes is just as blocking and is invisible today.</td></tr>
+      <tr><td class="m">dispatch(job)</td><td class="m">free</td><td>The one write tool the advisor needs for ⑤. It queues; it does not do.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============================================================ -->
+  <h2>What I would do</h2>
+  <p class="big">
+    Build ③ with ② inside it, then put ⑤ on top. Skip ④.
+  </p>
+  <ul>
+    <li><b>③ before ②</b>, narrowly — because the dispatcher and the predicate check are what make
+      a tool-using worker safe to let loose. Tools without a predicate is just a longer guess.</li>
+    <li><b>Skip the foreman.</b> The board's ordering is a sort, and a sort is code. Paying a model
+      to decide what an <code>ORDER BY</code> decides buys you an invisible reason for every job it
+      quietly skipped. Revisit if the board is ever genuinely long and mixed.</li>
+    <li><b>⑤ last</b>, because it is the one that changes how the thing feels, and it wants ③
+      underneath it to dispatch into.</li>
+  </ul>
+
+  <div class="note-box">
+    <b>The gate, and why it is smaller than it looks.</b> Everything from ② onward needs the model
+    to call tools, and that has never been tested on your plan. But <code>npm run probe</code> tests
+    <i>two</i> mechanisms: native tool calling, and a plain JSON protocol that needs no tool support
+    at all and works on any model that can return JSON — which yours demonstrably can, since all six
+    prompts already do. So the probe decides <b>which mechanism</b>, not <b>whether</b>. There is a
+    floor, and the floor works everywhere.
+  </div>
+
+  <h2>Open questions</h2>
+  <ul>
+    <li><b>Q68 — How many workers at once?</b> Two is what the summariser uses today. More is faster
+      and makes a runaway cost arrive faster too.</li>
+    <li><b>Q69 — Should you see the board?</b> It is the honest view of what the assistant is doing
+      and about to do. It is also one more thing to look at. Leaning: a count in the dateline, the
+      full board behind a click.</li>
+    <li><b>Q70 — What happens to a job you cancel mid-flight?</b> There is a real difference between
+      "stop" and "undo", and Plane B is reversible, so both are possible. Worth deciding before it
+      matters rather than after.</li>
+    <li><b>Q71 — Does the advisor tell you when dispatched work finishes?</b> A notification is a
+      product decision, not a technical one. The alternative is that it simply appears, which is
+      quieter and matches everything else here.</li>
+  </ul>
+
+</div>
+</body>
+</html>
