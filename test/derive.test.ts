@@ -65,6 +65,7 @@ function snap(branches: Branch[], goals: Goal[] = [], over: Partial<Snapshot> = 
     warnings: [],
     rateLimit: null,
     brief: null,
+    work: { jobs: [], workers: 2 },
     llm: { enabled: false, pending: 0, errors: [] },
     ...over,
   };

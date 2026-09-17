@@ -43,6 +43,8 @@ function sanitise(settings: Settings): Settings {
     askBranchCap: clamp(settings.askBranchCap, 1, 400, DEFAULT_SETTINGS.askBranchCap),
     visionAutoDraft: settings.visionAutoDraft !== false,
     maxOpenQuestions: clamp(settings.maxOpenQuestions, 0, 40, DEFAULT_SETTINGS.maxOpenQuestions),
+    // Capped low on purpose: more workers make a runaway bill arrive faster, not later.
+    workers: clamp(settings.workers, 1, 8, DEFAULT_SETTINGS.workers),
   };
 }
 

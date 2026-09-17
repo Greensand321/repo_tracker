@@ -1,32 +1,29 @@
 /**
- * The assistant's paid pass: draft the visions nobody has stated, compare each branch
- * against its vision, then read the whole fleet once and write the brief.
+ * The assistant's stations that are not the summariser: draft a vision, compare the branch
+ * against it, and read the whole fleet once to write the brief.
  *
- * Runs in the background after the snapshot is already being served, like `enrich`. The
- * deterministic snapshot never waits for a model, and a provider that is down costs you
- * the assistant, not the dashboard.
- *
- * Order matters and is not arbitrary: **vision before judgement**. A goal called done on
- * the strength of branches whose purpose was never stated is the assistant marking its
- * own inference as the owner's intent.
+ * Each is one job on the board (D68) with a predicate the dispatcher checks afterwards
+ * (D69), plus the free pass that applies everything already on disk before the snapshot is
+ * served. The ordering that used to be a sequence of `for` loops here is now expressed as
+ * dependencies between derivations in `server/work/board.ts` — vision before judgement,
+ * because a goal called done on branches whose purpose was never stated is the assistant
+ * marking its own inference as the owner's intent.
  */
 
-import { randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { refKey, type Assessment, type BranchRef, type Settings, type Snapshot } from '../../shared/types.ts';
+import { type Assessment, type Branch, type BranchRef, type Settings, type Snapshot } from '../../shared/types.ts';
 import { DATA_DIR, ensureDirs } from '../paths.ts';
 import {
   applyVisions,
   getAssessment,
   putAssessment,
-  pruneVisions,
+  recordDecline,
   setVision,
+  wasDeclined,
 } from '../vision.ts';
-import { LlmError } from './client.ts';
-import { BRIEF_PROMPT_VERSION, briefKey, worthAVision, writeBrief, type BriefResult } from './brief.ts';
-import { llmReady } from './enrich.ts';
+import { BRIEF_PROMPT_VERSION, briefKey, writeBrief, type BriefResult } from './brief.ts';
 import { VISION_PROMPT_VERSION, assessBranch, draftVision } from './vision.ts';
 
 // ---------------------------------------------------------------------------
@@ -107,159 +104,94 @@ export function applyAssist(snapshot: Snapshot, settings: Settings): void {
 }
 
 // ---------------------------------------------------------------------------
-// Paid pass
+// Station: draft a vision for a branch nobody has described
 // ---------------------------------------------------------------------------
 
-export type AssistResult = {
-  drafted: number;
-  declined: number;
-  assessed: number;
-  briefed: boolean;
-  failed: number;
-  errors: string[];
-  /** True when the budget ran out with work left. The next read picks up where this stopped. */
-  budgetSpent: boolean;
-};
+export async function draftFor(branch: Branch, settings: Settings, sessionId: string): Promise<void> {
+  const ref: BranchRef = { repoKey: branch.repoKey, branch: branch.name };
+  const draft = await draftVision(branch, settings, sessionId);
 
-export async function assist(
-  snapshot: Snapshot,
-  settings: Settings,
-  onProgress?: () => void,
-): Promise<AssistResult> {
-  const result: AssistResult = {
-    drafted: 0, declined: 0, assessed: 0, briefed: false, failed: 0, errors: [], budgetSpent: false,
-  };
-  if (!llmReady(settings)) return result;
-
-  pruneVisions(new Set(snapshot.branches.map((b) => refKey(b.repoKey, b.name))));
-
-  const sessionId = randomUUID();
-  let fatal = false;
-
-  /**
-   * One budget for the whole pass, not one per step.
-   *
-   * Drafting was capped and assessing was not, so a read that distributed forty visions
-   * would then assess all forty — well past the ceiling that exists so a first run cannot
-   * surprise you with a bill. "Max per read" should mean the read.
-   */
-  let budget = settings.llmMaxPerRun;
-  const spend = (): boolean => (budget > 0 ? (budget--, true) : false);
-
-  const fail = (what: string, err: unknown): void => {
-    result.failed++;
-    const message = err instanceof Error ? err.message : String(err);
-    result.errors.push(`${what}: ${message}`);
-    if (err instanceof LlmError && isFatal(err)) {
-      fatal = true;
-      result.errors.push('stopped early — this failure will repeat');
-    }
-  };
-
-  // --- 1. Draft a vision for branches nobody has described -----------------
-  if (settings.visionAutoDraft) {
-    const needsOne = snapshot.branches
-      .filter((b) => worthAVision(b) && b.vision === null)
-      .sort((a, b) => Date.parse(b.lastActivity ?? '0') - Date.parse(a.lastActivity ?? '0'));
-
-    for (const branch of needsOne) {
-      if (fatal || !spend()) break;
-      try {
-        const draft = await draftVision(branch, settings, sessionId);
-        if (draft.text === null) {
-          // Declining is a correct outcome, not a failure. A vision that cannot be
-          // contradicted is worse than none, so nothing is written.
-          result.declined++;
-          continue;
-        }
-        branch.vision = setVision(
-          { repoKey: branch.repoKey, branch: branch.name },
-          draft.text,
-          'proposed',
-          { from: draft.from, draftedAt: branch.headSha },
-        );
-        result.drafted++;
-        onProgress?.();
-      } catch (err) {
-        fail(`${branch.repoKey}/${branch.name} (draft)`, err);
-      }
-    }
+  if (draft.text === null) {
+    // Declining is a correct outcome, not a failure: a vision that cannot be contradicted
+    // is worse than none. But it has to be *recorded*, or this job is derived again on the
+    // next read and paid for again, every minute, forever (D70).
+    recordDecline(ref, branch.headSha);
+    return;
   }
 
-  // --- 2. Compare each vision against what the branch actually did ---------
-  const toAssess = snapshot.branches.filter(
-    (b) => !b.isBase && b.vision !== null && b.assessment === null,
-  );
-
-  for (const branch of toAssess) {
-    if (fatal) break;
-    const ref: BranchRef = { repoKey: branch.repoKey, branch: branch.name };
-    const vision = branch.vision!;
-
-    // Reading the cache is free, so it happens before the budget is consulted — a run
-    // that is out of budget still serves everything already paid for.
-    const cached = getAssessment(ref, branch.headSha, vision.text, VISION_PROMPT_VERSION, settings.llmModel);
-    if (cached) {
-      branch.assessment = cached;
-      continue;
-    }
-    if (!spend()) break;
-
-    try {
-      const verdict = await assessBranch(branch, vision.text, settings, sessionId);
-      const assessment: Assessment = {
-        verdict: verdict.verdict,
-        because: verdict.because,
-        evidence: verdict.evidence,
-        overtakenBy: null,
-        model: settings.llmModel,
-        promptVersion: VISION_PROMPT_VERSION,
-        generatedAt: new Date().toISOString(),
-        headSha: branch.headSha,
-        visionText: vision.text,
-      };
-      putAssessment(ref, assessment);
-      branch.assessment = assessment;
-      result.assessed++;
-      onProgress?.();
-    } catch (err) {
-      fail(`${branch.repoKey}/${branch.name} (assess)`, err);
-    }
-  }
-
-  // --- 3. Read the whole fleet once and write the brief --------------------
-  result.budgetSpent = budget <= 0;
-
-  // The brief is one call for the whole fleet and is the thing the owner actually reads,
-  // so it is worth the last of the budget rather than being starved by per-branch work.
-  if (!fatal) {
-    const key = briefKey(snapshot, settings);
-    const stored = loadStored();
-    if (!stored || stored.key !== key) {
-      try {
-        const written = await writeBrief(snapshot, settings);
-        saveStored({
-          key,
-          brief: written.brief,
-          generatedAt: new Date().toISOString(),
-          model: settings.llmModel,
-          judgements: Object.fromEntries(written.judgements),
-          overtaken: written.overtaken,
-        });
-        applyAssist(snapshot, settings);
-        result.briefed = true;
-        onProgress?.();
-      } catch (err) {
-        fail('the brief', err);
-      }
-    }
-  }
-
-  return result;
+  branch.vision = setVision(ref, draft.text, 'proposed', {
+    from: draft.from,
+    draftedAt: branch.headSha,
+  });
 }
 
-/** Auth, billing and a bad model are settings problems; retrying cannot fix them. */
-function isFatal(err: LlmError): boolean {
-  if (err.status === 401 || err.status === 402 || err.status === 403) return true;
-  return /no API key|no model chosen|did not answer on any known endpoint/i.test(err.message);
+/** Done means the question has been settled either way — a vision, or a recorded decline. */
+export function isDescribed(branch: Branch): boolean {
+  return branch.vision !== null || wasDeclined({ repoKey: branch.repoKey, branch: branch.name }, branch.headSha);
+}
+
+// ---------------------------------------------------------------------------
+// Station: compare a vision against what the branch actually did
+// ---------------------------------------------------------------------------
+
+export async function assessFor(branch: Branch, settings: Settings, sessionId: string): Promise<void> {
+  const ref: BranchRef = { repoKey: branch.repoKey, branch: branch.name };
+  const vision = branch.vision;
+  if (!vision) return;
+
+  const verdict = await assessBranch(branch, vision.text, settings, sessionId);
+  const assessment: Assessment = {
+    verdict: verdict.verdict,
+    because: verdict.because,
+    evidence: verdict.evidence,
+    overtakenBy: null,
+    model: settings.llmModel,
+    promptVersion: VISION_PROMPT_VERSION,
+    generatedAt: new Date().toISOString(),
+    headSha: branch.headSha,
+    visionText: vision.text,
+  };
+  putAssessment(ref, assessment);
+  branch.assessment = assessment;
+}
+
+export function isAssessed(branch: Branch, settings: Settings): boolean {
+  if (!branch.vision) return true; // nothing to compare against; not this job's problem
+  return (
+    getAssessment(
+      { repoKey: branch.repoKey, branch: branch.name },
+      branch.headSha,
+      branch.vision.text,
+      VISION_PROMPT_VERSION,
+      settings.llmModel,
+    ) !== null
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Station: the brief
+// ---------------------------------------------------------------------------
+
+export async function writeTheBrief(
+  snapshot: Snapshot,
+  settings: Settings,
+  sessionId?: string,
+): Promise<void> {
+  const key = briefKey(snapshot, settings);
+  const written = await writeBrief(snapshot, settings, sessionId);
+  saveStored({
+    key,
+    brief: written.brief,
+    generatedAt: new Date().toISOString(),
+    model: settings.llmModel,
+    judgements: Object.fromEntries(written.judgements),
+    overtaken: written.overtaken,
+  });
+  applyAssist(snapshot, settings);
+}
+
+/** The brief on disk was written about this exact fleet, vision for vision, verdict for verdict. */
+export function isBriefed(snapshot: Snapshot, settings: Settings): boolean {
+  const stored = loadStored();
+  return stored !== null && stored.key === briefKey(snapshot, settings);
 }

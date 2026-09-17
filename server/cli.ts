@@ -15,7 +15,10 @@
 
 import { listModels } from './advise/client.ts';
 import { probeTools, type ProbeOutcome } from './advise/probe.ts';
-import { applyCached, enrich, llmReady } from './advise/enrich.ts';
+import { applyCached, llmReady } from './advise/enrich.ts';
+import { applyAssist } from './advise/assist.ts';
+import { applyGoals } from './goals.ts';
+import { runBoard } from './work/run.ts';
 import { collect } from './collect.ts';
 import { loadSettings } from './settings.ts';
 import type { Branch, Settings, Snapshot } from '../shared/types.ts';
@@ -55,16 +58,16 @@ async function brief(noLlm: boolean): Promise<number> {
 
   process.stderr.write(dim(`reading ${settings.repos.length} repo(s) from GitHub…\n`));
   const snapshot = await collect(settings);
+  applyGoals(snapshot);
   applyCached(snapshot, settings);
+  applyAssist(snapshot, settings);
 
   if (!noLlm && llmReady(settings)) {
-    const waiting = snapshot.llm.pending;
-    if (waiting > 0) {
-      process.stderr.write(dim(`summarising ${waiting} branch(es) with ${settings.llmModel}…\n`));
-    }
-    const result = await enrich(snapshot, settings);
+    process.stderr.write(dim(`working the board with ${settings.llmModel}…\n`));
+    const result = await runBoard(snapshot, settings, () => {});
+    process.stderr.write(dim(`${result.done} job(s) done\n`));
     if (result.failed > 0) {
-      process.stderr.write(red(`\n${result.failed} summary failure(s):\n`));
+      process.stderr.write(red(`\n${result.failed} failure(s):\n`));
       for (const error of result.errors) process.stderr.write(red(`  ${error}\n`));
       process.stderr.write('\n');
     }

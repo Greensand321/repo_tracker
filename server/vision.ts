@@ -28,7 +28,19 @@ import { DATA_DIR, ensureDirs } from './paths.ts';
 
 const FILE = join(DATA_DIR, 'visions.json');
 
-type Entry = { vision: Vision | null; assessment: Assessment | null };
+type Entry = {
+  vision: Vision | null;
+  assessment: Assessment | null;
+  /**
+   * The head SHA at which the assistant looked at this branch and said it could not write
+   * a falsifiable vision for it. Declining is a correct outcome, not a failure — but it
+   * has to be *written down*, or the job to draft one is derived again on the very next
+   * read and paid for again, every minute, forever (D70).
+   *
+   * Keyed on the SHA, so the branch moving is what makes the question worth asking again.
+   */
+  declinedAt?: string | null;
+};
 type VisionFile = Record<string, Entry>;
 
 let cache: VisionFile | null = null;
@@ -50,7 +62,7 @@ function persist(all: VisionFile): void {
 }
 
 const entry = (all: VisionFile, key: string): Entry =>
-  all[key] ?? { vision: null, assessment: null };
+  all[key] ?? { vision: null, assessment: null, declinedAt: null };
 
 // ---------------------------------------------------------------------------
 // Visions
@@ -91,7 +103,7 @@ export function setVision(
   };
 
   const textChanged = existing.vision?.text !== trimmed;
-  all[key] = { vision, assessment: textChanged ? null : existing.assessment };
+  all[key] = { vision, assessment: textChanged ? null : existing.assessment, declinedAt: null };
   persist(all);
   return vision;
 }
@@ -108,7 +120,25 @@ export function clearVision(ref: BranchRef): void {
   const all = load();
   const key = refKey(ref.repoKey, ref.branch);
   if (!all[key]) return;
-  all[key] = { vision: null, assessment: null };
+  // Clearing also clears the decline: saying "I do not want to say" is the owner's answer,
+  // and the assistant should be free to offer a draft again once the branch moves.
+  all[key] = { vision: null, assessment: null, declinedAt: null };
+  persist(all);
+}
+
+// ---------------------------------------------------------------------------
+// Declines — the assistant looked and could not be specific
+// ---------------------------------------------------------------------------
+
+/** True when the assistant already declined to describe this exact state of the branch. */
+export function wasDeclined(ref: BranchRef, headSha: string): boolean {
+  return entry(load(), refKey(ref.repoKey, ref.branch)).declinedAt === headSha;
+}
+
+export function recordDecline(ref: BranchRef, headSha: string): void {
+  const all = load();
+  const key = refKey(ref.repoKey, ref.branch);
+  all[key] = { ...entry(all, key), declinedAt: headSha };
   persist(all);
 }
 

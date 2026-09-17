@@ -265,6 +265,101 @@ appears in the dateline — the one line always in view — as well as in Notice
 at the bottom of a long column. This is D50 applied to the background rather than to the
 page: anything that breaks should say so on screen.
 
+### D68 — Work is derived onto a board, never queued
+
+Every read derives the whole set of outstanding jobs from the snapshot plus what is already
+on disk — the same derivation `assist()` already does, consumed by a dispatcher instead of
+a `for` loop. Job ids are **derived and stable** (`kind:repo:branch:headSha`), so a read
+landing while a worker is mid-flight finds the job already claimed rather than starting a
+second one.
+
+The reason this shape rather than a queue: **routine work then recovers from a crash for
+free.** A summarise that died halfway leaves no summary on disk, so the next read derives
+it again. There is nothing to restore and nothing to reconcile, because there is no second
+copy of the truth. A queue would be exactly that second copy, and the copy is the thing
+that goes stale.
+
+Work the owner *dispatched* is the exception and is written down (D72), because nothing in
+the fleet implies it — it exists only because they asked.
+
+### D69 — Every job carries a predicate, and done is checked rather than claimed
+
+Three stopping conditions, all three needed: the worker stops asking for tools; the
+predicate agrees against the snapshot; the budget runs out. The middle one is what makes a
+room of workers safe here, and Bearing is unusual in being able to have it — *"summarise
+this branch"* is done when a summary exists at this head SHA, which is free to check and
+cannot be faked.
+
+The exception is judgement — *is this goal done?* — which has no predicate, which is
+precisely why it stays a proposal the owner accepts (D64).
+
+Two consequences kept deliberately: every disagreement between a worker's claim and its
+predicate is **counted**, because a rising number is the only early sign that the tools are
+wrong or the job is too big; and a job that fails twice **parks as something waiting on
+you** rather than retrying or vanishing (D67 again, one layer down).
+
+**A job whose predicate can never become true is a job that runs forever.** That rule found
+a live cost bug the moment it was written — see D70.
+
+### D70 — Declining to draft a vision is recorded, not just returned
+
+`draft vision` was derived as *"active, has commits, `vision === null`"*. The model is
+instructed to decline rather than write something unfalsifiable, and a decline wrote
+nothing — so the branch still had no vision, the job was derived again on the next read,
+and it was paid for again. Every minute, for every branch it had ever declined, for as long
+as the program was open.
+
+A decline is now stored against the head SHA it was made at: the branch moving is what
+makes the question worth asking again, and nothing else does. The bug is ordinary; what is
+worth keeping is that the predicate rule found it on paper, before any of it was built.
+
+### D71 — Two lanes: routine work is capped, dispatched work is never queued behind it
+
+`workers` (default 2) runs the board. `dispatchWorkers` (default 2) serves work the owner
+asked for, starting immediately and in addition. The owner's reasoning, kept because it is
+the actual justification for such a small number: the only real burst is the first import;
+after that branches move every few minutes, and a machine left running overnight finishes
+everything regardless.
+
+Both are settings (rule 7), and both are capped — "spin up another rather than block" is
+right, "spin up another every time" is how a runaway bill arrives faster.
+
+### D72 — Only dispatched work is persisted, and it reboots on the next start
+
+Written to `data/dispatched.json` when accepted, cleared when its predicate passes, put
+back on the board at startup if it is still there. Rebooted twice without finishing, it
+parks — otherwise one poison job re-runs on every startup for the rest of the program's
+life.
+
+Routine work is deliberately *not* logged for recovery: it is derivable, and a recovery log
+for derivable work is a second source of truth that will eventually disagree with the
+first. The append-only run log (`data/runs.jsonl`) is a separate thing, and it is for the
+owner and for the disagreement counter, not for recovery.
+
+### D73 — The floor is a product surface
+
+The owner asked to see how many workers are active and what each is doing, so it is built
+rather than left as a debug view: a count in the dateline beside the failure count (D67),
+and a panel under the advisor listing live jobs in plain English — *"Reading what
+claude/kind-meitner is doing"*, with the job kind as small supporting metadata (rule 3).
+Dispatched work is marked as the owner's. Parked jobs join *Waiting on you* rather than
+starting a second list of problems. The panel is derived from the board like every other
+surface (rule 4).
+
+### D74 — A station's tool list is part of its prompt version
+
+Adding a tool changes what a station can see and therefore what it writes. If the cache key
+does not move, the store silently mixes answers drawn from different evidence with no way
+to tell which is which — the exact failure `PROMPT_VERSION` already exists to prevent
+(D39). So the tool set is folded into the version, and adding a tool regenerates
+everything that station produced, the same way editing its prompt does.
+
+This also settles the tool caution recorded in `ai-map.html`: it was calibrated to one real
+burn (`response_format` failing whole requests on some Zen models) and generalised further
+than the evidence supported. Native tool calling is used where the model supports it, with
+a plain JSON protocol as the floor — same catalogue either way — because the provider is
+swappable by design (D32), not because the models are suspect.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

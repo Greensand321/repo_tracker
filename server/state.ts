@@ -7,8 +7,9 @@
  */
 
 import { refKey, type Snapshot, type SnapshotResponse } from '../shared/types.ts';
-import { applyAssist, assist } from './advise/assist.ts';
-import { applyCached, enrich, llmReady } from './advise/enrich.ts';
+import { applyAssist } from './advise/assist.ts';
+import { applyCached, llmReady } from './advise/enrich.ts';
+import { applyWork, runBoard } from './work/run.ts';
 import { collect } from './collect.ts';
 import { applyGoals, pruneGoals } from './goals.ts';
 import { recordHistory } from './history.ts';
@@ -74,6 +75,9 @@ export async function refresh(): Promise<void> {
     applyCached(next, settings);
     // Visions, assessments, judgements and the brief that are already on disk. Free.
     applyAssist(next, settings);
+    // And what is left to do about all that — derived, not stored (D68). Also free, and
+    // done before anyone sees the snapshot so the floor is populated from the first frame.
+    applyWork(next, settings);
 
     snapshot = next;
     lastError = null;
@@ -93,40 +97,46 @@ export async function refresh(): Promise<void> {
 
   // The paid pass runs after the snapshot is already being served. Deliberately not
   // awaited: nothing on screen should wait for a model.
-  if (snapshot && llmReady(loadSettings())) void enrichInBackground(snapshot);
+  if (snapshot && llmReady(loadSettings())) void workInBackground(snapshot);
 }
 
-let enriching = false;
+let working = false;
 
-async function enrichInBackground(target: Snapshot): Promise<void> {
-  if (enriching) return;
-  enriching = true;
+/**
+ * Work the board until it is empty or the budget is spent.
+ *
+ * Deliberately not awaited by `refresh`: nothing on screen waits for a model. The page is
+ * told after every job so the floor fills in as the room works, rather than sitting still
+ * and then jumping.
+ */
+async function workInBackground(target: Snapshot): Promise<void> {
+  if (working) return;
+  working = true;
   try {
     const announceIfCurrent = (): void => {
       // Only announce for the snapshot still on screen; a refresh may have replaced it.
       if (snapshot === target) announce('snapshot');
     };
 
-    const result = await enrich(target, loadSettings(), announceIfCurrent);
-    if (result.failed > 0) {
-      console.error(`advisor: ${result.failed} branch(es) failed`, result.errors.join('; '));
-    }
+    const result = await runBoard(target, loadSettings(), announceIfCurrent);
 
-    // Summaries first, then the assistant: drafting a vision reads better with a summary
-    // already in hand, and the brief reads everything.
-    const assisted = await assist(target, loadSettings(), announceIfCurrent);
-    if (assisted.failed > 0) {
-      console.error(`assistant: ${assisted.failed} failure(s)`, assisted.errors.join('; '));
-      target.llm.errors = [...target.llm.errors, ...assisted.errors];
+    if (result.failed > 0) {
+      console.error(`the assistant: ${result.failed} failure(s)`, result.errors.join('; '));
+      target.llm.errors = [...target.llm.errors, ...result.errors];
       // Say so on screen, not only in the terminal behind start.bat. Appending without
       // announcing meant the failure was replaced by the next read before the page ever
       // heard about it — a provider error repeating every minute went unseen for a day.
       announceIfCurrent();
     }
+    if (result.claimedButNotDone > 0) {
+      // The number worth watching: a worker said it was finished and the predicate
+      // disagreed. If it climbs, the job is too big or its tools are wrong (D69).
+      console.error(`the assistant: ${result.claimedButNotDone} job(s) claimed done without producing anything`);
+    }
   } catch (err) {
-    console.error('advisor failed:', message(err));
+    console.error('the assistant failed:', message(err));
   } finally {
-    enriching = false;
+    working = false;
     if (snapshot === target) announce('snapshot');
   }
 }
@@ -140,8 +150,10 @@ async function enrichInBackground(target: Snapshot): Promise<void> {
  */
 export function reapplyGoals(): void {
   if (!snapshot) return;
+  const settings = loadSettings();
   applyGoals(snapshot);
-  applyAssist(snapshot, loadSettings());
+  applyAssist(snapshot, settings);
+  applyWork(snapshot, settings);
   announce('snapshot');
 }
 
@@ -154,7 +166,11 @@ export function reapplyGoals(): void {
  */
 export function reapplyVisions(): void {
   if (!snapshot) return;
-  applyAssist(snapshot, loadSettings());
+  const settings = loadSettings();
+  applyAssist(snapshot, settings);
+  // Saying what a branch is for puts an assessment on the board, and clearing a vision
+  // takes one off. The floor should show that the moment you type it, not a minute later.
+  applyWork(snapshot, settings);
   announce('snapshot');
 }
 

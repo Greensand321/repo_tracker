@@ -126,13 +126,19 @@ export function buildBriefPrompt(snapshot: Snapshot, cap: number): string {
   return lines.join('\n');
 }
 
-export async function writeBrief(snapshot: Snapshot, settings: Settings): Promise<BriefResult> {
+export async function writeBrief(
+  snapshot: Snapshot,
+  settings: Settings,
+  sessionId: string = randomUUID(),
+): Promise<BriefResult> {
   const raw = await complete(settings, {
     system: SYSTEM,
     user: buildBriefPrompt(snapshot, settings.askBranchCap),
     maxTokens: 1200,
-    // One call, its own batch. Nothing shares a prefix with the brief.
-    sessionId: randomUUID(),
+    // The read's own session: every job in one read is one batch of work, which is what
+    // keeps a shared prompt prefix warm on one provider. A caller with no read behind it
+    // gets a fresh one rather than no header at all (D66).
+    sessionId,
   });
   return parseBrief(raw, snapshot, settings);
 }
