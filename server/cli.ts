@@ -202,7 +202,11 @@ function config(): number {
   console.log(`  provider           ${settings.llmBaseUrl}`);
   console.log(`  provider key       ${settings.llmApiKey ? green('set') : red('not set')}`);
   console.log(`  model              ${settings.llmModel || red('not chosen')}`);
-  console.log(`  max per run        ${settings.llmMaxPerRun}`);
+  console.log(`  calls per read     ${settings.llmMaxPerRun}`);
+  console.log(`  jobs at once       ${settings.workers}`);
+  console.log(
+    `  lookups            ${settings.toolsEnabled ? `on, up to ${settings.toolCallsPerJob} a job` : 'off'}`,
+  );
   console.log('');
   if (!llmReady(settings)) console.log(dim(`  ${whyNotReady(settings)}\n`));
   return 0;
