@@ -54,8 +54,10 @@ agent in `docs/plans/agent-plan.md`. Everything else in Stage 2 is now built.
 
 There is also a **plan waiting for review**: [`docs/plans/agent-memory-plan.md`](plans/agent-memory-plan.md)
 — the assistant that answers "what goals are done, what still needs doing, what work is going
-on". Its stage A (goal judgement with evidence, plus the brief) needs no tool calling and can
-start before the probe.
+on". Its stage A (branch **visions**, the vision-vs-reality assessment, then goal judgement and
+the brief) needs no tool calling and can start before the probe. The vision mechanism has its
+own end-user walkthrough waiting for review:
+[`docs/plans/vision-ux.md`](plans/vision-ux.md).
 
 After that, in order:
 

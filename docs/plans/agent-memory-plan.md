@@ -43,34 +43,37 @@ to be requested; they are what it answers continuously, without being asked.
 
 ## 3. "Knows my context better than me" — what that actually requires
 
-This is the load-bearing claim and it deserves to be taken apart, because half of it is
-free and half of it is not.
+> **Superseded and corrected.** An earlier draft of this section claimed a model *cannot*
+> infer what a goal is for, "at any model quality". That was overstated. A model reading a
+> handful of PRs and commits can work out what software is being built and what a branch is
+> doing to it — Bearing already does exactly that, every time it summarises a branch.
 
-**What can be inferred from the Snapshot, free and reliably:** what a branch did, whether it
-is moving, how far it has diverged, whether CI is red, whether a PR merged, when it last
-went quiet. All of this is already collected.
+The narrower claim is the true one:
 
-**What cannot be inferred at all:** what a goal is *for*. What *done* means for it. Which of
-two plausible goals a branch belongs to when both fit. Which thread you care about this
-week. Why a branch was parked rather than abandoned.
+> **Inference gives you the *is*. Only you supply the *ought*.**
 
-No amount of model quality closes that gap — the information is not in the data.
+The assistant can tell you, accurately, that a branch spent three days benchmarking mmap. It
+cannot tell you whether that was a worthwhile detour or three wasted days, because
+"worthwhile" is a function of what you were trying to do.
 
-**So the assistant comes to know it by asking once, and writing it down.** That is the
-mechanism, and it is the honest version of "knows better than me": not that it is smarter,
-but that **it never forgets and you do.** You hold five threads at a time and have big ideas
-that outnumber them; it holds all of them at a uniform, unimpressive, permanent level of
-detail.
+So it reads the work and describes it — and the one thing it cannot read, and therefore the
+one thing worth asking for, is **what you meant the branch to be for**. Said once, it turns
+every later assessment from a guess into a comparison.
 
-Three consequences, and they shape the design more than anything else here:
+That mechanism is **vision**, and it has its own walkthrough:
+**[`vision-ux.md`](vision-ux.md)**. In short: one falsifiable sentence per branch, in your
+words or drafted and confirmed, against which the work is measured. It is what makes
+*drifted*, *done against its vision* and *overtaken by another branch* computable at all.
 
-1. **The assistant is allowed to ask you questions**, and those questions land on the docket
-   like any other work. *"I do not know what done looks like for 'Two machines, one set of
-   notes' — what would finish it?"* is a legitimate item, not a failure.
-2. **Every answer becomes a note on the object it is about**, so it is asked once and never
-   again. This is R6, which has been a requirement since day one.
-3. **Not knowing is stated, never guessed.** An assistant that invents an intent is worse
-   than one that asks, because you cannot tell the difference from the outside.
+Three consequences shape everything below:
+
+1. **The assistant asks, rather than invents.** A drafted vision is marked as a draft and is
+   never the basis for calling something done. Silently treating its own guess as your intent
+   is how reasoning becomes invisible.
+2. **Asked once, written down, never asked again.** This is the honest version of "knows
+   better than me": not that it is smarter, but that it never forgets and you do.
+3. **Not knowing is stated.** When many things are moving and there is no clear thread, it
+   asks about the *shape* rather than inventing one — see `vision-ux.md` §5.
 
 ## 4. Three things that break if built literally
 
@@ -131,14 +134,15 @@ dismissed the old state, not the branch.
 
 ## 5. The pieces
 
-Six, named in the project's existing register. Each has one job.
+Seven, named in the project's existing register. Each has one job.
 
 | Piece | What it is | Who writes it |
 |---|---|---|
 | **The brief** | The standing answer to the three questions, regenerated on read | The assistant |
 | **Judgements** | Goal and milestone progress, with evidence, provisional until accepted | The assistant proposes, you accept |
 | **The docket** | Derived work, in two columns: its work and yours | Derived + your dispositions |
-| **Notes** | What a thing is *for* — one-liners on a branch or goal (R6) | Both, marked as to which |
+| **Vision** | What a branch is *for*, in one falsifiable sentence — the yardstick | You, or drafted and confirmed |
+| **Notes** | Everything else worth remembering about a thing (R6) | Both, marked as to which |
 | **Standing orders** | How you want things done. ~20 lines, always loaded, dated and reasoned | You confirm; the assistant proposes |
 | **Orders + run log** | The packet one instance is handed, and the record of what it did | Assembled; never hand-written |
 
@@ -177,20 +181,28 @@ Two columns, one derivation.
 **Its work** — has a `doneWhen` predicate, so the assistant can do it and the result is
 checkable: unsummarised branches, unfiled branches, goals whose judgement is stale.
 
-**Your work** — has no predicate, because it needs a decision only you can make: *this goal
-has no branches and no note — is it dead?*; *these two branches both fit "Ship the ledger
-interface" and one of them is 11 behind — cut it?*; *what does done look like here?*
+**Your work** — has no predicate, because it needs a decision only you can make. In practice
+most of it is **vision questions**, which is a better answer than open-ended asks for
+context: *"I think this branch is for X — right?"*; *"this has drifted from what you said —
+new plan, or wandered?"*; *"three branches moved and I see no common thread — one push or
+three things?"*. Each is concrete and answerable in a click.
 
 The second column is not a lesser thing. **It is the assistant doing its actual job:**
 noticing what is waiting on you, which is the part you cannot do for yourself because it
 requires holding all of it at once.
 
-### 5.4 Notes, and 5.5 Standing orders
+### 5.4 Vision, notes, and 5.5 standing orders
 
-**Notes** (R6) are what a thing is *for*. They are the answer to §3: asked once, written
-down, never asked again. They are also the agent's scoped memory — an instance working on a
-branch gets that branch's notes and its goal's, which is the whole of its working context
-and is bounded by construction.
+**Vision** is what a branch is *for* — the yardstick, one falsifiable sentence, fully
+described in [`vision-ux.md`](vision-ux.md). It is not a note and should not be stored as
+one: a note is remembered, a vision is **compared against**. Every branch assessment is
+vision versus reality, and the verdicts that matter most — *drifted*, *overtaken* — exist
+only because there is a stated intent to contradict.
+
+**Notes** (R6) are everything else worth remembering about a thing: an observation, a
+reminder, a piece of context that is not a yardstick. They are also the agent's scoped
+memory — an instance working on a branch gets that branch's vision, its notes and its goal's,
+which is the whole of its working context and is bounded by construction.
 
 **Standing orders** are how you want things done — the `CLAUDE.md` of the assistant. They
 come from **R7, a requirement since day one and never built**: a comment tool next to
@@ -275,18 +287,18 @@ because the probe has still not run.
 
 | | Stage | What lands | Needs |
 |---|---|---|---|
-| **A** | **The assistant's answer** | Goal judgement with evidence; the brief; notes on goals as the intent input | Nothing new — same single-turn shape as the advisor today (D60) |
+| **A** | **Vision, assessment, brief** | Branch visions (drafted, confirmed, edited); vision-vs-reality assessment; goal judgement built on it; the brief | Nothing new — same single-turn shape as the advisor today (D60) |
 | **B** | **The docket** | Derived work in two columns, dispositions, "what's waiting on you" | Stage A |
 | **C** | **Learning** | Feedback → standing orders (R7); the assistant asking when it lacks context | Stage B |
 | **D** | **Many hands** | Packets, one instance per task, run log | The probe |
 
-**A is first** because it is the thing the assistant is *for*, and because everything else
-needs it to exist: there is no point building a feedback loop before there are judgements
-worth correcting, and no point building a docket before something can judge what belongs on
-it.
+**A is first** because it is the thing the assistant is *for*, and everything else needs it:
+no point in a feedback loop before there are judgements worth correcting, and no point in a
+docket before something can judge what belongs on it.
 
-Notes on goals are folded into A rather than split out, because a judgement made without
-knowing what a goal is for is a guess, and §3 says the assistant does not guess.
+**Within A, vision comes before judgement.** A goal called done on the strength of branches
+whose purpose was never stated is exactly the guesswork §3 warns about — the assistant would
+be marking its own inference as your intent. Vision first, assessment second, roll-up third.
 
 ## 8. What it costs to run continuously
 
