@@ -360,6 +360,62 @@ than the evidence supported. Native tool calling is used where the model support
 a plain JSON protocol as the floor — same catalogue either way — because the provider is
 swappable by design (D32), not because the models are suspect.
 
+### D75 — The budget is counted in provider calls, and a job is claimed only if the read can pay for it in full
+
+`llmMaxPerRun` used to count *jobs*, which was fine while every job was one call. With
+lookups it stopped meaning anything: a cap of forty claimed forty jobs, each of which could
+then look eight things up — three hundred and sixty calls behind a number that said forty.
+
+Two changes. The budget is now a purse counted in calls: claiming a job takes one, and every
+lookup asks for another. And a pass claims jobs against a **reserve** — one call, plus one
+more for a station that has tools — rather than against the raw cap.
+
+The reserve is the part worth keeping. Claiming purely by the cap was *worse* than a guess:
+a budget of four claimed four jobs, each then wanted a lookup there was no money for, and
+the read finished nothing at all while spending everything. Better to start half the work
+and finish it than to start all of it and finish none.
+
+When the purse does empty mid-conversation, the job **fails without writing anything**. The
+alternative — hand back the half-finished exchange — has the station parse a tool call as a
+verdict and store "unclear, no reason given", which is an accounting limit wearing the
+clothes of a judgement. Nothing written, nothing charged for twice: the next read does it
+properly.
+
+### D76 — A fatal provider error parks nothing
+
+A rejected key, an empty wallet, a model that does not exist: nothing about the *job*
+failed, and every other job would fail identically. So the attempt is not counted and
+nothing parks.
+
+Found by an audit, and it was worse than it sounds. Two reads with a bad key gave every
+claimed job its second failure, so the whole fleet parked; fixing the key brought back one
+branch, and the rest sat in *Waiting on you* needing a click each — a repair job created
+entirely by the reporting of the original problem. Settings changes now also clear every
+remembered failure, because a key, a model and an endpoint are exactly what was just edited.
+
+### D77 — A tool never sees a secret
+
+`ToolContext` carries `SafeSettings` — the same object the browser is allowed, with the
+GitHub token and the provider key removed. A tool's output goes straight into a prompt that
+goes straight to a provider, and a tool cannot leak what it never had.
+
+This costs nothing today, because no tool wants either. It is written down now because the
+first tool that touches GitHub (step 4) will be the moment someone reaches for the token —
+and the answer is that it gets a narrow reader passed to it, never the credentials to make
+its own calls. A test asserts that nothing under `server/tools/` names either secret, or
+writes anything anywhere.
+
+### D78 — The brief is a stage, not a condition
+
+It was derived only when the board was otherwise empty, which reads as "it goes last" and
+means something else: **a parked job is still on the board**. One branch the model would not
+summarise blocked the brief — the most valuable thing the assistant writes — permanently.
+
+Jobs now carry a stage: everything about one branch is 0, the brief is 1. The dispatcher
+works the lowest stage that has anything *runnable* in it, and work that has given up is
+filtered out before that choice is made. Ordering stays a number, so there is still no
+foreman deciding it.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

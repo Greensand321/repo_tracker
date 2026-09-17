@@ -6,7 +6,7 @@
 
 ---
 
-## The room is built (workroom steps 1–2)
+## The room is built (workroom steps 1–3)
 
 The assistant's work is no longer three loops with three ideas of the budget. Every station
 derives what it has outstanding onto **one board**, a dispatcher runs it N at a time, and a
@@ -23,8 +23,20 @@ never recorded, so the job was derived again every read and paid for again — e
 for every declined branch, forever (D70). The rule that caught it, before a line was built:
 **a job whose predicate can never become true is a job that runs forever.**
 
-Plan and what is next: [`plans/workroom.md`](plans/workroom.md) — tools per station (step 3–4),
-dispatch (step 5), then the advisor that can act (step 6). D68–D74.
+**Stations can look things up.** `assess` — the station whose verdicts are claims about
+intent — can now read the branches next to this one and how things moved this week, instead
+of inferring both from commit subjects. It is the JSON protocol, so it needs no tool support
+from the provider: the model replies with `{"tool": …}`, we run it and ask again. A reply
+with no `tool` key is the answer, handed to the station's own parser unchanged — no prompt
+and no parser changed to gain tools.
+
+Bounded three ways and it needs all three: the model stops asking, the lookups run out, or
+the clock does. An unknown tool is a correction, a repeated one is answered from what we
+already have, and a model that never answers **fails the job** rather than having its last
+tool call parsed into a verdict.
+
+Plan and what is next: [`plans/workroom.md`](plans/workroom.md) — GitHub tools at the other
+stations (step 4), dispatch (step 5), then the advisor that can act (step 6). D68–D78.
 
 ## The assistant is built (stage A)
 
@@ -73,7 +85,7 @@ recommendation there was D6; the owner chose D4 and the reasons are in D57.
 | **Stage 1** | Built. Every branch across your repos, with its real commit history, PR and CI state. ETag change detection; a repo that has not moved costs nothing. |
 | **Stage 2 engine** | Built. Per-branch plain-English title, summary, and progress judgement, cached so an idle branch is never re-summarised. |
 | **Stage 2 surfaces** | Deliberately not built — the comment tool, the chat panel, and "what changed since I last looked" all wait for the real design. |
-| Tests | 179, no network. Recorded GitHub fixtures and a stubbed provider. |
+| Tests | 208, no network. Recorded GitHub fixtures and a stubbed provider. |
 
 ## Try it without the GUI
 
@@ -142,7 +154,18 @@ After that, in order:
 - **The board lives in `server/work/`.** `board.ts` derives it (pure-ish, the stations are
   rows), `run.ts` spends the budget. Nothing under `server/advise/` may read `llmMaxPerRun` —
   a test enforces that too.
-- **Adding a station is adding a row in `board.ts`**, with its `run` and its `doneWhen`.
+- **Adding a station is adding a row in `board.ts`**, with its `run`, its `doneWhen`, its
+  `stage` and its `reserve`.
+- **`llmMaxPerRun` counts provider calls, not jobs** (D75). A job is claimed only when the
+  read can pay for it in full — a lookup costs the same as an answer.
+- **A tool is handed `SafeSettings`, never `Settings`** (D77). It cannot leak a token it
+  never had, and a test enforces that nothing under `server/tools/` reaches for one.
+- **Announcements to the page are coalesced at 300ms.** The page re-reads the whole snapshot
+  on every one, and the board announces on every job claimed, every lookup and every job
+  done — several hundred full reads a run, for a panel whose unit of meaning is "something
+  moved".
+- **A parked job never blocks the brief** (D78). Ordering is `stage`, and work that gave up
+  is filtered out before the next stage is chosen.
 - **Advisor failures show in the dateline as well as Notices** (D67).
 - **One budget per read, not one per step.** `llmMaxPerRun` is spent across summarising,
   drafting and assessing together. It used to cap the first two and not the third.
@@ -168,5 +191,6 @@ After that, in order:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 17 Sep 2026 | **The workroom, step 3 and an audit**: stations can look things up (the JSON protocol, two free tools, `assess` wired). The audit found four: a bad key parked the whole fleet, the call budget could be overshot ninefold, a parked job blocked the brief for ever, and a model that never answered had its tool call stored as a verdict. D75–D78 |
 | 17 Sep 2026 | **The workroom, steps 1–2**: work derived onto a board, done checked rather than claimed, failures park, and the floor shows the room working. A declined vision was being re-paid every read. D68–D74 |
 | 17 Sep 2026 | **D4 "The Broadsheet" chosen and built** — `web/` rebuilt from scratch against it. Goals land as Plane B with their own store, API and tests; the advisor answers questions single-turn. D57–D60 recorded |

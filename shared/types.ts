@@ -129,6 +129,12 @@ export type Assessment = {
   evidence: string[];
   /** For `overtaken`: the branch that satisfied this one's vision first. */
   overtakenBy: BranchRef | null;
+  /**
+   * What it went and looked at before deciding, by tool name. Empty means it judged from
+   * what it was handed — which is a real difference in how much the verdict is worth, and
+   * one the owner should be able to see rather than infer.
+   */
+  looked: string[];
   model: string;
   promptVersion: string;
   generatedAt: string;

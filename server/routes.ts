@@ -11,6 +11,7 @@ import { GitHubError, splitRepoKey, verifyToken } from './github.ts';
 import { GoalError, assignBranch, createGoal, deleteGoal, listGoals, updateGoal } from './goals.ts';
 import { VisionError, clearVision, confirmVision, setVision } from './vision.ts';
 import { loadSettings, saveSettings, toSafe } from './settings.ts';
+import { resetBoardState } from './work/run.ts';
 import {
   currentResponse,
   reapplyGoals,
@@ -93,6 +94,10 @@ api.put('/settings', async (c) => {
   }
 
   const saved = saveSettings(patch);
+  // A job parked because of a rejected key, a missing model or a wrong endpoint — the
+  // three things most likely to have just been edited on this screen. Keeping it parked
+  // on the strength of a problem that was just fixed is the opposite of helpful.
+  resetBoardState();
   // Settings changed what or how often we fetch, so restart the loop rather than
   // waiting out the old interval.
   startPolling();

@@ -148,7 +148,12 @@ export async function assessBranch(
   branch: Branch,
   visionText: string,
   settings: Settings,
-  options: { sessionId?: string; ctx?: ToolContext; onTool?: (name: string) => void } = {},
+  options: {
+    sessionId?: string;
+    ctx?: ToolContext;
+    onTool?: (name: string | null) => void;
+    spend?: () => boolean;
+  } = {},
 ): Promise<AssessResult> {
   const tools = options.ctx ? toolsFor('assess', settings) : [];
   const user = `It is FOR: ${visionText}\n\n${describeBranch(branch)}`;
@@ -167,6 +172,7 @@ export async function assessBranch(
     sessionId,
     maxTokens: 350,
     ...(options.onTool ? { onTool: options.onTool } : {}),
+    ...(options.spend ? { spend: options.spend } : {}),
   });
 
   return {

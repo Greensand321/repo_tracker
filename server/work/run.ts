@@ -20,6 +20,7 @@ import { randomUUID } from 'node:crypto';
 import type { Job, JobKind, Settings, Snapshot } from '../../shared/types.ts';
 import { refKey } from '../../shared/types.ts';
 import { LlmError } from '../advise/client.ts';
+import { BudgetError } from '../advise/converse.ts';
 import { isFatal, llmReady } from '../advise/enrich.ts';
 import { insightKey, pruneInsights } from '../advise/store.ts';
 import { pruneVisions } from '../vision.ts';
@@ -50,6 +51,14 @@ const attempts = new Map<string, number>();
 const parked = new Map<string, Job>();
 
 /**
+ * Claimed right now. Module-scope rather than per-run, because a read that lands mid-flight
+ * builds a *new* snapshot and asks what is outstanding — and the honest answer includes the
+ * two jobs a worker already has in its hands. Per-run, the new snapshot showed them as
+ * waiting and the floor said "0 at work" while two were.
+ */
+const working = new Map<string, Job>();
+
+/**
  * Put a parked job back on the board.
  *
  * Parking is not a verdict on the work, only on two attempts at it, so "try again" has to
@@ -62,10 +71,17 @@ export function unpark(id: string): boolean {
   return parked.delete(id);
 }
 
-/** Tests and the debug CLI want a clean room. */
+/**
+ * Forget every failure. Called when settings change, because what parked a job may be
+ * exactly what just changed: a key, a model, an endpoint. Leaving work parked on the
+ * strength of a problem the owner has since fixed is the opposite of helpful.
+ *
+ * Nothing in flight is touched — there is nothing to cancel, only a memory of failures.
+ */
 export function resetBoardState(): void {
   attempts.clear();
   parked.clear();
+  working.clear();
 }
 
 export type RunResult = {
@@ -84,9 +100,11 @@ export type RunResult = {
 
 /** The free pass: what is outstanding, before anything is spent. Beside applyCached. */
 export function applyWork(snapshot: Snapshot, settings: Settings): void {
-  const waiting = deriveBoard(snapshot, settings).filter((spec) => !parked.has(spec.id));
+  const waiting = deriveBoard(snapshot, settings).filter(
+    (spec) => !parked.has(spec.id) && !working.has(spec.id),
+  );
   snapshot.work = {
-    jobs: [...waiting.map(toJob), ...parked.values()],
+    jobs: [...working.values(), ...waiting.map(toJob), ...parked.values()],
     workers: Math.max(1, settings.workers),
   };
 }
@@ -116,20 +134,33 @@ export async function runBoard(
   pruneVisions(live);
   pruneInsights(new Set(snapshot.branches.map((b) => insightKey(b.repoKey, b.name))));
 
-  // One budget for the whole read, spent across every station. "Max per read" means the
-  // read — it used to cap two stations and not the third.
+  /**
+   * One budget for the whole read, spent across every station, and counted in **provider
+   * calls** rather than jobs. A job that looks two things up costs three calls, and a cap
+   * that counted jobs would quietly let a read cost several times what it says.
+   *
+   * Claiming deducts one per job up front; the lookups are deducted as they happen, so a
+   * pass can overshoot slightly and the next pass sees the real total.
+   */
   let budget = settings.llmMaxPerRun;
+  /** One call, if there is one to be had. The only place money is committed. */
+  const spend = (): boolean => (budget > 0 ? (budget--, true) : false);
   const workers = Math.max(1, settings.workers);
   // Every job in a read shares an identical system prompt per station, so routing them
   // together is exactly what the session header is for. Reads stay distinct.
   const sessionId = randomUUID();
 
   let fatal = false;
-  const working = new Map<string, Job>();
+  /**
+   * Finished in this run. A correct board never re-derives a done job — its predicate now
+   * holds — but "never spend twice for the same thing because a derivation was wrong" is
+   * too cheap a guarantee to leave to correctness elsewhere.
+   */
+  const finished = new Set<string>();
 
   const publish = (): void => {
     const waiting = derive(snapshot, settings).filter(
-      (spec) => !parked.has(spec.id) && !working.has(spec.id),
+      (spec) => !parked.has(spec.id) && !working.has(spec.id) && !finished.has(spec.id),
     );
     snapshot.work = {
       jobs: [...working.values(), ...waiting.map(toJob), ...parked.values()],
@@ -138,73 +169,126 @@ export async function runBoard(
     onProgress?.();
   };
 
-  for (let pass = 0; pass < MAX_PASSES && !fatal; pass++) {
-    const board = derive(snapshot, settings).filter((spec) => !parked.has(spec.id));
-    if (board.length === 0) break;
+  // Everything this run claimed, so nothing can be left marked as in-flight by a failure
+  // outside the per-job try — a job stuck in `working` is filtered out of the board for
+  // the life of the process and would simply never run again.
+  const claimedHere = new Set<string>();
 
-    if (budget <= 0) {
-      result.budgetSpent = true;
-      break;
+  try {
+    for (let pass = 0; pass < MAX_PASSES && !fatal; pass++) {
+      const outstanding = derive(snapshot, settings).filter(
+        (spec) => !parked.has(spec.id) && !finished.has(spec.id) && !working.has(spec.id),
+      );
+      if (outstanding.length === 0) break;
+
+      // The lowest stage that still has anything in it. Everything about a branch comes
+      // before the brief that reads them all, and a job that gave up is already gone from
+      // this list — so one unsummarisable branch cannot hold the brief back for ever.
+      const stage = Math.min(...outstanding.map((spec) => spec.stage));
+      const board = outstanding.filter((spec) => spec.stage === stage);
+
+      if (budget <= 0) {
+        result.budgetSpent = true;
+        break;
+      }
+
+      // Claim what can be paid for in full, rather than starting more than the purse can
+      // finish. Each claim pays for its own first call here; lookups ask as they go.
+      const claimed: JobSpec[] = [];
+      let reserved = 0;
+      for (const spec of board) {
+        if (reserved + spec.reserve > budget) break;
+        reserved += spec.reserve;
+        claimed.push(spec);
+      }
+      if (claimed.length === 0) {
+        result.budgetSpent = true;
+        break;
+      }
+      for (const _ of claimed) spend();
+
+      const before = result.done;
+      await pool(claimed, workers, async (spec) => {
+        if (fatal) return;
+        const tried = (attempts.get(spec.id) ?? 0) + 1;
+        attempts.set(spec.id, tried);
+
+        const job: Job = {
+          ...toJob(spec),
+          state: 'working',
+          startedAt: new Date().toISOString(),
+          attempts: tried,
+          toolCalls: 0,
+          doing: null,
+        };
+        working.set(spec.id, job);
+        claimedHere.add(spec.id);
+        publish();
+
+        try {
+          await spec.run({
+            sessionId,
+            spend,
+            onTool: (name) => {
+              // Live, so the floor moves while the work happens rather than jumping at the
+              // end. A worker that is looking something up should look like one — and one
+              // that has finished looking should stop saying it is.
+              if (name === null) {
+                job.doing = null;
+              } else {
+                job.toolCalls++;
+                job.doing = name;
+              }
+              publish();
+            },
+          });
+          // Never the worker's word for it. The predicate reads the store the cache reads.
+          if (spec.doneWhen()) {
+            result.done++;
+            result.byKind[spec.kind] = (result.byKind[spec.kind] ?? 0) + 1;
+            attempts.delete(spec.id);
+            finished.add(spec.id);
+          } else {
+            result.claimedButNotDone++;
+            park(spec, tried, 'finished without producing anything', result);
+          }
+        } catch (err) {
+          if (err instanceof BudgetError) {
+            // Not a failure and not an attempt: the read ran out of money mid-job. Nothing
+            // was written, so the next read does it properly on a fresh budget.
+            attempts.delete(spec.id);
+            result.budgetSpent = true;
+            return;
+          }
+
+          const message = err instanceof Error ? err.message : String(err);
+          result.failed++;
+          result.errors.push(`${spec.title}: ${message}`);
+
+          if (err instanceof LlmError && isFatal(err)) {
+            // A rejected key, an empty wallet, a model that does not exist: nothing about
+            // *this job* failed, and every other job would fail identically. So the attempt
+            // is not counted and nothing parks — otherwise two reads with a bad key park the
+            // whole fleet, and fixing the key would not bring it back. Which it did.
+            attempts.delete(spec.id);
+            fatal = true;
+            result.errors.push('stopped early — this failure will repeat until it is fixed in settings');
+          } else {
+            park(spec, tried, message, result);
+          }
+        } finally {
+          working.delete(spec.id);
+          publish();
+        }
+      });
+
+      // A pass that achieved nothing will achieve nothing again a second later. Whatever
+      // failed is left for the next read, which is also its one retry.
+      if (result.done === before) break;
     }
 
-    const claimed = board.slice(0, budget);
-    budget -= claimed.length;
-
-    const before = result.done;
-    await pool(claimed, workers, async (spec) => {
-      if (fatal) return;
-      const tried = (attempts.get(spec.id) ?? 0) + 1;
-      attempts.set(spec.id, tried);
-
-      const job: Job = {
-        ...toJob(spec),
-        state: 'working',
-        startedAt: new Date().toISOString(),
-        attempts: tried,
-        toolCalls: 0,
-        doing: null,
-      };
-      working.set(spec.id, job);
-      publish();
-
-      try {
-        await spec.run({
-          sessionId,
-          onTool: (name) => {
-            // Live, so the floor moves while the work happens rather than jumping at the
-            // end. A worker that is looking something up should look like one.
-            job.toolCalls++;
-            job.doing = name;
-            publish();
-          },
-        });
-        // Never the worker's word for it. The predicate reads the store the cache reads.
-        if (spec.doneWhen()) {
-          result.done++;
-          result.byKind[spec.kind] = (result.byKind[spec.kind] ?? 0) + 1;
-          attempts.delete(spec.id);
-        } else {
-          result.claimedButNotDone++;
-          park(spec, tried, 'finished without producing anything', result);
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        result.failed++;
-        result.errors.push(`${spec.title}: ${message}`);
-        park(spec, tried, message, result);
-        if (err instanceof LlmError && isFatal(err)) {
-          fatal = true;
-          result.errors.push('stopped early — this failure will repeat');
-        }
-      } finally {
-        working.delete(spec.id);
-        publish();
-      }
-    });
-
-    // A pass that achieved nothing will achieve nothing again a second later. Whatever
-    // failed is left for the next read, which is also its one retry.
-    if (result.done === before) break;
+  } finally {
+    for (const id of claimedHere) working.delete(id);
   }
 
   // Anything still derivable and not parked is left for the next read, honestly shown.

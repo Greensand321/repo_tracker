@@ -210,22 +210,24 @@ test('a job that fails twice parks; it is not tried a third time', async () => {
   const first = snapshot([branch('a')]);
   enrich.applyCached(first, settings());
   const one = await work.runBoard(first, settings());
-  assert.equal(calls.calls, 1);
+  assert.equal(calls.summarised(), 1);
   assert.equal(one.parked, 0, 'once is not a verdict');
 
   const second = snapshot([branch('a')]);
   enrich.applyCached(second, settings());
   const two = await work.runBoard(second, settings());
-  assert.equal(calls.calls, 2, 'tried once, retried once');
+  assert.equal(calls.summarised(), 2, 'tried once, retried once');
   assert.equal(two.parked, 1);
-  assert.equal(second.work.jobs.filter((j) => j.state === 'parked').length, 1);
-  assert.ok(second.work.jobs[0]!.error, 'the parked job carries what went wrong');
+  const stuck = second.work.jobs.filter((j) => j.state === 'parked');
+  assert.equal(stuck.length, 1);
+  assert.ok(stuck[0]!.error, 'the parked job carries what went wrong');
 
   // And no later read quietly starts it over while the branch sits at the same head.
   const third = snapshot([branch('a')]);
   enrich.applyCached(third, settings());
-  await work.runBoard(third, settings());
-  assert.equal(calls.calls, 2, 'still parked at the same head');
+  const three = await work.runBoard(third, settings());
+  assert.equal(calls.summarised(), 2, 'still parked at the same head');
+  assert.equal(three.byKind.brief, 1, 'and the brief is written anyway — it is not blocked by it');
 });
 
 test('one failing branch does not stop the others', async () => {
@@ -252,7 +254,7 @@ test('done is checked against the snapshot, not taken on the worker\'s word', as
     id: 'liar:1', kind: 'summarise' as const, title: 'Pretending to work',
     subject: { kind: 'branch' as const, repoKey: 'o/r', branch: 'a' },
     origin: 'routine' as const, state: 'waiting' as const, startedAt: null, attempts: 0,
-    toolCalls: 0, doing: null, error: null,
+    toolCalls: 0, doing: null, error: null, reserve: 1, stage: 0,
     run: async () => { ran++; },
     doneWhen: () => false,
   }];
@@ -360,7 +362,10 @@ test('the free pass fills the board before anything is spent', () => {
   enrich.applyCached(snap, config);
   work.applyWork(snap, config);
 
-  assert.equal(snap.work.jobs.length, 2);
+  // Two summaries and the brief: the brief is on the board from the start, so that one
+  // branch the model will not summarise cannot hold it back for ever.
+  assert.equal(snap.work.jobs.length, 3);
+  assert.equal(snap.work.jobs.filter((j) => j.kind === 'brief').length, 1);
   assert.equal(snap.work.workers, 3);
   assert.ok(snap.work.jobs.every((j) => j.state === 'waiting'));
 });
@@ -438,4 +443,143 @@ test('the same assessment is not re-paid when tools are left alone', async () =>
   enrich.applyCached(third, off);
   assist.applyAssist(third, off);
   assert.equal(third.branches[0]!.assessment, null, 'the stored one was written with tools');
+});
+
+// ---------------------------------------------------------------------------
+// The audit — each of these is a way the room misbehaved before it was fixed
+// ---------------------------------------------------------------------------
+
+test('a bad API key does not park the fleet, and fixing it resumes the work', async () => {
+  // It used to: two reads of 401 gave every claimed job its second failure, so everything
+  // parked. Fixing the key brought back one branch — the rest sat in "waiting on you"
+  // needing a click each. A rejected key is a fact about the settings, not about a job.
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ error: { message: 'bad key' } }), { status: 401 })) as typeof fetch;
+
+  for (const _read of [1, 2]) {
+    const snap = snapshot([branch('a'), branch('b'), branch('c')]);
+    enrich.applyCached(snap, settings());
+    const result = await work.runBoard(snap, settings());
+    assert.equal(result.parked, 0, 'a settings problem parks nothing');
+    assert.ok(result.errors.some((e: string) => /fixed in settings/.test(e)));
+  }
+
+  const calls = stubProvider(insight());
+  const snap = snapshot([branch('a'), branch('b'), branch('c')]);
+  enrich.applyCached(snap, settings());
+  const result = await work.runBoard(snap, settings());
+
+  assert.equal(result.byKind.summarise, 3, 'all three resume by themselves');
+  assert.equal(snap.work.jobs.filter((j) => j.state === 'parked').length, 0);
+  assert.equal(calls.summarised(), 3);
+});
+
+test('a job in flight is shown as in flight, even to a read that lands mid-run', async () => {
+  // The floor said "0 at work" while two were: a refresh builds a new snapshot and asks
+  // what is outstanding, and the answer has to include what a worker already has.
+  const config = settings();
+  const snap = snapshot([branch('a')]);
+  enrich.applyCached(snap, config);
+
+  let seenByLateRead: ReturnType<typeof board.deriveBoard> extends never ? never : number = 0;
+  let lateJobs: { state: string }[] = [];
+
+  globalThis.fetch = (async () => {
+    // A read lands while this call is in flight, exactly as the refresh timer would.
+    const later = snapshot([branch('a')]);
+    enrich.applyCached(later, config);
+    work.applyWork(later, config);
+    lateJobs = later.work.jobs;
+    seenByLateRead = later.work.jobs.filter((j) => j.state === 'working').length;
+    return new Response(JSON.stringify(insight()), { status: 200 });
+  }) as typeof fetch;
+
+  await work.runBoard(snap, config);
+
+  assert.equal(seenByLateRead, 1, `the later read should see it working: ${JSON.stringify(lateJobs)}`);
+  assert.equal(lateJobs.filter((j) => j.state === 'waiting').length, 0, 'and not also as waiting');
+});
+
+test('nothing is left marked in flight once a run is over', async () => {
+  const config = settings();
+  const snap = snapshot([branch('a')]);
+  enrich.applyCached(snap, config);
+  stubProvider(insight());
+  await work.runBoard(snap, config);
+
+  const after = snapshot([branch('a'), branch('z')]);
+  enrich.applyCached(after, config);
+  work.applyWork(after, config);
+  assert.equal(after.work.jobs.filter((j) => j.state === 'working').length, 0);
+  assert.deepEqual(
+    after.work.jobs.map((j) => j.kind).sort(),
+    ['brief', 'summarise'],
+    'the new branch, and the brief the fleet moving made stale',
+  );
+});
+
+test('one job is never paid for twice in a run, whatever the board says', async () => {
+  const calls = stubProvider(insight());
+  const snap = snapshot([branch('a')]);
+  enrich.applyCached(snap, settings());
+
+  // A board that wrongly keeps offering a finished job. The dispatcher must not buy it
+  // again: the derivation is the thing most likely to be wrong, and calls cost money.
+  const specs = board.deriveBoard(snap, settings());
+  const result = await work.runBoard(snap, settings(), undefined, () => specs);
+
+  assert.equal(result.done, specs.length, 'every job ran');
+  assert.equal(calls.calls, specs.length, 'and none of them ran twice');
+});
+
+test('the budget counts provider calls, not jobs — lookups come out of it too', async () => {
+  // "Max per read" has to mean what a read costs. Counting jobs let a read with lookups
+  // cost several times the number on the settings screen.
+  const config = settings({ visionAutoDraft: false, toolsEnabled: true, llmMaxPerRun: 4 });
+  for (const name of ['a', 'b', 'c', 'd']) {
+    vision.setVision({ repoKey: 'o/r', branch: name }, `Do the ${name} thing`, 'yours');
+  }
+
+  let calls = 0;
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    calls++;
+    // Every assessment looks one thing up before answering: two calls a job.
+    const content = String(init?.body ?? '').includes('you asked for')
+      ? '{"verdict":"on-track","because":"fine","evidence":[]}'
+      : '{"tool":"sibling_branches","args":{}}';
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
+  }) as typeof fetch;
+
+  const snap = snapshot(['a', 'b', 'c', 'd'].map((n) => branch(n)));
+  enrich.applyCached(snap, config);
+  assist.applyAssist(snap, config);
+  const result = await work.runBoard(snap, config, undefined, (s, c) =>
+    board.deriveBoard(s, c).filter((j) => j.kind === 'assess'),
+  );
+
+  assert.ok(calls <= 8, `a budget of 4 calls should not have bought ${calls}`);
+  assert.ok(result.done >= 2 && result.done < 4, `two jobs at two calls each: got ${result.done}`);
+  assert.equal(result.budgetSpent, true, 'and it says the rest waits for the next read');
+});
+
+test('two workers really do work at once', async () => {
+  const config = settings({ workers: 2 });
+  let inFlight = 0;
+  let peak = 0;
+
+  globalThis.fetch = (async () => {
+    inFlight++;
+    peak = Math.max(peak, inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    inFlight--;
+    return new Response(JSON.stringify(insight()), { status: 200 });
+  }) as typeof fetch;
+
+  const snap = snapshot([branch('a'), branch('b'), branch('c'), branch('d')]);
+  enrich.applyCached(snap, config);
+  await work.runBoard(snap, config, undefined, (s, c) =>
+    board.deriveBoard(s, c).filter((j) => j.kind === 'summarise'),
+  );
+
+  assert.equal(peak, 2, `settings say 2 at once; saw ${peak}`);
 });

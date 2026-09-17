@@ -29,6 +29,7 @@ import {
   writeTheBrief,
 } from '../advise/assist.ts';
 import { briefKey, worthAVision } from '../advise/brief.ts';
+import { toolsFor } from '../tools/catalog.ts';
 import { isSummarised, llmReady, summariseBranch, worthSummarising } from '../advise/enrich.ts';
 import type { RunHandle } from './handle.ts';
 
@@ -37,6 +38,28 @@ import type { RunHandle } from './handle.ts';
  * whether it was actually done. The `Job` half is what reaches the page.
  */
 export type JobSpec = Job & {
+  /**
+   * Which round this job belongs to. Everything about one branch is stage 0; the brief,
+   * which reads every branch's verdict, is stage 1. The dispatcher works the lowest stage
+   * that has anything in it and re-derives, so ordering is a number rather than a foreman.
+   *
+   * It is a stage rather than a condition on the derivation for one reason: a job that has
+   * **given up** must not hold the brief back. One branch the model will not summarise
+   * used to block the most valuable thing the assistant writes, permanently, because the
+   * brief only appeared when the board was otherwise empty — and a parked job is still on
+   * the board.
+   */
+  stage: number;
+  /**
+   * What to set aside for this job, in provider calls: one for the answer, plus one for a
+   * lookup if the station has tools.
+   *
+   * A guess, and it only decides how many jobs a read *claims*; the purse is what actually
+   * enforces the cap. Claiming purely by the cap was worse than a guess — a budget of four
+   * claimed four jobs, each then wanted a lookup there was no money for, and the read
+   * finished nothing at all while spending the lot.
+   */
+  reserve: number;
   /**
    * Checked against the snapshot after the worker says it has finished — never instead of
    * it, and never in place of it (D69). Free: it reads the same stores the cache reads.
@@ -52,10 +75,13 @@ function forBranch(
   kind: JobKind,
   branch: Branch,
   title: string,
+  settings: Settings,
   run: (handle: RunHandle) => Promise<void>,
   doneWhen: () => boolean,
 ): JobSpec {
   return {
+    stage: 0,
+    reserve: toolsFor(kind, settings).length > 0 ? 2 : 1,
     id: jobId(kind, branch),
     kind,
     title,
@@ -102,6 +128,7 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
           'summarise',
           branch,
           `Reading what ${branch.name} is doing`,
+          settings,
           (handle) => summariseBranch(branch, settings, handle.sessionId),
           () => isSummarised(branch, settings),
         ),
@@ -117,6 +144,7 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
             'draft-vision',
             branch,
             `Working out what ${branch.name} is for`,
+            settings,
             (handle) => draftFor(branch, settings, handle.sessionId),
             () => isDescribed(branch),
           ),
@@ -132,6 +160,7 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
           'assess',
           branch,
           `Checking ${branch.name} against what it is for`,
+          settings,
           (handle) => assessFor(branch, snapshot, settings, handle),
           () => isAssessed(branch, settings),
         ),
@@ -140,11 +169,14 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
   }
 
   // The brief reads every branch, every vision and every verdict, so it is worth nothing
-  // until those have settled. Waiting for an empty board is what orders it.
-  if (jobs.length === 0 && !isBriefed(snapshot, settings)) {
+  // until those have settled — which is what stage 1 says, and why it is not a condition
+  // on deriving it at all.
+  if (!isBriefed(snapshot, settings)) {
     jobs.push({
+      stage: 1,
       // Keyed on what the brief would be written FROM, not on when: an unchanged fleet
       // derives the same id, and the moment anything moves it becomes a different job.
+      reserve: toolsFor('brief', settings).length > 0 ? 2 : 1,
       id: `brief:${briefKey(snapshot, settings)}`,
       kind: 'brief',
       title: 'Writing the brief',

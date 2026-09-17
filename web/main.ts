@@ -91,6 +91,19 @@ async function loadSnapshot(): Promise<void> {
 
 /** The server pushes; the page does not poll. Reconnects on its own if dropped. */
 function listen(): void {
+  // The clock on a working job counts up between events, and a job with no lookups sends
+  // none for a minute. One second of ticking, and only the panel that moves is redrawn —
+  // re-reading a hundred branches to advance a timer would be absurd.
+  setInterval(() => {
+    const snapshot = state.data?.snapshot;
+    if (!snapshot || floor(snapshot).working.length === 0) return;
+    try {
+      $('#floor').innerHTML = renderFloor(snapshot);
+    } catch {
+      // A tick must never be the thing that breaks the page.
+    }
+  }, 1000);
+
   const events = new EventSource('/api/events');
   events.addEventListener('snapshot', () => void loadSnapshot());
   events.addEventListener('state', () => void loadSnapshot());

@@ -281,9 +281,9 @@ Each step is useful alone and leaves the program working.
 
 | | Step | What lands | Needs |
 |---|---|---|---|
-| **1** | **The board and the dispatcher** | Jobs derived with stable ids and predicates; the two loops in `enrich`/`assist` become one dispatcher; done is *checked*; failures park; the declined-vision cost bug fixed | Nothing |
-| **2** | **The floor** | Jobs on the Snapshot; the count in the dateline; the floor panel; parked work joins *Waiting on you* | 1 |
-| **3** | **The tool layer** | `Tool` contract, the JSON-protocol loop, the free tools (`sibling_branches`, `what_changed`), a per-job tool budget, the disagreement counter | 1 |
+| **1** ✅ | **The board and the dispatcher** | Jobs derived with stable ids and predicates; the two loops in `enrich`/`assist` become one dispatcher; done is *checked*; failures park; the declined-vision cost bug fixed | Nothing |
+| **2** ✅ | **The floor** | Jobs on the Snapshot; the count in the dateline; the floor panel; parked work joins *Waiting on you* | 1 |
+| **3** ✅ | **The tool layer** | `Tool` contract, the JSON-protocol loop, the free tools (`sibling_branches`, `what_changed`), a per-job lookup budget, the disagreement counter — and `assess` wired to use them | 1 |
 | **4** | **Tools at the stations** | `repo_readme` + `commit_files` (new GitHub collection, cached); wired into draft-vision first, then assess, then summarise; tool list folded into each prompt version | 3, and `npm run probe` to pick native vs protocol |
 | **5** | **Dispatch** | `dispatch()` as an internal call, the dispatched lane, `data/dispatched.json`, reboot-on-start, "you asked for this" in the floor, the finished notice | 1, 2 |
 | **6** | **The desk** | The advisor may dispatch: reorganise the register, rank by your criteria, go and check something and come back with it on the page | 3, 4, 5 |
@@ -298,15 +298,21 @@ same keys (D39), so an unmoved fleet still spends nothing.
 
 Three things do change:
 
-- **Tools add calls within a job** — a draft that was one call becomes one call plus two or
-  three cheap reads and a second turn. Capped per job, and the cap is a setting.
+- **Tools add calls within a job** — an assessment that was one call becomes one call plus a
+  lookup or two and a second turn.
 - **The declined-vision fix removes a recurring cost** that has been running on every read.
   Probably a net saving on day one.
 - **`repo_readme` and `commit_files` are new GitHub calls**, both cached: the README once
   per repo forever, the file list once per SHA.
 
-`llmMaxPerRun` keeps meaning what it says: one budget for the whole read, spent across
-every station (fixed 17 Sep).
+**`llmMaxPerRun` now counts provider calls rather than jobs** (D75), because with lookups
+the two stopped being the same number and only one of them is what a bill is made of. A
+job is claimed only when the read can pay for it in full, so a small budget finishes half
+the work rather than starting all of it and finishing none.
+
+Measured on a four-branch fleet with a stub provider: **cold read** 15 calls (4 summaries,
+4 drafts, 3 assessments at 2 calls each, 1 brief); **unchanged fleet** 0; **one branch
+moved** 4. The economics of D39 survive tools intact.
 
 ## 10. What I would not build
 
@@ -328,8 +334,10 @@ a branch to be re-assessed while a routine assessment of it is in flight, the pr
 satisfied by the routine one and yours never runs. Assumed: a dispatched job **supersedes**
 the routine job for the same subject, because you asked for the fresher answer.
 
-**Q73 — What may one job spend?** Tool calls, tokens, seconds. Still the unanswered Q59 and
-Q54, and it now sets three caps rather than one. Assumed: **8 tool calls, 60s**.
+**Q73 — What may one job spend?** ✅ Built as **8 lookups and 60s**, both settings, on top of
+the read's own call budget which is the real ceiling (D75). Still worth your eye on the
+numbers: 8 is a ceiling rather than an expectation — with two tools available a job makes
+one or two.
 
 **Q74 — Does the floor show finished work, or only live work?** A rolling "last five things
 done" makes the room feel alive and gives the run log somewhere to be seen. It is also five

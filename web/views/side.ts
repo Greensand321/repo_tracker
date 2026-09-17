@@ -116,6 +116,8 @@ export function renderNotices(snapshot: Snapshot, response: { error: string | nu
  * "Nothing to do" is the most common state and the correct one, so it says that rather
  * than rendering an empty box that looks broken.
  */
+const MAX_PARKED_ROWS = 6;
+
 export function renderFloor(snapshot: Snapshot, now = new Date()): string {
   const board = floor(snapshot);
 
@@ -161,7 +163,9 @@ export function renderFloor(snapshot: Snapshot, now = new Date()): string {
     </div>`);
   }
 
-  for (const job of board.parked) {
+  // A provider outage can park a great many at once, and forty identical rows is a wall
+  // rather than a panel. The first few say what is wrong; the count says how wide it is.
+  for (const job of board.parked.slice(0, MAX_PARKED_ROWS)) {
     rows.push(`<div class="jrow bad">
       <span class="jglyph">&#9873;</span>
       <span class="jbody">
@@ -169,6 +173,13 @@ export function renderFloor(snapshot: Snapshot, now = new Date()): string {
         <span class="jmeta">${esc(job.error ?? 'failed twice')}</span>
       </span>
       <span class="jclock">parked</span>
+    </div>`);
+  }
+
+  if (board.parked.length > MAX_PARKED_ROWS) {
+    rows.push(`<div class="jrow bad">
+      <span class="jglyph">&#9873;</span>
+      <span class="jbody"><span class="jtitle dim">${plural(board.parked.length - MAX_PARKED_ROWS, 'more')} parked</span></span>
     </div>`);
   }
 

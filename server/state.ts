@@ -39,6 +39,29 @@ function announce(event: string): void {
   }
 }
 
+/**
+ * At most one snapshot announcement every {@link COALESCE_MS}, trailing edge.
+ *
+ * The page re-reads the whole snapshot on every announcement, and the board announces on
+ * every job claimed, every lookup started and finished, and every job done. Forty jobs
+ * with a couple of lookups each is several hundred full reads of a structure covering a
+ * hundred branches — for a panel whose smallest unit of meaning is "something moved".
+ *
+ * Trailing edge rather than leading, because the last state is the one that must be right;
+ * a quarter of a second late is imperceptible, and a missed final update is not.
+ */
+const COALESCE_MS = 300;
+let pending: NodeJS.Timeout | null = null;
+
+function announceSnapshot(): void {
+  if (pending) return;
+  pending = setTimeout(() => {
+    pending = null;
+    announce('snapshot');
+  }, COALESCE_MS);
+  pending.unref?.();
+}
+
 export function currentResponse(): SnapshotResponse {
   const settings = loadSettings();
   return {
@@ -115,7 +138,7 @@ async function workInBackground(target: Snapshot): Promise<void> {
   try {
     const announceIfCurrent = (): void => {
       // Only announce for the snapshot still on screen; a refresh may have replaced it.
-      if (snapshot === target) announce('snapshot');
+      if (snapshot === target) announceSnapshot();
     };
 
     const result = await runBoard(target, loadSettings(), announceIfCurrent);

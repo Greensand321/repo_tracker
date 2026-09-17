@@ -23,8 +23,15 @@ import { ToolError, type Tool, type ToolContext } from '../tools/types.ts';
 import { complete } from './client.ts';
 import { extractJson } from './prompt.ts';
 
-/** What the result of a tool may occupy in the next prompt. Beyond this it is cut. */
+/** What one result may occupy in the next prompt. Beyond this it is cut. */
 const MAX_RESULT_CHARS = 4000;
+
+/**
+ * And what all of them may occupy together. Eight results of four thousand characters is a
+ * prompt several times the size of the branch it is about — at which point the evidence is
+ * drowning the question. Past this, the worker is told to answer with what it has.
+ */
+const MAX_TRANSCRIPT_CHARS = 12_000;
 
 export type ToolUse = {
   name: string;
@@ -42,6 +49,21 @@ export type ConverseResult = {
   hitBudget: boolean;
 };
 
+/**
+ * Out of budget part-way through a conversation.
+ *
+ * Deliberately an error rather than a truncated answer: the station would otherwise write
+ * down whatever the half-finished exchange produced — an "unclear" verdict that looks like
+ * a judgement and is really an accounting limit. The job is simply not done, and the next
+ * read, with a fresh budget, does it properly.
+ */
+export class BudgetError extends Error {
+  constructor() {
+    super('the read ran out of budget part-way through');
+    this.name = 'BudgetError';
+  }
+}
+
 export type ConverseRequest = {
   system: string;
   user: string;
@@ -49,16 +71,20 @@ export type ConverseRequest = {
   ctx: ToolContext;
   sessionId: string;
   maxTokens?: number;
-  /** Called as each tool starts, so the floor can show what a worker is doing. */
-  onTool?: (name: string) => void;
+  /** The tool's name as it starts, then null as it ends. Drives the floor. */
+  onTool?: (name: string | null) => void;
+  /** Permission for one more provider call. Absent means unmetered (tests, one-offs). */
+  spend?: () => boolean;
 };
 
 export async function converse(settings: Settings, request: ConverseRequest): Promise<ConverseResult> {
   const uses: ToolUse[] = [];
 
-  // No tools is not a special case worth branching on elsewhere: it is one plain call,
-  // identical to what every station did before this file existed.
-  if (request.tools.length === 0) {
+  // No tools — or no lookups allowed, which is the same thing — is not a special case
+  // worth branching on elsewhere: it is one plain call, identical to what every station
+  // did before this file existed. Advertising tools that cannot be used would be worse
+  // than not having them: the model would spend its one reply asking for one.
+  if (request.tools.length === 0 || settings.toolCallsPerJob <= 0) {
     const text = await complete(settings, {
       system: request.system,
       user: request.user,
@@ -82,7 +108,11 @@ export async function converse(settings: Settings, request: ConverseRequest): Pr
   let hitBudget = false;
 
   for (let call = 0; ; call++) {
-    const last = call >= maxCalls || Date.now() >= deadline;
+    // The first call was paid for when the job was claimed; every turn after it asks.
+    if (call > 0 && request.spend && !request.spend()) throw new BudgetError();
+
+    const written = transcript.reduce((n, entry) => n + entry.length, 0);
+    const last = call >= maxCalls || Date.now() >= deadline || written >= MAX_TRANSCRIPT_CHARS;
     const user = [
       request.user,
       ...transcript,
@@ -98,15 +128,17 @@ export async function converse(settings: Settings, request: ConverseRequest): Pr
       ...(request.maxTokens ? { maxTokens: request.maxTokens } : {}),
     });
 
+    hitBudget = hitBudget || last;
     const wanted = readToolCall(raw);
     if (!wanted) return { text: raw, uses, hitBudget };
 
     if (last) {
-      // It asked for another lookup with nothing left to spend. Its last reply is the
-      // answer we have to work with, and the station's parser will say so honestly if it
-      // is not usable. Better that than an unbounded loop.
-      hitBudget = true;
-      return { text: raw, uses, hitBudget };
+      // Told to answer, and it asked for another lookup instead. Handing this back would
+      // have the station parse a tool call as a verdict: "unclear", with no reason, cached
+      // and shown as though it were a judgement. A job that did not answer did not answer.
+      throw new Error(
+        `it asked to look things up ${uses.length + 1} times and never answered`,
+      );
     }
 
     const tool = byName.get(wanted.name);
@@ -131,6 +163,8 @@ export async function converse(settings: Settings, request: ConverseRequest): Pr
           err instanceof ToolError
             ? `That call failed: ${err.message}`
             : `That call failed: ${err instanceof Error ? err.message : String(err)}`;
+      } finally {
+        request.onTool?.(null);
       }
     }
 

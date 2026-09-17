@@ -273,6 +273,8 @@ a:hover { color: var(--text-hi); }
    small grey line under it (rule 3). Teal marks live work — the same teal the "happening
    now" band uses, and the only place it appears in this column. */
 
+.looked { font-family: var(--mono); font-size: 9.5px; color: var(--faint); white-space: nowrap; }
+
 .jrow {
   display: flex; align-items: baseline; gap: 9px;
   padding: 6px 0; border-bottom: 1px solid var(--line);

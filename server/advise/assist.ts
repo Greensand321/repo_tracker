@@ -15,6 +15,7 @@ import { join } from 'node:path';
 
 import { type Assessment, type Branch, type BranchRef, type Settings, type Snapshot } from '../../shared/types.ts';
 import { DATA_DIR, ensureDirs } from '../paths.ts';
+import { toSafe } from '../settings.ts';
 import {
   applyVisions,
   getAssessment,
@@ -150,14 +151,18 @@ export async function assessFor(
   const verdict = await assessBranch(branch, vision.text, settings, {
     sessionId: handle.sessionId,
     // The worker's whole world: the fleet it can look at, and the one branch it is about.
-    ctx: { snapshot, settings, branch, now: new Date() },
+    // `toSafe` is not decoration — a tool's output lands in a prompt, so it is never given
+    // the GitHub token or the provider key to put there.
+    ctx: { snapshot, settings: toSafe(settings), branch, now: new Date() },
     onTool: handle.onTool,
+    spend: handle.spend,
   });
   const assessment: Assessment = {
     verdict: verdict.verdict,
     because: verdict.because,
     evidence: verdict.evidence,
     overtakenBy: null,
+    looked: verdict.looked,
     model: settings.llmModel,
     promptVersion: assessVersion(settings),
     generatedAt: new Date().toISOString(),

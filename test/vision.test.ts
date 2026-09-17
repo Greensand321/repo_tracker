@@ -97,7 +97,7 @@ test('confirming keeps the words, so the assessment drawn against them survives'
   store.clearVision(REF);
   store.setVision(REF, 'Build the broadsheet', 'proposed');
   store.putAssessment(REF, {
-    verdict: 'on-track', because: 'it is', evidence: [], overtakenBy: null,
+    verdict: 'on-track', because: 'it is', evidence: [], overtakenBy: null, looked: [],
     model: 'test-model', promptVersion: 'v1', generatedAt: '', headSha: 'head1',
     visionText: 'Build the broadsheet',
   });
@@ -115,7 +115,7 @@ test('rewriting the vision throws away the assessment drawn against the old one'
   store.clearVision(REF);
   store.setVision(REF, 'Build the broadsheet', 'proposed');
   store.putAssessment(REF, {
-    verdict: 'on-track', because: 'it is', evidence: [], overtakenBy: null,
+    verdict: 'on-track', because: 'it is', evidence: [], overtakenBy: null, looked: [],
     model: 'test-model', promptVersion: 'v1', generatedAt: '', headSha: 'head1',
     visionText: 'Build the broadsheet',
   });
@@ -133,7 +133,7 @@ test('an assessment of a head you have moved past is not served', () => {
   store.clearVision(REF);
   store.setVision(REF, 'A vision', 'yours');
   store.putAssessment(REF, {
-    verdict: 'done', because: '', evidence: [], overtakenBy: null,
+    verdict: 'done', because: '', evidence: [], overtakenBy: null, looked: [],
     model: 'test-model', promptVersion: 'v1', generatedAt: '', headSha: 'old',
     visionText: 'A vision',
   });
@@ -144,7 +144,7 @@ test('applyVisions drops an assessment that no longer matches, rather than showi
   store.clearVision(REF);
   store.setVision(REF, 'A vision', 'yours');
   store.putAssessment(REF, {
-    verdict: 'done', because: '', evidence: [], overtakenBy: null,
+    verdict: 'done', because: '', evidence: [], overtakenBy: null, looked: [],
     model: 'test-model', promptVersion: 'v1', generatedAt: '', headSha: 'old',
     visionText: 'A vision',
   });
@@ -325,7 +325,7 @@ test('the brief cache key is stable when nothing has changed', () => {
 const proposed = { text: 'A guess', state: 'proposed' as const, from: '', draftedAt: null, createdAt: '', updatedAt: '' };
 const mine = { text: 'Mine', state: 'yours' as const, from: '', draftedAt: null, createdAt: '', updatedAt: '' };
 const drifted = {
-  verdict: 'drifted' as const, because: 'doing something else', evidence: [], overtakenBy: null,
+  verdict: 'drifted' as const, because: 'doing something else', evidence: [], overtakenBy: null, looked: [],
   model: 'm', promptVersion: 'v1', generatedAt: '', headSha: 'aaaaaaa1111', visionText: 'Mine',
 };
 

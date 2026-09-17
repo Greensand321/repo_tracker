@@ -61,12 +61,16 @@ const snapshot = (branches: Branch[]): Snapshot => ({
   brief: null, work: { jobs: [], workers: 2 }, llm: { enabled: true, pending: 0, errors: [] },
 });
 
-const ctx = (branches: Branch[], subject: Branch | null, over: Partial<Settings> = {}) => ({
-  snapshot: snapshot(branches),
-  settings: settings(over),
-  branch: subject,
-  now: new Date('2026-09-17T12:00:00Z'),
-});
+const ctx = (branches: Branch[], subject: Branch | null, over: Partial<Settings> = {}) => {
+  // A tool is handed SafeSettings, never Settings: it cannot leak a token it never had.
+  const { token: _t, llmApiKey: _k, ...safe } = settings(over);
+  return {
+    snapshot: snapshot(branches),
+    settings: { ...safe, hasToken: true, hasLlmKey: true },
+    branch: subject,
+    now: new Date('2026-09-17T12:00:00Z'),
+  };
+};
 
 /** Replies in order, then repeats the last one. Records what it was asked. */
 function scripted(replies: string[]): { asks: string[] } {
@@ -128,15 +132,16 @@ test('with no tools it is exactly one plain call', async () => {
 test('a model that only ever asks for tools still terminates, at the budget', async () => {
   // The worst case, and the one that has to be impossible: it never answers.
   const asks = scripted(['{"tool":"sibling_branches","args":{}}']);
-  const result = await converse.converse(settings({ toolCallsPerJob: 3 }), {
-    system: 'sys', user: 'usr', tools: [free.siblingBranches],
-    ctx: ctx([branch('a'), branch('b')], branch('a')), sessionId: 's',
-  });
+  await assert.rejects(
+    () => converse.converse(settings({ toolCallsPerJob: 3 }), {
+      system: 'sys', user: 'usr', tools: [free.siblingBranches],
+      ctx: ctx([branch('a'), branch('b')], branch('a')), sessionId: 's',
+    }),
+    /never answered/,
+  );
 
-  assert.equal(result.hitBudget, true);
-  assert.equal(result.uses.length, 3, 'three lookups, no more');
-  assert.equal(asks.asks.length, 4, 'and one last turn to answer in');
-  assert.match(asks.asks[3]!, /no lookups left/);
+  assert.equal(asks.asks.length, 4, 'three lookups, then one last turn to answer in');
+  assert.match(asks.asks[3]!, /no lookups left/, 'and it was told so');
 });
 
 test('the same call twice is answered from what we already have', async () => {
@@ -197,15 +202,15 @@ test('a tool result too large to send is cut rather than blowing the prompt', as
   assert.match(result.uses[0]!.result, /cut/);
 });
 
-test('the clock ends it even when the budget has not', async () => {
-  scripted(['{"tool":"sibling_branches","args":{}}']);
+test('the clock ends it even when the lookup budget has not', async () => {
+  // Nothing sleeps here, so a deadline already in the past stands in for a slow provider.
+  scripted(['{"tool":"sibling_branches","args":{}}', FINAL]);
   const result = await converse.converse(settings({ toolCallsPerJob: 20, toolSeconds: 5 }), {
     system: 'sys', user: 'usr', tools: [free.siblingBranches],
     ctx: ctx([branch('a'), branch('b')], branch('a')), sessionId: 's',
   });
-  // Nothing sleeps here, so this passes on the budget; the point is that both are checked
-  // on the same line and neither can be reached alone.
-  assert.equal(result.hitBudget, true);
+  assert.equal(result.uses.length, 1, 'it did get one lookup');
+  assert.equal(result.text, FINAL);
 });
 
 test('what the model sends is never trusted, arguments included', () => {
@@ -309,4 +314,56 @@ test('a station with no tools has an empty tag, and one with tools does not', ()
     catalog.toolSetTag([free.whatChanged, free.siblingBranches]),
     'the order they are listed in is not a change',
   );
+});
+
+test('a tool is never handed a secret', async () => {
+  // Its output goes straight into a prompt that goes straight to a provider, so the type
+  // itself refuses: ToolContext carries SafeSettings, which has neither credential.
+  const seen = ctx([branch('a')], branch('a'));
+  assert.equal('token' in seen.settings, false);
+  assert.equal('llmApiKey' in seen.settings, false);
+
+  const fs = await import('node:fs');
+  for (const file of fs.readdirSync(new URL('../server/tools/', import.meta.url))) {
+    const src = fs.readFileSync(new URL(file, new URL('../server/tools/', import.meta.url)), 'utf8');
+    assert.doesNotMatch(src, /settings\.token|llmApiKey/, `${file} must not reach for a credential`);
+    assert.doesNotMatch(src, /writeFileSync|appendFileSync|execSync|spawn/, `${file} must not write anything`);
+  }
+});
+
+test('a model that never answers fails the job rather than writing a junk verdict', async () => {
+  // It used to hand the last tool call back as the answer. The station parsed it into a
+  // verdict of "unclear" with no reason, and cached it — an accounting limit dressed up
+  // as a judgement.
+  scripted(['{"tool":"sibling_branches","args":{}}']);
+  await assert.rejects(
+    () => converse.converse(settings({ toolCallsPerJob: 2 }), {
+      system: 'sys', user: 'usr', tools: [free.siblingBranches],
+      ctx: ctx([branch('a'), branch('b')], branch('a')), sessionId: 's',
+    }),
+    /never answered/,
+  );
+});
+
+test('running out of budget mid-conversation is not a verdict either', async () => {
+  scripted(['{"tool":"sibling_branches","args":{}}', FINAL]);
+  await assert.rejects(
+    () => converse.converse(settings(), {
+      system: 'sys', user: 'usr', tools: [free.siblingBranches],
+      ctx: ctx([branch('a'), branch('b')], branch('a')), sessionId: 's',
+      spend: () => false,
+    }),
+    (err: Error) => err.name === 'BudgetError',
+  );
+});
+
+test('it says so when it was pushed to answer, and the answer still counts', async () => {
+  scripted(['{"tool":"sibling_branches","args":{}}', FINAL]);
+  const result = await converse.converse(settings({ toolCallsPerJob: 1 }), {
+    system: 'sys', user: 'usr', tools: [free.siblingBranches],
+    ctx: ctx([branch('a'), branch('b')], branch('a')), sessionId: 's',
+  });
+  assert.equal(result.text, FINAL);
+  assert.equal(result.hitBudget, true);
+  assert.equal(result.uses.length, 1);
 });

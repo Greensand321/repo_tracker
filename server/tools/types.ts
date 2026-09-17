@@ -16,9 +16,11 @@
  *
  *   **A tool says what it costs, in its own description.** Models respect that when you
  *   tell them, and it is the cheapest steering available.
+ *
+ *   **A tool never sees a secret.** Its context carries `SafeSettings`, not `Settings`.
  */
 
-import type { Branch, Settings, Snapshot } from '../../shared/types.ts';
+import type { Branch, SafeSettings, Snapshot } from '../../shared/types.ts';
 
 /**
  * A failure the model is meant to see and recover from — "no such branch", "that is not a
@@ -33,9 +35,18 @@ export class ToolError extends Error {
   }
 }
 
+/**
+ * Everything a tool may see — and deliberately **not** the settings, which hold the GitHub
+ * token and the provider key. `SafeSettings` is the same object with both removed; it is
+ * what the browser is allowed to know, and a tool is no more entitled than the browser.
+ *
+ * A tool cannot leak what it cannot see, and a tool's output goes straight into a prompt
+ * that goes straight to a provider. When a tool eventually needs GitHub (step 4), it gets
+ * a narrow reader passed to it, never the credentials to make its own calls.
+ */
 export type ToolContext = {
   snapshot: Snapshot;
-  settings: Settings;
+  settings: SafeSettings;
   /** The branch this job is about, when it is about one. Null for fleet-level work. */
   branch: Branch | null;
   now: Date;

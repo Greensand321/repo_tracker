@@ -149,8 +149,10 @@
         </div>
       </div>
       <div>
-        <label for="llmMaxPerRun">Max summaries per read</label>
+        <label for="llmMaxPerRun">Provider calls per read</label>
         <input id="llmMaxPerRun" type="number" min="0" max="500">
+        <div class="hint">The whole read, every job and every lookup. Work left over waits
+          for the next one.</div>
       </div>
       <div>
         <label for="askBranchCap">Branches per question</label>
