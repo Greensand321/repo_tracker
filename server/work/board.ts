@@ -30,6 +30,7 @@ import {
 } from '../advise/assist.ts';
 import { briefKey, worthAVision } from '../advise/brief.ts';
 import { isSummarised, llmReady, summariseBranch, worthSummarising } from '../advise/enrich.ts';
+import type { RunHandle } from './handle.ts';
 
 /**
  * A job, plus the two things only the server may hold: how to do it, and how to tell
@@ -41,7 +42,7 @@ export type JobSpec = Job & {
    * it, and never in place of it (D69). Free: it reads the same stores the cache reads.
    */
   doneWhen(): boolean;
-  run(sessionId: string): Promise<void>;
+  run(handle: RunHandle): Promise<void>;
 };
 
 const jobId = (kind: JobKind, branch: Branch): string =>
@@ -51,7 +52,7 @@ function forBranch(
   kind: JobKind,
   branch: Branch,
   title: string,
-  run: (sessionId: string) => Promise<void>,
+  run: (handle: RunHandle) => Promise<void>,
   doneWhen: () => boolean,
 ): JobSpec {
   return {
@@ -63,6 +64,8 @@ function forBranch(
     state: 'waiting',
     startedAt: null,
     attempts: 0,
+    toolCalls: 0,
+    doing: null,
     error: null,
     run,
     doneWhen,
@@ -99,7 +102,7 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
           'summarise',
           branch,
           `Reading what ${branch.name} is doing`,
-          (session) => summariseBranch(branch, settings, session),
+          (handle) => summariseBranch(branch, settings, handle.sessionId),
           () => isSummarised(branch, settings),
         ),
       );
@@ -114,7 +117,7 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
             'draft-vision',
             branch,
             `Working out what ${branch.name} is for`,
-            (session) => draftFor(branch, settings, session),
+            (handle) => draftFor(branch, settings, handle.sessionId),
             () => isDescribed(branch),
           ),
         );
@@ -129,7 +132,7 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
           'assess',
           branch,
           `Checking ${branch.name} against what it is for`,
-          (session) => assessFor(branch, settings, session),
+          (handle) => assessFor(branch, snapshot, settings, handle),
           () => isAssessed(branch, settings),
         ),
       );
@@ -150,8 +153,10 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
       state: 'waiting',
       startedAt: null,
       attempts: 0,
+      toolCalls: 0,
+      doing: null,
       error: null,
-      run: (session) => writeTheBrief(snapshot, settings, session),
+      run: (handle) => writeTheBrief(snapshot, settings, handle.sessionId),
       doneWhen: () => isBriefed(snapshot, settings),
     });
   }

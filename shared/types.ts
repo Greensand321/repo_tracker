@@ -199,6 +199,10 @@ export type Job = {
   state: JobState;
   startedAt: string | null;
   attempts: number;
+  /** Lookups this job has made. On screen, so "what is it doing" has a real answer. */
+  toolCalls: number;
+  /** The tool it is running right now, if any. */
+  doing: string | null;
   /** Set when parked: what it tried and what came back. */
   error: string | null;
 };
@@ -334,6 +338,18 @@ export type Settings = {
   /** How many questions may be waiting at once. A wall of them is a chore list, not help. */
   maxOpenQuestions: number;
   /**
+   * Whether a station may look things up before answering (workroom step 3).
+   *
+   * Off is a real setting, not a panic button: it costs you evidence and saves you calls,
+   * and every answer stays correct either way. Switching it changes what each station can
+   * see, so the answers it already wrote are regenerated (D74) — one cheap pass.
+   */
+  toolsEnabled: boolean;
+  /** Lookups one job may make. The ceiling, not the expectation: two tools rarely need 8. */
+  toolCallsPerJob: number;
+  /** And a clock, because a cheap tool can still be asked for forty times slowly. */
+  toolSeconds: number;
+  /**
    * How many routine jobs run at once (D71). Small on purpose: the only real burst is the
    * first import, after which the fleet moves every few minutes and this has all night.
    * More workers make a runaway bill arrive faster, not later.
@@ -361,6 +377,9 @@ export const DEFAULT_SETTINGS: Settings = {
   askBranchCap: 60,
   visionAutoDraft: true,
   maxOpenQuestions: 3,
+  toolsEnabled: true,
+  toolCallsPerJob: 8,
+  toolSeconds: 60,
   workers: 2,
 };
 

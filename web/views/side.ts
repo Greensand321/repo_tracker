@@ -17,6 +17,7 @@ import {
   questions,
   tallies,
   threads,
+  toolLabel,
   type Question,
 } from '../derive.ts';
 import { branchKey, shortRepo } from './leader.ts';
@@ -129,11 +130,19 @@ export function renderFloor(snapshot: Snapshot, now = new Date()): string {
   const rows: string[] = [];
 
   for (const job of board.working) {
+    // What it is doing right now beats what kind of job it is: "reading the branches next
+    // to it" is the answer to the question the panel exists to answer.
+    const meta = [
+      job.doing ? toolLabel(job.doing) : jobKindLabel(job.kind),
+      job.toolCalls > 0 && !job.doing ? plural(job.toolCalls, 'lookup') : '',
+      job.origin === 'dispatched' ? 'you asked for this' : '',
+    ].filter(Boolean);
+
     rows.push(`<div class="jrow live">
       <span class="jglyph">&#9670;</span>
       <span class="jbody">
         <span class="jtitle">${esc(job.title)}</span>
-        <span class="jmeta">${esc(jobKindLabel(job.kind))}${job.origin === 'dispatched' ? ' · you asked for this' : ''}</span>
+        <span class="jmeta">${esc(meta.join(' \u00b7 '))}</span>
       </span>
       <span class="jclock">${esc(elapsed(job.startedAt, now))}</span>
     </div>`);

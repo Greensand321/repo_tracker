@@ -196,6 +196,18 @@ export function floor(snapshot: Snapshot): Floor {
 }
 
 /**
+ * What a worker is doing this second, in the owner's language.
+ *
+ * Tool names are for the model; this line is for you. An unknown name falls back to
+ * itself rather than to nothing — a new tool should look odd on screen, not invisible.
+ */
+export const toolLabel = (name: string): string =>
+  ({
+    sibling_branches: 'reading the branches next to it',
+    what_changed: 'reading what changed lately',
+  })[name] ?? `using ${name}`;
+
+/**
  * The job kind in the owner's language, for the small grey line under the title.
  *
  * The headline is the job's own `title` — "Reading what claude/foo is doing" — because

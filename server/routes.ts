@@ -77,6 +77,8 @@ api.put('/settings', async (c) => {
     'askBranchCap',
     'maxOpenQuestions',
     'workers',
+    'toolCallsPerJob',
+    'toolSeconds',
   ] as const) {
     if (body[key] !== undefined) patch[key] = Number(body[key]);
   }
@@ -85,6 +87,7 @@ api.put('/settings', async (c) => {
   }
   if (typeof body.llmEnabled === 'boolean') patch.llmEnabled = body.llmEnabled;
   if (typeof body.visionAutoDraft === 'boolean') patch.visionAutoDraft = body.visionAutoDraft;
+  if (typeof body.toolsEnabled === 'boolean') patch.toolsEnabled = body.toolsEnabled;
   if (typeof body.llmApiKey === 'string' && body.llmApiKey.trim()) {
     patch.llmApiKey = body.llmApiKey.trim();
   }

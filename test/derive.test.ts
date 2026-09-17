@@ -274,6 +274,8 @@ const job = (over: Partial<Job> = {}): Job => ({
   state: 'waiting',
   startedAt: null,
   attempts: 0,
+  toolCalls: 0,
+  doing: null,
   error: null,
   ...over,
 });

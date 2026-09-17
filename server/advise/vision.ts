@@ -10,13 +10,26 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { refKey, type Branch, type BranchRef, type Verdict } from '../../shared/types.ts';
+import { refKey, type Branch, type BranchRef, type Settings, type Verdict } from '../../shared/types.ts';
+import { toolSetTag, toolsFor } from '../tools/catalog.ts';
+import type { ToolContext } from '../tools/types.ts';
 import { complete } from './client.ts';
+import { converse } from './converse.ts';
 import { extractJson, shortSha, validEvidence } from './prompt.ts';
 
 /** Part of every assessment cache key: bumping it re-judges everything rather than
  *  leaving a silent mix of old reasoning and new. */
 export const VISION_PROMPT_VERSION = 'v1';
+
+/**
+ * The version an assessment is cached under, **including the tools the station had**
+ * (D74). An assessment written with the fleet in view is a different thing from one
+ * written from commit subjects alone, and the store must not hold both under one key with
+ * no way to tell them apart.
+ */
+export function assessVersion(settings: Settings): string {
+  return VISION_PROMPT_VERSION + toolSetTag(toolsFor('assess', settings));
+}
 
 const VERDICTS: Verdict[] = ['on-track', 'drifted', 'done', 'overtaken', 'unclear'];
 
@@ -114,26 +127,59 @@ Rules:
 Reply with ONLY a JSON object, no prose, no markdown fence:
 {"verdict": "on-track|drifted|done|unclear", "because": "...", "evidence": ["sha", ...]}`;
 
-export type AssessResult = { verdict: Verdict; because: string; evidence: string[] };
+export type AssessResult = {
+  verdict: Verdict;
+  because: string;
+  evidence: string[];
+  /** What it looked up to decide, so a wrong verdict is debuggable rather than mysterious. */
+  looked: string[];
+};
 
+/**
+ * The one station with tools so far, and the reason is its verdicts.
+ *
+ * *Drifted* is a claim about intent, and the fleet-level *overtaken* it feeds is a claim
+ * that another branch got there first — neither is knowable from one branch's commit
+ * subjects. `sibling_branches` is what that actually needs; `what_changed` is what tells a
+ * stall from a pause. Without them the honest answer to most of this is "unclear", which
+ * is what it has been returning.
+ */
 export async function assessBranch(
   branch: Branch,
   visionText: string,
-  settings: Parameters<typeof complete>[0],
-  sessionId?: string,
+  settings: Settings,
+  options: { sessionId?: string; ctx?: ToolContext; onTool?: (name: string) => void } = {},
 ): Promise<AssessResult> {
-  const raw = await complete(settings, {
+  const tools = options.ctx ? toolsFor('assess', settings) : [];
+  const user = `It is FOR: ${visionText}\n\n${describeBranch(branch)}`;
+  const sessionId = options.sessionId ?? randomUUID();
+
+  if (tools.length === 0 || !options.ctx) {
+    const raw = await complete(settings, { system: ASSESS_SYSTEM, user, maxTokens: 350, sessionId });
+    return parseAssessment(raw, branch);
+  }
+
+  const result = await converse(settings, {
     system: ASSESS_SYSTEM,
-    user: `It is FOR: ${visionText}\n\n${describeBranch(branch)}`,
+    user,
+    tools,
+    ctx: options.ctx,
+    sessionId,
     maxTokens: 350,
-    ...(sessionId ? { sessionId } : {}),
+    ...(options.onTool ? { onTool: options.onTool } : {}),
   });
-  return parseAssessment(raw, branch);
+
+  return {
+    ...parseAssessment(result.text, branch),
+    looked: result.uses.map((use) => use.name),
+  };
 }
 
 export function parseAssessment(raw: string, branch: Branch): AssessResult {
   const json = extractJson(raw);
-  if (!json) return { verdict: 'unclear', because: 'the model did not reply with JSON', evidence: [] };
+  if (!json) {
+    return { verdict: 'unclear', because: 'the model did not reply with JSON', evidence: [], looked: [] };
+  }
   try {
     const parsed = JSON.parse(json) as { verdict?: unknown; because?: unknown; evidence?: unknown };
     const verdict = VERDICTS.includes(parsed.verdict as Verdict) ? (parsed.verdict as Verdict) : 'unclear';
@@ -144,9 +190,10 @@ export function parseAssessment(raw: string, branch: Branch): AssessResult {
       verdict: safe,
       because: typeof parsed.because === 'string' ? parsed.because.trim() : '',
       evidence: validEvidence(parsed.evidence, branch),
+      looked: [],
     };
   } catch {
-    return { verdict: 'unclear', because: 'the model’s reply was not valid JSON', evidence: [] };
+    return { verdict: 'unclear', because: 'the model’s reply was not valid JSON', evidence: [], looked: [] };
   }
 }
 

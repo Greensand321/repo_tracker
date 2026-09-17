@@ -673,6 +673,8 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#askBranchCap').value = String(settings.askBranchCap);
     $<HTMLInputElement>('#maxOpenQuestions').value = String(settings.maxOpenQuestions);
     $<HTMLInputElement>('#workers').value = String(settings.workers);
+    $<HTMLInputElement>('#toolCallsPerJob').value = String(settings.toolCallsPerJob);
+    $<HTMLInputElement>('#toolsEnabled').checked = settings.toolsEnabled;
     $<HTMLInputElement>('#visionAutoDraft').checked = settings.visionAutoDraft;
     state.maxQuestions = settings.maxOpenQuestions;
     $<HTMLInputElement>('#token').value = '';
@@ -721,6 +723,8 @@ async function saveSettings(): Promise<void> {
       askBranchCap: Number($<HTMLInputElement>('#askBranchCap').value),
       maxOpenQuestions: Number($<HTMLInputElement>('#maxOpenQuestions').value),
       workers: Number($<HTMLInputElement>('#workers').value),
+      toolCallsPerJob: Number($<HTMLInputElement>('#toolCallsPerJob').value),
+      toolsEnabled: $<HTMLInputElement>('#toolsEnabled').checked,
       visionAutoDraft: $<HTMLInputElement>('#visionAutoDraft').checked,
       llmBaseUrl: $<HTMLInputElement>('#llmBaseUrl').value.trim(),
       llmModel: ensureModelPicker().getValue(),

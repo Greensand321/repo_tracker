@@ -251,7 +251,8 @@ test('done is checked against the snapshot, not taken on the worker\'s word', as
   const liar = () => [{
     id: 'liar:1', kind: 'summarise' as const, title: 'Pretending to work',
     subject: { kind: 'branch' as const, repoKey: 'o/r', branch: 'a' },
-    origin: 'routine' as const, state: 'waiting' as const, startedAt: null, attempts: 0, error: null,
+    origin: 'routine' as const, state: 'waiting' as const, startedAt: null, attempts: 0,
+    toolCalls: 0, doing: null, error: null,
     run: async () => { ran++; },
     doneWhen: () => false,
   }];
@@ -362,4 +363,79 @@ test('the free pass fills the board before anything is spent', () => {
   assert.equal(snap.work.jobs.length, 2);
   assert.equal(snap.work.workers, 3);
   assert.ok(snap.work.jobs.every((j) => j.state === 'waiting'));
+});
+
+// ---------------------------------------------------------------------------
+// Tools, end to end: board → dispatcher → station → tool → the floor
+// ---------------------------------------------------------------------------
+
+test('an assessment can look things up, and the floor sees it happen', async () => {
+  const config = settings({ visionAutoDraft: false, toolsEnabled: true });
+  const subject = branch('a');
+  const other = branch('b');
+
+  // The owner said what it is for, so the assess job is derivable.
+  vision.setVision({ repoKey: 'o/r', branch: 'a' }, 'Replace the picker with a searchable one', 'yours');
+
+  const bodies: string[] = [];
+  let turn = 0;
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    bodies.push(String(init?.body ?? ''));
+    const content = turn++ === 0
+      ? '{"tool":"sibling_branches","args":{"limit":3}}'
+      : '{"verdict":"drifted","because":"b already did it","evidence":[]}';
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
+  }) as typeof fetch;
+
+  const snap = snapshot([subject, other]);
+  enrich.applyCached(snap, config);
+  assist.applyAssist(snap, config);
+
+  // Only the assess job: summaries are off and the brief is not what is being tested.
+  const onlyAssess = (s: Snapshot, c: Settings) =>
+    board.deriveBoard(s, c).filter((j) => j.kind === 'assess');
+  assert.equal(onlyAssess(snap, config).length, 1, 'one branch with a vision and no assessment');
+
+  const seen: { doing: string | null; toolCalls: number }[] = [];
+  const result = await work.runBoard(snap, config, () => {
+    for (const job of snap.work.jobs) {
+      if (job.state === 'working') seen.push({ doing: job.doing, toolCalls: job.toolCalls });
+    }
+  }, onlyAssess);
+
+  assert.equal(result.done, 1);
+  assert.equal(snap.branches[0]!.assessment?.verdict, 'drifted');
+  assert.ok(
+    seen.some((s) => s.doing === 'sibling_branches' && s.toolCalls === 1),
+    `the floor should have shown the lookup: ${JSON.stringify(seen)}`,
+  );
+  assert.match(bodies[1]!, /o\/r b/, 'the sibling really was read and sent back');
+});
+
+test('the same assessment is not re-paid when tools are left alone', async () => {
+  const config = settings({ visionAutoDraft: false, toolsEnabled: true });
+  const subject = branch('a');
+  vision.setVision({ repoKey: 'o/r', branch: 'a' }, 'Replace the picker', 'yours');
+
+  const calls = stubProvider({ choices: [{ message: { content: '{"verdict":"on-track","because":"yes","evidence":[]}' } }] });
+
+  const first = snapshot([subject]);
+  enrich.applyCached(first, config);
+  assist.applyAssist(first, config);
+  await work.runBoard(first, config, undefined, (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'assess'));
+  assert.equal(calls.calls, 1);
+
+  const again = snapshot([branch('a')]);
+  enrich.applyCached(again, config);
+  assist.applyAssist(again, config);
+  assert.equal(again.branches[0]!.assessment?.verdict, 'on-track', 'served from disk, free');
+  await work.runBoard(again, config, undefined, (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'assess'));
+  assert.equal(calls.calls, 1, 'nothing moved, nothing spent');
+
+  // But turning tools off makes it a different question, drawn from different evidence.
+  const off = { ...config, toolsEnabled: false };
+  const third = snapshot([branch('a')]);
+  enrich.applyCached(third, off);
+  assist.applyAssist(third, off);
+  assert.equal(third.branches[0]!.assessment, null, 'the stored one was written with tools');
 });

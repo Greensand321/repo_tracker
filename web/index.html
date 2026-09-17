@@ -167,6 +167,11 @@
         <input id="workers" type="number" min="1" max="8">
         <div class="hint">How many the assistant works on in parallel. Watch it on The floor.</div>
       </div>
+      <div>
+        <label for="toolCallsPerJob">Lookups per job</label>
+        <input id="toolCallsPerJob" type="number" min="0" max="20">
+        <div class="hint">A ceiling, not a target. 0 is the same as turning lookups off.</div>
+      </div>
     </div>
 
     <label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--body);font-weight:400">
@@ -176,6 +181,17 @@
     <div class="hint">It only proposes when it can be specific — a purpose nothing could
       contradict is worthless as a yardstick, so it says nothing rather than padding.
       Proposals are always marked until you confirm them.</div>
+
+    <label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--body);font-weight:400">
+      <input id="toolsEnabled" type="checkbox" style="width:auto">
+      Let it look things up before answering
+    </label>
+    <div class="hint">When it judges a branch against what the branch is for, it can read the
+      branches next to it and how things moved this week — instead of inferring both from
+      commit messages. It costs a call or two more per branch, and it is what turns
+      “drifted” and “already done elsewhere” from a hunch into a finding.
+      Switching this regenerates those judgements, because they were drawn from different
+      evidence.</div>
 
     <div class="err" id="settingsErr"></div>
     <div class="actions">

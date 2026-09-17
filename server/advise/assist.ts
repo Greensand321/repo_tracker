@@ -23,8 +23,9 @@ import {
   setVision,
   wasDeclined,
 } from '../vision.ts';
+import type { RunHandle } from '../work/handle.ts';
 import { BRIEF_PROMPT_VERSION, briefKey, writeBrief, type BriefResult } from './brief.ts';
-import { VISION_PROMPT_VERSION, assessBranch, draftVision } from './vision.ts';
+import { VISION_PROMPT_VERSION, assessBranch, assessVersion, draftVision } from './vision.ts';
 
 // ---------------------------------------------------------------------------
 // The fleet-level store: one brief, its judgements, its overtaken findings
@@ -71,7 +72,9 @@ export function resetAssistCache(): void {
  * No network, no cost, no waiting. Called beside `applyCached` and `applyGoals`.
  */
 export function applyAssist(snapshot: Snapshot, settings: Settings): void {
-  applyVisions(snapshot, VISION_PROMPT_VERSION, settings.llmModel);
+  // The version carries the station's tool set (D74): turning tools on or off makes every
+  // stored assessment stale, because it was drawn from different evidence.
+  applyVisions(snapshot, assessVersion(settings), settings.llmModel);
 
   const stored = loadStored();
   if (!stored || stored.key !== briefKey(snapshot, settings)) {
@@ -134,19 +137,29 @@ export function isDescribed(branch: Branch): boolean {
 // Station: compare a vision against what the branch actually did
 // ---------------------------------------------------------------------------
 
-export async function assessFor(branch: Branch, settings: Settings, sessionId: string): Promise<void> {
+export async function assessFor(
+  branch: Branch,
+  snapshot: Snapshot,
+  settings: Settings,
+  handle: RunHandle,
+): Promise<void> {
   const ref: BranchRef = { repoKey: branch.repoKey, branch: branch.name };
   const vision = branch.vision;
   if (!vision) return;
 
-  const verdict = await assessBranch(branch, vision.text, settings, sessionId);
+  const verdict = await assessBranch(branch, vision.text, settings, {
+    sessionId: handle.sessionId,
+    // The worker's whole world: the fleet it can look at, and the one branch it is about.
+    ctx: { snapshot, settings, branch, now: new Date() },
+    onTool: handle.onTool,
+  });
   const assessment: Assessment = {
     verdict: verdict.verdict,
     because: verdict.because,
     evidence: verdict.evidence,
     overtakenBy: null,
     model: settings.llmModel,
-    promptVersion: VISION_PROMPT_VERSION,
+    promptVersion: assessVersion(settings),
     generatedAt: new Date().toISOString(),
     headSha: branch.headSha,
     visionText: vision.text,
@@ -162,7 +175,7 @@ export function isAssessed(branch: Branch, settings: Settings): boolean {
       { repoKey: branch.repoKey, branch: branch.name },
       branch.headSha,
       branch.vision.text,
-      VISION_PROMPT_VERSION,
+      assessVersion(settings),
       settings.llmModel,
     ) !== null
   );

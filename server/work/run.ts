@@ -156,12 +156,28 @@ export async function runBoard(
       const tried = (attempts.get(spec.id) ?? 0) + 1;
       attempts.set(spec.id, tried);
 
-      const job: Job = { ...toJob(spec), state: 'working', startedAt: new Date().toISOString(), attempts: tried };
+      const job: Job = {
+        ...toJob(spec),
+        state: 'working',
+        startedAt: new Date().toISOString(),
+        attempts: tried,
+        toolCalls: 0,
+        doing: null,
+      };
       working.set(spec.id, job);
       publish();
 
       try {
-        await spec.run(sessionId);
+        await spec.run({
+          sessionId,
+          onTool: (name) => {
+            // Live, so the floor moves while the work happens rather than jumping at the
+            // end. A worker that is looking something up should look like one.
+            job.toolCalls++;
+            job.doing = name;
+            publish();
+          },
+        });
         // Never the worker's word for it. The predicate reads the store the cache reads.
         if (spec.doneWhen()) {
           result.done++;
