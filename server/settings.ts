@@ -40,6 +40,7 @@ function sanitise(settings: Settings): Settings {
     llmModel: settings.llmModel.trim(),
     llmEnabled: settings.llmEnabled !== false,
     llmMaxPerRun: clamp(settings.llmMaxPerRun, 0, 500, DEFAULT_SETTINGS.llmMaxPerRun),
+    askBranchCap: clamp(settings.askBranchCap, 1, 400, DEFAULT_SETTINGS.askBranchCap),
   };
 }
 

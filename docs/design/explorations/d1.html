@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<!--
+  D1 — THE REGISTER
+  One continuous ledger of every branch, newest first. No nav, no panes, no detail view:
+  a row opens downward in place. The question it answers is "what do I have, all of it,
+  in one reading".
+-->
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bearing — D1 The Register</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="base.css">
+<style>
+  .page { max-width: 1120px; margin: 0 auto; padding: 0 34px 140px; position: relative; z-index: 1; }
+  .top { display: flex; align-items: flex-end; gap: 22px; padding: 26px 0 18px; border-bottom: 1px solid var(--line-2); }
+  .top .brand { padding: 0; }
+  .top .ask { max-width: 360px; margin-left: auto; }
+  .meta { font-family: var(--mono); font-size: 10.5px; color: var(--muted); text-align: right; line-height: 1.8; }
+
+  .filters { display: flex; align-items: center; gap: 6px; padding: 14px 0 6px; flex-wrap: wrap; }
+  .f { font-size: 11.5px; padding: 4px 11px; border-radius: 999px; color: var(--muted); border: 1px solid transparent; }
+  .f:hover { color: var(--text); background: #ffffff09; }
+  .f.on { color: var(--text-hi); border-color: var(--line-3); background: var(--panel-2); }
+  .f .n { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-left: 5px; }
+  .find { margin-left: auto; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line-2); padding: 3px 2px; }
+  .find input { font-family: var(--mono); font-size: 11.5px; outline: 0; width: 210px; }
+  .find input::placeholder { color: var(--faint); }
+
+  .reg .cell-b { width: 100%; }
+  .reg tr.open { border-left: 2px solid var(--now); }
+  .reg td.detail { padding: 2px 0 26px 30px; border-bottom: 1px solid var(--line); }
+  .detail .why { max-width: 74ch; margin: 6px 0 16px; }
+  .detail .src { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 12px; }
+  .chips { display: flex; gap: 5px; align-items: center; }
+  .chips .chip { font-size: 10px; padding: 1px 7px; }
+  .fold { margin-top: 34px; }
+  .fold-head { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line-2); color: var(--muted); font-size: 12px; }
+  .fold-head .eyebrow { flex: none; }
+  .fold-head .rule { flex: 1; height: 1px; background: var(--line); }
+  .warn-line { font-family: var(--mono); font-size: 11px; color: var(--bad); padding: 8px 0 16px; }
+</style></head>
+<body>
+<div class="page">
+  <div class="top">
+    <div class="brand"><div><div class="word">Bearing</div><small>the register</small></div></div>
+    <button class="ask"><span>Ask about anything in this register</span><span class="kbd">⌘K</span></button>
+    <div class="meta" id="meta"></div>
+  </div>
+  <div class="filters" id="filters"></div>
+  <div class="warn-line" id="warn"></div>
+  <table class="reg"><thead><tr>
+    <th style="width:18px"></th><th>Branch</th><th style="width:96px">Ahead</th>
+    <th style="width:300px">State</th><th style="width:70px">Last</th>
+  </tr></thead><tbody id="rows"></tbody></table>
+  <div class="fold" id="fold"></div>
+</div>
+<div class="xbar" id="xbar"></div>
+<script src="data.js"></script><script src="frame.js"></script>
+<script>
+const GLYPH = { progressing: '●', stalled: '⚓', blocked: '⚑', done: '✦', null: '·' };
+let filter = 'all', query = '', open = new Set();
+
+function chips(b) {
+  const out = [];
+  if (b.progress) out.push(`<span class="chip prog-${b.progress}">${b.progress}</span>`);
+  if (b.ci.state !== 'none') out.push(`<span class="chip ci-${b.ci.state}">CI ${b.ci.state}</span>`);
+  if (b.pr) out.push(`<span class="chip pr-${b.pr.state}">#${b.pr.number} ${b.pr.state}${b.pr.draft ? ' · draft' : ''}</span>`);
+  return `<div class="chips">${out.join('')}</div>`;
+}
+
+function row(b, i) {
+  const isOpen = open.has(b.name);
+  return `<tr class="row ${isOpen ? 'open' : ''}" data-b="${b.name}">
+    <td class="g">${GLYPH[b.progress] || '·'}</td>
+    <td class="cell-b">
+      <div class="name"><span class="repo">${shortRepo(b.repoKey)} /</span> ${b.name}</div>
+      ${b.title ? `<div class="title">${esc(b.title)}</div>` : `<div class="title" style="color:var(--muted);font-style:italic">${esc(b.commits[0] ? b.commits[0].message : 'nothing of its own')}</div>`}
+    </td>
+    <td class="num"><span class="up">↑${b.ahead}</span> <span class="down">↓${b.behind}</span></td>
+    <td>${chips(b)}</td>
+    <td class="age">${age(b.lastActivity)}</td>
+  </tr>
+  ${isOpen ? `<tr class="open"><td></td><td class="detail" colspan="4">
+    ${b.summary ? `<div class="reflect why">${esc(b.summary)}</div>` : `<div class="why" style="color:var(--muted);font-size:12px">No summary yet — the advisor has not read this branch.</div>`}
+    <div class="stream">
+      ${b.commits.map(c => `<div class="ev commit">
+        <span class="when">${clock(c.authoredAt)}</span>
+        <span class="what"><span class="msg">${esc(c.message)}</span>
+        ${c.body ? `<span class="reflect">${esc(c.body)}</span>` : ''}</span>
+      </div>`).join('')}
+    </div>
+    <div class="src">${b.diff.files} files · +${b.diff.additions} −${b.diff.deletions}${b.insight ? ` · summarised from ${b.insight.evidence.join(', ')} by ${b.insight.model}` : ''}</div>
+  </td></tr>` : ''}`;
+}
+
+function matches(b) {
+  if (query && !(b.name + ' ' + b.repoKey + ' ' + (b.title || '')).toLowerCase().includes(query)) return false;
+  if (filter === 'all') return true;
+  if (filter === 'flag') return b.ci.state === 'failing' || b.progress === 'blocked';
+  if (filter === 'pr') return !!b.pr;
+  return b.repoKey.endsWith('/' + filter);
+}
+
+function draw() {
+  const c = counts();
+  document.getElementById('meta').innerHTML =
+    `${c.branches} branches in ${c.repos} repos · ${c.commits} commits<br>read 13:42 UTC · ${SNAP.rateLimit.remaining} of ${SNAP.rateLimit.limit} calls left`;
+  document.getElementById('warn').innerHTML = SNAP.warnings.map(w => '! ' + esc(w)).join('<br>');
+
+  const f = [['all', 'Everything', threads().length], ['flag', 'Needs a decision', counts().failing + 1], ['pr', 'Has a PR', counts().open + 2]]
+    .concat(SNAP.repos.map(r => [r.name, r.name, threads().filter(b => b.repoKey === r.key).length]));
+  document.getElementById('filters').innerHTML =
+    f.map(([k, label, n]) => `<button class="f ${filter === k ? 'on' : ''}" data-f="${k}">${label}<span class="n">${n}</span></button>`).join('') +
+    `<span class="find">🔍<input placeholder="branch name, literally" id="q" value="${query}"></span>`;
+
+  const list = active().filter(matches).sort(byRecency);
+  document.getElementById('rows').innerHTML = list.map(row).join('');
+
+  const q = quiet().filter(matches).sort(byRecency);
+  document.getElementById('fold').innerHTML =
+    `<div class="fold-head"><span class="eyebrow">Gone quiet</span><span class="rule"></span>
+      <span style="font-family:var(--mono);font-size:11px">${q.length} shown · ${counts().folded} more folded away</span></div>
+     <table class="reg"><tbody>${q.map(row).join('')}</tbody></table>`;
+}
+
+document.addEventListener('click', e => {
+  const f = e.target.closest('[data-f]');
+  if (f) { filter = f.dataset.f; return draw(); }
+  const r = e.target.closest('[data-b]');
+  if (r) { const n = r.dataset.b; open.has(n) ? open.delete(n) : open.add(n); draw(); }
+});
+document.addEventListener('input', e => { if (e.target.id === 'q') { query = e.target.value.toLowerCase(); draw(); document.getElementById('q').focus(); } });
+draw();
+</script></body></html>

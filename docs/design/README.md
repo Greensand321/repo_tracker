@@ -1,5 +1,12 @@
 # Design
 
+> **17 Sep 2026 — the record, corrected.** The owner re-sent the "real" prototype files and
+> they are **byte-identical to `prototype/` below**; that folder was right all along. The
+> file that was wrong is `dashboard-concept.html`, which `web/` was built from (D22). The
+> design language now being built on is **variant C, "The Logbook"** — see
+> [`explorations/`](explorations/), where six full interfaces are drawn in it and one is
+> recommended. D22 is superseded by **D54**.
+
 The visual target for Bearing. These are the mockups we are building toward — the
 "real ones", as distinct from the paradigm explorations now in [`../archive/workflow-mockups/`](../archive/workflow-mockups/).
 

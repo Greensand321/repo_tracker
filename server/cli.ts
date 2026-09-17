@@ -10,9 +10,11 @@
  *   npm run brief -- --no-llm    deterministic only, no provider calls
  *   npm run models         list the models your provider actually offers
  *   npm run config         show settings, with secrets redacted
+ *   npm run probe          can this model do tool calling? (see docs/plans/agent-plan.md)
  */
 
 import { listModels } from './advise/client.ts';
+import { probeTools, type ProbeOutcome } from './advise/probe.ts';
 import { applyCached, enrich, llmReady } from './advise/enrich.ts';
 import { collect } from './collect.ts';
 import { loadSettings } from './settings.ts';
@@ -38,8 +40,10 @@ async function main(): Promise<number> {
       return models();
     case 'config':
       return config();
+    case 'probe':
+      return probe();
     default:
-      console.error(`unknown command "${command}" — try: brief | models | config`);
+      console.error(`unknown command "${command}" — try: brief | models | config | probe`);
       return 2;
   }
 }
@@ -150,6 +154,36 @@ async function models(): Promise<number> {
   }
   console.log(dim('\nSet one in settings, or in data/settings.json as "llmModel".\n'));
   return 0;
+}
+
+/**
+ * Answers the one question the agent plan rests on, before anything is built on it.
+ * Two provider calls, a few hundred tokens.
+ */
+async function probe(): Promise<number> {
+  const settings = loadSettings();
+  if (!settings.llmApiKey) return complain('No provider API key set.');
+  if (!settings.llmModel) return complain('No model chosen — run `npm run models` first.');
+
+  process.stderr.write(dim(`asking ${settings.llmModel} to call a tool…\n`));
+  const result = await probeTools(settings);
+
+  const mark = (outcome: ProbeOutcome): string =>
+    outcome === 'works' ? green('✓ works') : outcome === 'unsupported' ? red('✗ unsupported') :
+    outcome === 'wrong-shape' ? brass('~ wrong shape') : red('✗ error');
+
+  console.log('');
+  console.log(`  ${bold(result.model)} ${dim(`at ${result.baseUrl}`)}`);
+  console.log(dim(`  speaking the ${result.protocol} API\n`));
+  console.log(`  native tool calling   ${mark(result.native.outcome)}`);
+  console.log(dim(`                        ${result.native.detail}`));
+  console.log(`  JSON protocol         ${mark(result.jsonProtocol.outcome)}`);
+  console.log(dim(`                        ${result.jsonProtocol.detail}`));
+  console.log('');
+  console.log(`  ${bold('→')} ${result.recommendation}`);
+  console.log('');
+
+  return result.native.outcome === 'works' || result.jsonProtocol.outcome === 'works' ? 0 : 1;
 }
 
 function config(): number {

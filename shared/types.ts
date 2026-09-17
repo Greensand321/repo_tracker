@@ -7,6 +7,12 @@ export type Snapshot = {
   generatedAt: string; // ISO-8601 UTC
   repos: Repo[];
   branches: Branch[];
+  /**
+   * Plane B. Not read from GitHub — merged in at the edge after collection, so that
+   * every surface still renders exactly one structure (rule 4) and no view has to join
+   * two sources itself.
+   */
+  goals: Goal[];
   warnings: string[]; // one unreachable repo must never cost you the others
   rateLimit: RateLimit | null;
   llm: LlmStatus;
@@ -54,6 +60,9 @@ export type Branch = {
   /** True when this is the repo's base branch, which is a reference point, not a thread. */
   isBase: boolean;
 
+  /** Plane B. The goal this branch belongs to, or null while it is unfiled. */
+  goalId: string | null;
+
   // --- Stage 2. Null until the LLM has read this branch; every view renders without them. ---
   /** LLM-written title, shown ALONGSIDE `name` and marked as generated. Never instead of it. */
   title: string | null;
@@ -64,6 +73,44 @@ export type Branch = {
 };
 
 export type Progress = 'progressing' | 'stalled' | 'blocked' | 'done';
+
+// ---------------------------------------------------------------------------
+// Goals (Plane B — the tool's own data, never written into a git repo)
+// ---------------------------------------------------------------------------
+
+/**
+ * One thread of intent, grouping the branches working toward it.
+ *
+ * A branch has at most one goal (the owner's rule: "one branch has one goal and sub
+ * tasks can diverge from that"). Branches with no goal are not an error — most start
+ * that way and some never need one.
+ *
+ * Milestones sit above goals in the eventual model and are deliberately not here yet;
+ * `milestone` is a plain string so the idea can be used before the structure exists.
+ */
+export type Goal = {
+  id: string;
+  title: string;
+  /** Free text, the owner's own words. Shown in full, never summarised. */
+  note: string;
+  /** A label for now, a foreign key later. Empty means unfiled. */
+  milestone: string;
+  /** Branches assigned to this goal, oldest assignment first. */
+  branches: BranchRef[];
+  /** Done goals fold away exactly as quiet branches do — never deleted (rule 10). */
+  done: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BranchRef = {
+  repoKey: string;
+  branch: string;
+};
+
+/** Unambiguous even for branch names containing slashes. */
+export const refKey = (repoKey: string, branch: string): string =>
+  JSON.stringify([repoKey, branch]);
 
 export type InsightMeta = {
   /** Short SHAs the model cited. Validated against the branch's own commits. */
@@ -135,6 +182,12 @@ export type Settings = {
   llmEnabled: boolean;
   /** Ceiling on summaries per refresh, so a first run cannot surprise you with a bill. */
   llmMaxPerRun: number;
+  /**
+   * How many branches a question may put in front of the model. The prompt grows with
+   * this, and so does the cost of every question — at a hundred branches the whole
+   * register does not need to be in the prompt to answer "what is red".
+   */
+  askBranchCap: number;
 };
 
 /** What the settings screen is allowed to see: never a secret, only whether one is set. */
@@ -154,6 +207,7 @@ export const DEFAULT_SETTINGS: Settings = {
   llmModel: '',
   llmEnabled: true,
   llmMaxPerRun: 40,
+  askBranchCap: 60,
 };
 
 // ---------------------------------------------------------------------------

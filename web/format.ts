@@ -37,6 +37,36 @@ export function relativeTime(iso: string | null, now: Date = new Date()): string
   return `${Math.round(months / 12)}y ago`;
 }
 
+/**
+ * How long until something in the future.
+ *
+ * `relativeTime` deliberately collapses the future to "just now", because a commit
+ * timestamp slightly ahead of the local clock is skew rather than news. A rate-limit
+ * reset is genuinely ahead of us, and "resets just now" was simply wrong.
+ */
+export function countdown(iso: string | null, now: Date = new Date()): string {
+  if (!iso) return '';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+
+  const seconds = Math.round((then - now.getTime()) / 1000);
+  if (seconds <= 30) return 'any moment';
+  if (seconds < 90) return 'in a minute';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `in ${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `in ${hours}h`;
+  return `in ${Math.round(hours / 24)}d`;
+}
+
+/** Time of day only. The date is already on the line beside it. */
+export function clockTime(iso: string | null): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
 /** Full timestamp for the title attribute, so the exact value is a hover away. */
 export function exactTime(iso: string | null): string {
   if (!iso) return '';

@@ -43,13 +43,13 @@ function branch(name: string, over: Partial<Branch> = {}): Branch {
     commits: [{ sha: 'abc1234def', message: `work on ${name}`, body: '', author: 'claude', authoredAt: '2026-09-15T00:00:00Z', url: 'c' }],
     ahead: 3, behind: 0, lastActivity: '2026-09-15T00:00:00Z',
     diff: { files: 1, additions: 1, deletions: 0 }, activity: ['2026-09-15'],
-    pr: null, ci: { state: 'none', url: null }, relevance: 'active', isBase: false,
+    pr: null, ci: { state: 'none', url: null }, relevance: 'active', isBase: false, goalId: null,
     title: null, summary: null, progress: null, insight: null, ...over,
   };
 }
 
 const snapshot = (branches: Branch[]): Snapshot => ({
-  generatedAt: '2026-09-16T12:00:00Z', repos: [], branches, warnings: [], rateLimit: null,
+  generatedAt: '2026-09-16T12:00:00Z', repos: [], branches, warnings: [], rateLimit: null, goals: [],
   llm: { enabled: false, pending: 0, errors: [] },
 });
 

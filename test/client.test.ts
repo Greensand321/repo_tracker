@@ -287,7 +287,7 @@ test('every branch in one run shares a session, and runs differ', async () => {
 
   const advise = await import('../server/advise/enrich.ts');
   const makeSnapshot = () => ({
-    generatedAt: '2026-09-16T12:00:00Z', repos: [], warnings: [], rateLimit: null,
+    generatedAt: '2026-09-16T12:00:00Z', repos: [], warnings: [], rateLimit: null, goals: [],
     llm: { enabled: false, pending: 0, errors: [] },
     branches: ['a', 'b'].map((name) => ({
       repoKey: 'o/r', name, headSha: `sha-${name}-${Math.random()}`, url: 'u',
@@ -295,7 +295,7 @@ test('every branch in one run shares a session, and runs differ', async () => {
       ahead: 1, behind: 0, lastActivity: '2026-09-15T00:00:00Z',
       diff: { files: 1, additions: 1, deletions: 0 }, activity: ['2026-09-15'],
       pr: null, ci: { state: 'none' as const, url: null }, relevance: 'active' as const,
-      isBase: false, title: null, summary: null, progress: null, insight: null,
+      isBase: false, goalId: null, title: null, summary: null, progress: null, insight: null,
     })),
   });
 
@@ -314,4 +314,26 @@ test('every branch in one run shares a session, and runs differ', async () => {
   assert.equal(runOne.length, 2);
   assert.ok(runOne[0] && runOne[0] === runOne[1], 'one session across the run');
   assert.notEqual(runOne[0], runTwo[0], 'a later run is a different session');
+});
+
+// --- the tool-calling probe (docs/plans/agent-plan.md step 1) ---
+
+import { findToolCall } from '../server/advise/probe.ts';
+
+test('a tool call is found in both response shapes', () => {
+  assert.deepEqual(
+    findToolCall({ choices: [{ message: { tool_calls: [{ function: { name: 'get_branch', arguments: '{"repo":"a/b"}' } }] } }] }),
+    { name: 'get_branch', args: '{"repo":"a/b"}' },
+  );
+  assert.deepEqual(
+    findToolCall({ content: [{ type: 'text', text: 'let me look' }, { type: 'tool_use', name: 'get_branch', input: { repo: 'a/b' } }] }),
+    { name: 'get_branch', args: '{"repo":"a/b"}' },
+  );
+});
+
+test('a prose reply is not mistaken for a tool call', () => {
+  // The failure that matters: a model that accepts `tools` and then ignores them.
+  assert.equal(findToolCall({ choices: [{ message: { content: 'I would look up that branch.' } }] }), null);
+  assert.equal(findToolCall({ content: [{ type: 'text', text: 'I would look it up.' }] }), null);
+  assert.equal(findToolCall({}), null);
 });

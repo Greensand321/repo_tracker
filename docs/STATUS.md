@@ -1,24 +1,24 @@
 # Status — where the project stands
 
-**Updated:** 16 Sep 2026 · **Stage 1 built · Stage 2 engine built** · **Branch:** `claude/kind-meitner-cpis9v`
+**Updated:** 17 Sep 2026 · **Stage 1 built · Stage 2 built · interface rebuilt** · **Branch:** `claude/kind-meitner-cpis9v`
 
 > Keep this short and current. It is the first thing to read after any time away.
 
 ---
 
-## ⚠️ The interface is being replaced
+## The interface is built
 
-The mockup Stage 1 was built against (`docs/design/dashboard-concept.html`) turned out to
-be a **throwaway superseded by a better design** the owner has at home. The current
-`web/` is a working placeholder, not the target.
+The placeholder is gone. `web/` is now **the Broadsheet** (D57): a masthead, a leader
+column that opens with whatever is happening now, and a standing column on the right
+holding the advisor and a register grouped by goal. The design language is the prototype's
+variant C, extracted and documented at the top of `web/app.css` — five rules, and losing
+any one of them turns it back into an ordinary dashboard.
 
-**What that costs:** `web/app.css`, `web/index.html`, `views/board.ts`, `views/timeline.ts`
-— roughly 700 lines. **What it does not touch:** everything in `server/`, `shared/types.ts`,
-and 58 of the 63 tests. The data/view separation (CLAUDE.md rule 4) is what makes this
-cheap.
+The centre list reads the same branches **by goal** or **by branch**, chosen from the
+dropdown. That is one grouping of one structure, not two views.
 
-**Do not polish `web/`.** Keep it working so the engine can be verified, and swap it when
-the real design arrives.
+Six explorations led here and are kept in `docs/design/explorations/` as reasoning. The
+recommendation there was D6; the owner chose D4 and the reasons are in D57.
 
 ## Where we are
 
@@ -48,14 +48,20 @@ would fail at the worst moment.
 
 ## The next concrete action
 
-**Wait for the real design files**, then rebuild `web/` against them.
+**Run `npm run probe`.** It is two provider calls and a few hundred tokens, and it is the
+last thing standing between the current single-turn advisor (D60) and the tool-calling
+agent in `docs/plans/agent-plan.md`. Everything else in Stage 2 is now built.
 
-When they arrive, the useful question is not "what does it look like" but **what data does
-it need that the Snapshot does not already carry.** Likely additions: per-commit file
-lists, review comments and reviewer state, which CI job failed, linked issues. All are
-additive — `collect.ts` widens, nothing restructures.
+After that, in order:
 
-After that, Stage 3: milestones → goals → branches → sub-tasks, plus notes.
+- **Milestones above goals.** `Goal.milestone` is a plain string today so the idea could
+  be used before the structure exists. The register already groups by goal; grouping goals
+  by milestone is the same move one level up.
+- **The advisor filing goals itself.** The register exists to be *checked* (D57), which
+  presumes something proposed the filing. That needs the agent, hence the probe.
+- **What the Snapshot still lacks**: which CI job failed, reviewer state, per-commit file
+  lists, linked issues. All additive — `collect.ts` widens, nothing restructures.
+- **Stage 4**, Supabase sync, so goals and notes reach the second machine.
 
 ## Worth knowing
 
@@ -67,7 +73,15 @@ After that, Stage 3: milestones → goals → branches → sub-tasks, plus notes
 - **A fatal provider error stops the run** rather than failing identically 99 more times.
 - **`data/history/*.jsonl`** has been accumulating since the first run and nothing reads it
   yet. That is deliberate (D31).
-- **`BEARING_DATA_DIR`** relocates everything the tool stores.
+- **`BEARING_DATA_DIR`** relocates everything the tool stores — `settings.json`, `goals.json`,
+  `insights.json`, the cache and the history. Tests point it at a temp directory so they can
+  never write into the real one.
+- **Filing a branch under a goal costs no GitHub call.** Goals are merged into the snapshot
+  already in memory and pushed to the page (D58).
+- **The page re-reads after every write rather than waiting for the push.** The server does
+  announce goal changes, but only while the event stream is up, and it reconnects on a
+  three-second timer — leaning on it alone meant a click in that window silently did nothing.
+- **Fonts are served from `web/fonts/`**, not Google Fonts (D56).
 
 ## Log
 
@@ -78,3 +92,7 @@ After that, Stage 3: milestones → goals → branches → sub-tasks, plus notes
 | 16 Sep 2026 | All questions closed (D20–D36); Stage 1 planned and **built** |
 | 16 Sep 2026 | **The design files were the wrong ones.** Interface marked as placeholder pending the real ones |
 | 16 Sep 2026 | **Stage 2 engine built** (D37–D44): provider client, prompt, parser with a hallucination guard, SHA-keyed cache, background enrichment, and a debug CLI |
+| 16 Sep 2026 | Five provider gates debugged live (D45–D50); agent plan written (D51–D53) |
+| 17 Sep 2026 | **The prototype was right all along** — the re-sent files are byte-identical to `docs/design/prototype/`. The wrong file was `dashboard-concept.html`, which `web/` was built from. D22 overturned |
+| 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
+| 17 Sep 2026 | **D4 "The Broadsheet" chosen and built** — `web/` rebuilt from scratch against it. Goals land as Plane B with their own store, API and tests; the advisor answers questions single-turn. D57–D60 recorded |

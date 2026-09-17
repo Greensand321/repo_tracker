@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "brief": "tsx server/cli.ts brief",
     "models": "tsx server/cli.ts models",
-    "config": "tsx server/cli.ts config"
+    "config": "tsx server/cli.ts config",
+    "probe": "tsx server/cli.ts probe"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",

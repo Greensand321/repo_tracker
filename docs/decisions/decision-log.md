@@ -68,7 +68,105 @@ open: [`open-questions.md`](open-questions.md).
 
 | D49 | **Send `x-opencode-session` on every OpenCode request: one opaque ID per enrichment run, shared by every branch in that run.** | OpenCode has required the header since 6 Sep 2026 and returns 400 without it. It exists so a conversation's requests reach the same provider and keep its prompt prefix cached — and every branch in a run sends an *identical* system prompt, so routing a run together is exactly the intended use. Runs stay distinct, per the guidance that the ID be distinct across conversations. Sent only to `opencode.ai` hosts, since other providers may reject unknown headers. |
 
+| D50 | **The page and its bundle are served `no-store`, and the UI shows a banner on any uncaught error.** | The bundle is built once at startup while `index.html` is read per request, so a browser holding an older `/app.js` pairs it with newer HTML. The old code then looks for an element the new page no longer has, throws, and the interface silently stops responding — and *reloading is what serves the stale copy*, so the obvious remedy does not work. It bricked a running install. Caching a 100 KB file from localhost buys nothing; a visible failure buys everything. |
+
+| D51 | **"Agent-native" means native to the program, not the browser.** The agent runs server-side, reads and writes the tool's own data through a tool catalogue, and the page is its surface. It does not drive a browser and does not run in the page. | Owner's clarification. The program already holds both keys, the cache and the history, so tools are local function calls over data in memory and no secret reaches the browser. |
+| D52 | **The agent writes Plane B on its own — no per-action confirmation — and every write is visible and reversible, with a log of what it did.** | Filing a hundred branches into goals is only a saving if you are not confirming each one. The safety comes from visibility and undo rather than from a prompt before each write. Plane A stays untouchable regardless (D1). |
+| D53 | **Job order: answer questions → what changed since I last looked → file branches into goals → judge progress → spot drift and overlap.** | Owner's agreement with the proposed ranking. The first two need no data that does not already exist, which is why the agent comes before the organising layer rather than after it. |
+
 ---
+
+### D54 — The interface is built in the prototype's variant C language ("The Logbook")
+
+Supersedes **D22** (build from `dashboard-concept.html`). The owner's words: the ledger
+layout "just felt so professional and like it was just ready for work. The card approach on
+the other hand just look over used and childish by comparison."
+
+The language is extracted once into `docs/design/explorations/base.css` and does not vary:
+rows on a rule and no cards; a fixed-width time column; a glyph gutter; mono for machine
+facts and serif italic for human reflection; teal used exactly once, on whatever is
+happening now. The header comment in that file names all five, so a later revision cannot
+quietly drop one.
+
+Variant A ("The Bridge", card-based) is rejected. Variant B ("The Map") is **postponed at
+the owner's request** — not rejected — to be revisited when the time is right.
+
+### D55 — One ledger, two spines: by thread and by day
+
+Chosen from six explorations (`docs/design/explorations/`, D6 "The Ledger"). "What is each
+branch doing" and "what moved while I was away" are the only two questions the tool has to
+answer, and they are the same rows grouped two ways. So there is **one** ledger with a
+spine toggle, not two screens — the clearest possible expression of rule 4, since a second
+screen would inevitably start computing facts of its own.
+
+Consequences: no nav rail (the repo list is a filter, not a place); a row expands **in
+place** into its dossier rather than opening a third pane; the advisor's command line is
+permanent rather than behind ⌘K; and an answer is **filed into the ledger** as a dated
+entry carrying its tool calls and its cost, not shown in a chat bubble that scrolls away.
+
+### D56 — Fonts are self-hosted
+
+The explorations ship `fonts/` (Fraunces, Inter, JetBrains Mono, latin subset, ~390 KB) and
+`fonts.css` instead of linking Google Fonts. A local-first program that silently degrades
+when the network is down is not local-first, and typography carries the whole hierarchy
+here (D54) — falling back to system faces is not a cosmetic loss.
+
+### D57 — The interface is the Broadsheet (exploration D4), with the register grouped by goal
+
+The owner chose D4 over the recommended D6, and the reasons are worth keeping because
+they are about how the tool gets used, not about how it looks:
+
+- **The standing column on the right.** The single biggest reason. The ask box sits at the
+  top of it and the register sits below, so a question and the thing it is a question
+  about are in the same field of view.
+- **“Happening now” at the top of the centre column.** Called "one big selling point".
+- **The register grouped by goal**, not a flat branch list: *"the stuff below is mostly
+  what the agent would organize itself, I can just comb through and see if it did it
+  correctly."* The register is a checking surface, and goals are what is being checked.
+
+D6's one genuinely better idea survives as the centre column's control: the same branches
+can be read **by goal** or **by branch**, chosen from a dropdown (the owner asked for a
+dropdown over a toggle). It is one grouping of one structure, not two views.
+
+### D58 — Goals are Plane B, merged into the Snapshot at the edge
+
+A goal groups the branches working toward it. One branch has at most one goal; assigning
+a branch that already has one moves it. **Unfiled is normal, not a backlog** — most
+branches start there and some never need a goal, so the unfiled group sorts last and is
+labelled rather than flagged.
+
+Goals live in `data/goals.json` and are attached to the snapshot by `applyGoals` beside
+`applyCached`, not fetched with everything else. Two consequences, both deliberate:
+`buildSnapshot` stays a pure transform of GitHub data (rule 5), and **filing a branch
+costs no GitHub call** — the server re-merges the snapshot already in memory and pushes.
+
+Deleting a goal unfiles its branches and touches nothing in the repo; a branch that
+disappears from GitHub is pruned out of its goal, but the goal itself is kept. Plane A is
+never ours to lose and Plane B is never GitHub's to delete.
+
+### D59 — No diffstats in the dashboard
+
+The owner: *"Seeing how many lines of code is committed is not relevant information for
+this view."* `+1802 −310` is still collected and still in the Snapshot, because a later
+surface — the "what changed and by how much" one that D31's dated snapshots exist for —
+is exactly where it belongs. It is simply not rendered here. Ahead/behind stays: it is a
+count of commits, which is navigational rather than volumetric, and it stays small (rule 3).
+
+### D60 — The advisor answers one question in one turn, with no tools
+
+`server/advise/ask.ts` writes the current snapshot into the prompt and asks the model
+once. It is not the tool-calling agent in `docs/plans/agent-plan.md`, and it is not a
+placeholder for it either — it is the floor that plan names, and the floor works anywhere.
+
+The reason it is not the agent yet is that `npm run probe` has still not been run against
+the owner's plan, so "this model can reliably call a tool" remains an assumption. Five
+provider gates in a row were caused by building on exactly that kind of assumption. When
+the probe comes back, this becomes the fallback path rather than being thrown away.
+
+What the model is shown is capped by `askBranchCap` (default 60, in settings) because the
+prompt — and the cost of every question — grows with the register. Every answer carries
+how many branches and goals it actually saw, so a wrong answer is debuggable rather than
+mysterious.
 
 ## 2. Carried over from the old documents
 
@@ -103,6 +201,8 @@ Kept because the arguments still explain how the current design was reached.
 | ~~Success metric: branch reduction~~ | D7 | The goal is the opposite. |
 | ~~Performance budget: < 5 s across 4 repos, ≤ 3 git calls per branch~~ | — | Written for local subprocess calls. A network-bound budget needs rewriting once the stack is chosen. |
 | ~~`safe-to-delete` is list-only, permanently~~ | Still true, but deprioritized | Follows from D1. Just no longer a feature anyone is waiting for. |
+| ~~Build the dashboard from `dashboard-concept.html`~~ (D22) | **D54** | Wrong file. The three-variant prototype was in `docs/design/prototype/` the whole time; variant C is the design language. Cards are out. |
+| ~~Board / Needs you / Timeline / Your notes as four views~~ | **D57** | One column, one list, one grouping control. The four tabs were four filters pretending to be places. |
 
 ---
 
