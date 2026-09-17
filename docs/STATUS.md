@@ -52,6 +52,10 @@ would fail at the worst moment.
 last thing standing between the current single-turn advisor (D60) and the tool-calling
 agent in `docs/plans/agent-plan.md`. Everything else in Stage 2 is now built.
 
+There is also a **plan waiting for review**: [`docs/plans/agent-memory-plan.md`](plans/agent-memory-plan.md)
+— what the agent remembers between instances, and how it knows what to work on. Its stage A
+(standing orders from feedback, R7) needs no tool calling and could start before the probe.
+
 After that, in order:
 
 - **Milestones above goals.** `Goal.milestone` is a plain string today so the idea could
