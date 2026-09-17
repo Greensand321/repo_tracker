@@ -117,6 +117,8 @@ export type AssistResult = {
   briefed: boolean;
   failed: number;
   errors: string[];
+  /** True when the budget ran out with work left. The next read picks up where this stopped. */
+  budgetSpent: boolean;
 };
 
 export async function assist(
@@ -124,13 +126,25 @@ export async function assist(
   settings: Settings,
   onProgress?: () => void,
 ): Promise<AssistResult> {
-  const result: AssistResult = { drafted: 0, declined: 0, assessed: 0, briefed: false, failed: 0, errors: [] };
+  const result: AssistResult = {
+    drafted: 0, declined: 0, assessed: 0, briefed: false, failed: 0, errors: [], budgetSpent: false,
+  };
   if (!llmReady(settings)) return result;
 
   pruneVisions(new Set(snapshot.branches.map((b) => refKey(b.repoKey, b.name))));
 
   const sessionId = randomUUID();
   let fatal = false;
+
+  /**
+   * One budget for the whole pass, not one per step.
+   *
+   * Drafting was capped and assessing was not, so a read that distributed forty visions
+   * would then assess all forty — well past the ceiling that exists so a first run cannot
+   * surprise you with a bill. "Max per read" should mean the read.
+   */
+  let budget = settings.llmMaxPerRun;
+  const spend = (): boolean => (budget > 0 ? (budget--, true) : false);
 
   const fail = (what: string, err: unknown): void => {
     result.failed++;
@@ -146,11 +160,10 @@ export async function assist(
   if (settings.visionAutoDraft) {
     const needsOne = snapshot.branches
       .filter((b) => worthAVision(b) && b.vision === null)
-      .sort((a, b) => Date.parse(b.lastActivity ?? '0') - Date.parse(a.lastActivity ?? '0'))
-      .slice(0, settings.llmMaxPerRun);
+      .sort((a, b) => Date.parse(b.lastActivity ?? '0') - Date.parse(a.lastActivity ?? '0'));
 
     for (const branch of needsOne) {
-      if (fatal) break;
+      if (fatal || !spend()) break;
       try {
         const draft = await draftVision(branch, settings, sessionId);
         if (draft.text === null) {
@@ -183,11 +196,14 @@ export async function assist(
     const ref: BranchRef = { repoKey: branch.repoKey, branch: branch.name };
     const vision = branch.vision!;
 
+    // Reading the cache is free, so it happens before the budget is consulted — a run
+    // that is out of budget still serves everything already paid for.
     const cached = getAssessment(ref, branch.headSha, vision.text, VISION_PROMPT_VERSION, settings.llmModel);
     if (cached) {
       branch.assessment = cached;
       continue;
     }
+    if (!spend()) break;
 
     try {
       const verdict = await assessBranch(branch, vision.text, settings, sessionId);
@@ -212,6 +228,10 @@ export async function assist(
   }
 
   // --- 3. Read the whole fleet once and write the brief --------------------
+  result.budgetSpent = budget <= 0;
+
+  // The brief is one call for the whole fleet and is the thing the owner actually reads,
+  // so it is worth the last of the budget rather than being starved by per-branch work.
   if (!fatal) {
     const key = briefKey(snapshot, settings);
     const stored = loadStored();

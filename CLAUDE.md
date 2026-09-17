@@ -58,6 +58,12 @@ Revisit at Stage 3 if the UI gets painful.
 10. **Stale branches fold away; they are never deleted or dropped from the data** (D35).
    ~100 branches exist, a few dozen matter at any time.
 
+## How the assistant works
+
+Six single-turn prompts, no tools, all of them Plane B. Before changing any of them, open
+[`docs/design/ai-map.html`](docs/design/ai-map.html): every path, what each call sees and
+decides, what it may never do, and which `PROMPT_VERSION` to bump when you edit one.
+
 ## Before adding anything
 
 Check [`docs/decisions/decision-log.md`](docs/decisions/decision-log.md) — §3 lists what

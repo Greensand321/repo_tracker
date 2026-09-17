@@ -22,6 +22,8 @@
  * The prompt asks for JSON and the parser is tolerant of a fence — see prompt.ts.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import type { Settings } from '../../shared/types.ts';
 
 export class LlmError extends Error {
@@ -173,8 +175,14 @@ async function callProtocol(
     authorization: `Bearer ${settings.llmApiKey}`,
     ...spec.headers,
   };
-  if (request.sessionId && isOpenCode(settings.llmBaseUrl)) {
-    headers['x-opencode-session'] = request.sessionId;
+  if (isOpenCode(settings.llmBaseUrl)) {
+    // Mandatory on Go — a request without it is a flat 400. It used to be sent only when
+    // a caller remembered to pass one, and three of them did not: the brief failed on
+    // every single read for as long as the program was open. A required header has no
+    // business being optional, so one is minted here when the caller has no batch to
+    // name. Callers that DO have a batch still pass theirs, which is what keeps a run's
+    // shared prompt prefix warm on one provider.
+    headers['x-opencode-session'] = request.sessionId ?? randomUUID();
   }
 
   const res = await withTimeout((signal) =>

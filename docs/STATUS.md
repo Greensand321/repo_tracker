@@ -19,6 +19,14 @@ doing and what is going on. Under the register, **Waiting on you** carries the q
 capped and answerable in place. Drift always offers both its causes (D62), and a goal is
 never silently marked done (D64).
 
+**Where it could go next:** [`design/agent-shapes.html`](design/agent-shapes.html) — five
+shapes the assistant could take, which turn out to be layers rather than alternatives, plus
+the answer to "how does the program know when an agent is done". Nothing in it is built.
+
+**How it works, end to end:** [`design/ai-map.html`](design/ai-map.html) — every path from
+the clock firing to what gets written, all six prompts with what each one sees, decides and
+may not do, and where to change each. Open it from disk.
+
 Plan: [`plans/vision-ux.md`](plans/vision-ux.md) (the walkthrough) and
 [`plans/agent-memory-plan.md`](plans/agent-memory-plan.md) (stage A of the build order).
 Decisions D61–D65.
@@ -101,6 +109,11 @@ After that, in order:
   announce goal changes, but only while the event stream is up, and it reconnects on a
   three-second timer — leaning on it alone meant a click in that window silently did nothing.
 - **Fonts are served from `web/fonts/`**, not Google Fonts (D56).
+- **`complete()` sets `x-opencode-session` itself** (D66). Never add a provider call that
+  bypasses it — a test enforces this.
+- **Advisor failures show in the dateline as well as Notices** (D67).
+- **One budget per read, not one per step.** `llmMaxPerRun` is spent across summarising,
+  drafting and assessing together. It used to cap the first two and not the third.
 - **The assistant costs almost nothing on an unchanged fleet.** An assessment is cached on
   head SHA + vision text; the brief and every goal judgement share one cache key hashed over
   every branch, vision and verdict. Nothing moves, nothing is spent.
@@ -121,5 +134,6 @@ After that, in order:
 | 16 Sep 2026 | Five provider gates debugged live (D45–D50); agent plan written (D51–D53) |
 | 17 Sep 2026 | **The prototype was right all along** — the re-sent files are byte-identical to `docs/design/prototype/`. The wrong file was `dashboard-concept.html`, which `web/` was built from. D22 overturned |
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
+| 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
 | 17 Sep 2026 | **D4 "The Broadsheet" chosen and built** — `web/` rebuilt from scratch against it. Goals land as Plane B with their own store, API and tests; the advisor answers questions single-turn. D57–D60 recorded |

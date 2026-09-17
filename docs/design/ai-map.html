@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<!--
+  THE ASSISTANT, END TO END — every path, every call, every guardrail.
+
+  A reference, not a design. Open it from disk. It describes what is actually built as of
+  17 Sep 2026; if the code and this page disagree, the code is right and this is stale.
+
+  Written to answer three questions: what does it see, what does it decide, and where do I
+  change it.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bearing — how the assistant works</title>
+<link rel="stylesheet" href="explorations/fonts.css">
+<style>
+  :root {
+    --bg:#0e1216; --panel:#101519; --panel-2:#141b21;
+    --line:#1d232b; --line-2:#232c35; --line-3:#2c3742;
+    --text:#d7dde3; --text-hi:#eef6f4; --body:#b9c2cd;
+    --dim:#8b93a8; --muted:#57616b; --faint:#3d4650;
+    --now:#62c9c0; --warn:#f2c976; --bad:#e2705f; --good:#63c08a;
+    --pr:#74a8e0; --done:#a98bdb; --note:#d8c8a8;
+    --serif:"Fraunces",Georgia,serif; --sans:"Inter",system-ui,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0;padding:0}
+  body{font-family:var(--sans);font-size:14px;line-height:1.55;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(1000px 500px at 85% -8%,rgba(98,201,192,.055),transparent 60%)}
+  .sheet{max-width:1080px;margin:0 auto;padding:0 40px 140px;position:relative}
+
+  .masthead{text-align:center;padding:34px 0 12px;border-bottom:3px double var(--line-3)}
+  .masthead .word{font-family:var(--serif);font-style:italic;font-size:40px;line-height:1}
+  .masthead .sub{font-family:var(--mono);font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted);margin-top:9px}
+  .dateline{font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:9px 0 26px;border-bottom:1px solid var(--line-2);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+  h2{font-family:var(--serif);font-size:25px;font-weight:600;margin:46px 0 6px;letter-spacing:-.01em}
+  h3{font-family:var(--serif);font-size:18px;font-weight:600;margin:30px 0 6px}
+  .lede{color:var(--body);max-width:74ch;margin:0 0 18px}
+  .eyebrow{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:var(--muted)}
+  .mono{font-family:var(--mono);font-size:12px}
+  code{font-family:var(--mono);font-size:12px;color:var(--dim)}
+  em.q{font-family:var(--serif);font-style:italic;color:var(--note)}
+
+  /* the flow */
+  .flow{margin:10px 0 0;overflow-x:auto}
+  svg{display:block;max-width:100%;height:auto}
+  .n-box{fill:var(--panel-2);stroke:var(--line-3)}
+  .n-call{fill:#141b21;stroke:#62c9c055}
+  .n-you{fill:#141b21;stroke:#f2c97644}
+  .n-t{font-family:var(--sans);font-size:13px;fill:var(--text-hi)}
+  .n-s{font-family:var(--mono);font-size:10px;fill:var(--muted)}
+  .n-num{font-family:var(--mono);font-size:11px;fill:var(--now)}
+  .lane{font-family:var(--mono);font-size:9px;letter-spacing:.2em;fill:var(--faint)}
+  .edge{stroke:var(--line-3);stroke-width:1.4;fill:none}
+  .edge-skip{stroke:var(--faint);stroke-width:1.2;fill:none;stroke-dasharray:3 3}
+  .edge-l{font-family:var(--mono);font-size:9.5px;fill:var(--muted)}
+  .rule-l{stroke:var(--now);stroke-width:1;stroke-dasharray:4 4;opacity:.6}
+  .rule-t{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;fill:var(--now)}
+
+  /* the call reference */
+  .call{padding:22px 0;border-bottom:1px solid var(--line)}
+  .call:last-child{border-bottom:0}
+  .call .top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .call .num{font-family:var(--mono);font-size:15px;color:var(--now);flex:none}
+  .call h4{font-family:var(--serif);font-size:19px;font-weight:600;margin:0}
+  .call .when{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--faint)}
+  .grid{display:grid;grid-template-columns:96px 1fr;gap:4px 16px;margin-top:12px}
+  .grid dt{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:700;padding-top:4px}
+  .grid dd{margin:0;font-size:13px;color:var(--body)}
+  .grid dd.never{color:var(--bad)}
+  .grid dd.where{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+
+  table{width:100%;border-collapse:collapse;margin-top:14px}
+  th{text-align:left;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 14px 8px 0;border-bottom:1px solid var(--line-2)}
+  td{padding:10px 14px 10px 0;border-bottom:1px solid var(--line);vertical-align:top;font-size:13px;color:var(--body)}
+  td.mono{font-family:var(--mono);font-size:11.5px;color:var(--dim);white-space:nowrap}
+
+  .never{border-left:2px solid var(--bad);padding:2px 0 2px 18px;margin:16px 0}
+  .never li{color:var(--body);margin:6px 0}
+  .note-box{border-left:2px solid var(--warn);padding:2px 0 2px 18px;margin:18px 0;color:var(--body);max-width:76ch}
+  .note-box b{color:var(--warn);font-weight:500}
+  ul{padding-left:20px} li{margin:5px 0}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="masthead">
+    <div class="word">The assistant</div>
+    <div class="sub">what it sees · what it decides · where to change it</div>
+  </div>
+  <div class="dateline">
+    <span>17 Sep 2026 · describes what is built</span>
+    <span>6 model calls · 0 tools · every call single-turn</span>
+  </div>
+
+  <h2>The short answer</h2>
+  <p class="lede">
+    There is no agent loop and no tool use yet. The assistant is <b>six separate prompts</b>,
+    each a single request and a single reply, fired at different moments. Four run on their own
+    in the background; two run because you pressed something. Everything any of them writes goes
+    to Plane B — never to a repo.
+  </p>
+
+  <h2>Every path, from the moment it wakes</h2>
+  <p class="lede">
+    Dashed lines are the paths where <b>nothing is spent</b>. On a fleet that has not moved, every
+    dashed line is taken and the whole pass costs zero.
+  </p>
+
+  <div class="flow">
+  <svg viewBox="0 0 1000 1080" role="img" aria-label="Flow from the clock firing through to what gets written">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#2c3742"/>
+      </marker>
+      <marker id="as" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#3d4650"/>
+      </marker>
+    </defs>
+
+    <!-- lanes -->
+    <text class="lane" x="16" y="70">FREE</text>
+    <text class="lane" x="16" y="86">NO MODEL</text>
+    <text class="lane" x="16" y="466">PAID</text>
+    <text class="lane" x="16" y="482">BACKGROUND</text>
+    <text class="lane" x="16" y="906">YOU</text>
+    <text class="lane" x="16" y="922">PRESSED IT</text>
+
+    <!-- 1 wake -->
+    <rect class="n-box" x="150" y="30" width="380" height="50" rx="9"/>
+    <text class="n-t" x="170" y="52">Bearing starts, or the clock fires</text>
+    <text class="n-s" x="170" y="69">every refreshSeconds · default 60 · 0 turns it off</text>
+    <path class="edge" d="M340 80 L340 108" marker-end="url(#a)"/>
+
+    <!-- 2 read github -->
+    <rect class="n-box" x="150" y="110" width="380" height="58" rx="9"/>
+    <text class="n-t" x="170" y="132">Read GitHub into one Snapshot</text>
+    <text class="n-s" x="170" y="149">branches · PRs · compare · CI. ETag: a 304 is free</text>
+    <text class="n-s" x="170" y="162">no model involved — this is just fetching</text>
+    <path class="edge" d="M340 168 L340 196" marker-end="url(#a)"/>
+
+    <!-- 3 attach -->
+    <rect class="n-box" x="150" y="198" width="380" height="72" rx="9"/>
+    <text class="n-t" x="170" y="220">Attach everything already on disk</text>
+    <text class="n-s" x="170" y="237">goals · summaries · visions · assessments</text>
+    <text class="n-s" x="170" y="250">judgements · the brief</text>
+    <text class="n-s" x="170" y="263">free, instant, and nothing here can fail</text>
+    <path class="edge" d="M340 270 L340 300" marker-end="url(#a)"/>
+
+    <!-- served line -->
+    <line class="rule-l" x1="60" y1="312" x2="940" y2="312"/>
+    <text class="rule-t" x="60" y="305">THE PAGE IS SERVED HERE — NOTHING BELOW EVER HOLDS IT UP</text>
+
+    <!-- 4 summarise -->
+    <rect class="n-call" x="150" y="336" width="380" height="62" rx="9"/>
+    <text class="n-num" x="168" y="358">①</text>
+    <text class="n-t" x="196" y="358">Summarise a branch</text>
+    <text class="n-s" x="196" y="375">one call per branch with no cached summary</text>
+    <text class="n-s" x="196" y="388">→ title · summary · progress · cited SHAs</text>
+    <path class="edge-skip" d="M530 360 C 600 360, 600 424, 660 424" marker-end="url(#as)"/>
+    <text class="edge-l" x="672" y="414">skipped when the head</text>
+    <text class="edge-l" x="672" y="428">has not moved</text>
+    <path class="edge" d="M340 398 L340 426" marker-end="url(#a)"/>
+
+    <!-- 5 draft vision -->
+    <rect class="n-call" x="150" y="428" width="380" height="74" rx="9"/>
+    <text class="n-num" x="168" y="450">②</text>
+    <text class="n-t" x="196" y="450">Draft what a branch is for</text>
+    <text class="n-s" x="196" y="467">active branches only — quiet ones are left alone</text>
+    <text class="n-s" x="196" y="480">→ a falsifiable sentence, marked “proposed”</text>
+    <text class="n-s" x="196" y="493" fill="#f2c976">→ or DECLINES, which is a correct answer</text>
+    <path class="edge-skip" d="M530 452 C 600 452, 600 540, 660 540" marker-end="url(#as)"/>
+    <text class="edge-l" x="672" y="536">skipped when one</text>
+    <text class="edge-l" x="672" y="550">already exists, or</text>
+    <text class="edge-l" x="672" y="564">you switched it off</text>
+    <path class="edge" d="M340 502 L340 530" marker-end="url(#a)"/>
+
+    <!-- 6 assess -->
+    <rect class="n-call" x="150" y="532" width="380" height="62" rx="9"/>
+    <text class="n-num" x="168" y="554">③</text>
+    <text class="n-t" x="196" y="554">Compare the vision to what happened</text>
+    <text class="n-s" x="196" y="571">→ on track · drifted · done · unclear</text>
+    <text class="n-s" x="196" y="584">“overtaken” is not allowed here — see ④</text>
+    <path class="edge-skip" d="M530 556 C 600 556, 600 640, 660 640" marker-end="url(#as)"/>
+    <text class="edge-l" x="672" y="636">skipped when the head</text>
+    <text class="edge-l" x="672" y="650">AND the vision are both</text>
+    <text class="edge-l" x="672" y="664">unchanged</text>
+    <path class="edge" d="M340 594 L340 622" marker-end="url(#a)"/>
+
+    <!-- 7 brief -->
+    <rect class="n-call" x="150" y="624" width="380" height="76" rx="9"/>
+    <text class="n-num" x="168" y="646">④</text>
+    <text class="n-t" x="196" y="646">Read the whole fleet, write the brief</text>
+    <text class="n-s" x="196" y="663">→ the brief · a state per goal · overtaken findings</text>
+    <text class="n-s" x="196" y="676">the only call that sees every branch at once</text>
+    <text class="n-s" x="196" y="689">one call, however many branches you have</text>
+    <path class="edge-skip" d="M530 648 C 600 648, 600 740, 660 740" marker-end="url(#as)"/>
+    <text class="edge-l" x="672" y="736">skipped when no head,</text>
+    <text class="edge-l" x="672" y="750">vision, verdict or goal</text>
+    <text class="edge-l" x="672" y="764">has changed at all</text>
+    <path class="edge" d="M340 700 L340 728" marker-end="url(#a)"/>
+
+    <!-- 8 writes -->
+    <rect class="n-box" x="150" y="730" width="380" height="76" rx="9"/>
+    <text class="n-t" x="170" y="752">Write — Plane B only</text>
+    <text class="n-s" x="170" y="769">data/insights.json · data/visions.json · data/assist.json</text>
+    <text class="n-s" x="170" y="782">the page updates as each one lands, not at the end</text>
+    <text class="n-s" x="170" y="795" fill="#e2705f">no path from here reaches a git repo. ever.</text>
+
+    <!-- budget note -->
+    <rect class="n-box" x="700" y="820" width="284" height="66" rx="9" fill="#141b21" stroke="#f2c97633"/>
+    <text class="n-s" x="716" y="842" fill="#f2c976">ONE BUDGET FOR ① ② ③</text>
+    <text class="n-s" x="716" y="858">llmMaxPerRun, default 40.</text>
+    <text class="n-s" x="716" y="872">Runs out → the next read</text>
+    <text class="n-s" x="716" y="886">picks up where it stopped.</text>
+
+    <!-- on demand -->
+    <line class="rule-l" x1="60" y1="880" x2="660" y2="880" stroke="#3d4650"/>
+    <text class="rule-t" x="60" y="873" fill="#57616b">AND SEPARATELY, WHEN YOU PRESS SOMETHING</text>
+
+    <rect class="n-you" x="150" y="906" width="380" height="60" rx="9"/>
+    <text class="n-num" x="168" y="928" fill="#f2c976">⑤</text>
+    <text class="n-t" x="196" y="928">Ask the advisor</text>
+    <text class="n-s" x="196" y="945">one question, one answer, over the snapshot</text>
+    <text class="n-s" x="196" y="958">writes nothing at all</text>
+
+    <rect class="n-you" x="150" y="982" width="380" height="74" rx="9"/>
+    <text class="n-num" x="168" y="1004" fill="#f2c976">⑥</text>
+    <text class="n-t" x="196" y="1004">Describe several branches at once</text>
+    <text class="n-s" x="196" y="1021">your paragraph → one vision per branch</text>
+    <text class="n-s" x="196" y="1034">proposals only — nothing is written until you</text>
+    <text class="n-s" x="196" y="1047">press Apply</text>
+  </svg>
+  </div>
+
+  <h2>The six calls, in detail</h2>
+  <p class="lede">
+    Each one is a fresh request with no memory of any other. Nothing is carried between them
+    except what got written to disk.
+  </p>
+
+  <div class="call">
+    <div class="top"><span class="num">①</span><h4>Summarise a branch</h4><span class="when">background · once per branch per head</span></div>
+    <dl class="grid">
+      <dt>Sees</dt><dd>One branch: repo, name, ahead/behind, diffstat, CI, PR, and up to 25 commit messages with bodies. Nothing about any other branch.</dd>
+      <dt>Decides</dt><dd>A title, a 1–3 sentence summary, a progress verdict, and which SHAs it rested on.</dd>
+      <dt>May not</dt><dd class="never">Cite a SHA the branch does not contain — invented ones are dropped before you see them.</dd>
+      <dt>Cached on</dt><dd class="where">head SHA + prompt version + model</dd>
+      <dt>Prompt</dt><dd class="where">server/advise/prompt.ts → SYSTEM_PROMPT</dd>
+    </dl>
+  </div>
+
+  <div class="call">
+    <div class="top"><span class="num">②</span><h4>Draft what a branch is for</h4><span class="when">background · once, if there is no vision</span></div>
+    <dl class="grid">
+      <dt>Sees</dt><dd>One branch, same as ① but without the diffstat.</dd>
+      <dt>Decides</dt><dd>A falsifiable sentence, <em class="q">or declines.</em> Declining is a success: a purpose nothing could contradict is worthless as a yardstick.</dd>
+      <dt>May not</dt><dd class="never">Mark its own draft as confirmed. It is stored as <code>proposed</code> and shown as a guess until you say otherwise.</dd>
+      <dt>Cached on</dt><dd class="where">nothing — it runs once, then the vision exists</dd>
+      <dt>Prompt</dt><dd class="where">server/advise/vision.ts → DRAFT_SYSTEM</dd>
+    </dl>
+  </div>
+
+  <div class="call">
+    <div class="top"><span class="num">③</span><h4>Compare the vision to what happened</h4><span class="when">background · per branch, per head, per vision</span></div>
+    <dl class="grid">
+      <dt>Sees</dt><dd>The vision text, then the same branch detail as ②.</dd>
+      <dt>Decides</dt><dd><code>on-track</code>, <code>drifted</code> (and must name what it is doing instead), <code>done</code>, or <code>unclear</code>.</dd>
+      <dt>May not</dt><dd class="never">Return <code>overtaken</code>. A branch judged alone cannot know another branch beat it to the punch, so that verdict is downgraded to <code>unclear</code> if it tries.</dd>
+      <dt>Cached on</dt><dd class="where">head SHA + <b>the vision text</b> + prompt version + model</dd>
+      <dt>Prompt</dt><dd class="where">server/advise/vision.ts → ASSESS_SYSTEM</dd>
+    </dl>
+  </div>
+
+  <div class="call">
+    <div class="top"><span class="num">④</span><h4>The brief</h4><span class="when">background · once per change to anything</span></div>
+    <dl class="grid">
+      <dt>Sees</dt><dd>Every branch at once (capped by <code>askBranchCap</code>, default 60): its vision, its summary, its verdict, its CI and PR. Plus every goal, its note and its members.</dd>
+      <dt>Decides</dt><dd>The brief itself; a state per goal with its reasoning; and which branches have been <b>overtaken</b> by which — the one finding that needs the whole fleet.</dd>
+      <dt>May not</dt><dd class="never">Judge a goal that does not exist, cite a branch not under that goal, or say a branch overtook itself. All three are dropped.</dd>
+      <dt>Cached on</dt><dd class="where">a hash of every head SHA, vision, verdict and goal</dd>
+      <dt>Prompt</dt><dd class="where">server/advise/brief.ts → SYSTEM</dd>
+    </dl>
+  </div>
+
+  <div class="call">
+    <div class="top"><span class="num">⑤</span><h4>Ask the advisor</h4><span class="when">you pressed Ask</span></div>
+    <dl class="grid">
+      <dt>Sees</dt><dd>A compact line per branch plus the goals — the same shape as ④, cheaper.</dd>
+      <dt>Decides</dt><dd>Four sentences of plain English. Nothing else.</dd>
+      <dt>May not</dt><dd class="never">Write anything at all. This call has no side effects.</dd>
+      <dt>Cached on</dt><dd class="where">nothing — you asked, so you get a fresh answer</dd>
+      <dt>Prompt</dt><dd class="where">server/advise/ask.ts → SYSTEM</dd>
+    </dl>
+  </div>
+
+  <div class="call">
+    <div class="top"><span class="num">⑥</span><h4>Describe several branches at once</h4><span class="when">you pressed “describe several”</span></div>
+    <dl class="grid">
+      <dt>Sees</dt><dd>Your paragraph, and a one-line list of every branch that exists.</dd>
+      <dt>Decides</dt><dd>Which branches you meant, and one vision each. It may also flag one as finished or dead.</dd>
+      <dt>May not</dt><dd class="never">Name a branch that does not exist, propose the same branch twice, or write anything before you press Apply.</dd>
+      <dt>Cached on</dt><dd class="where">nothing</dd>
+      <dt>Prompt</dt><dd class="where">server/advise/vision.ts → DISTRIBUTE_SYSTEM</dd>
+    </dl>
+  </div>
+
+  <h2>What it can never do</h2>
+  <ul class="never">
+    <li><b>Touch a repo.</b> No prompt has a write tool, and no code path from any of the six reaches git. Plane A is read-only forever.</li>
+    <li><b>Mark a goal done.</b> It writes a <i>judgement</i>; <code>Goal.done</code> stays your boolean and only an <b>accept</b> click flips it.</li>
+    <li><b>Confirm its own vision.</b> A draft is <code>proposed</code> until you say otherwise, and a proposed vision is marked everywhere it appears.</li>
+    <li><b>Decide a drift is your fault or its own.</b> It reports the drift and offers you both answers.</li>
+    <li><b>Invent evidence.</b> Every SHA, branch name and goal id it returns is checked against the snapshot and dropped if it does not exist.</li>
+  </ul>
+
+  <h2>Tools: none, yet — and that is deliberate</h2>
+  <p class="lede">
+    All six calls are single-turn. The assistant cannot fetch anything, cannot follow up, and
+    cannot look at a second branch. Whatever it needs is written into the prompt before it runs.
+  </p>
+  <div class="note-box">
+    <b>Why:</b> a tool-using agent needs a model that reliably calls tools, and that has never been
+    verified on the OpenCode Go plan. Five provider gates in a row came from building on exactly
+    that kind of assumption. <code>npm run probe</code> answers it in two calls and a few hundred
+    tokens — it is still unrun. The tool catalogue is designed in
+    <code>docs/plans/agent-plan.md</code> §3 and waits on that.
+  </div>
+
+  <h2>Where to change things — today</h2>
+  <table>
+    <thead><tr><th style="width:36%">What you want to change</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td>How the brief is written and ordered</td><td class="mono">server/advise/brief.ts → SYSTEM, part 1</td></tr>
+      <tr><td>How conservative “looks done” is</td><td class="mono">server/advise/brief.ts → SYSTEM, part 2</td></tr>
+      <tr><td>What counts as a good vision</td><td class="mono">server/advise/vision.ts → DRAFT_SYSTEM</td></tr>
+      <tr><td>When something counts as drifted</td><td class="mono">server/advise/vision.ts → ASSESS_SYSTEM</td></tr>
+      <tr><td>How branch summaries read</td><td class="mono">server/advise/prompt.ts → SYSTEM_PROMPT</td></tr>
+      <tr><td>How questions are answered</td><td class="mono">server/advise/ask.ts → SYSTEM</td></tr>
+      <tr><td>Spend per read · questions waiting · auto-drafting</td><td class="mono">Settings, in the app</td></tr>
+    </tbody>
+  </table>
+  <div class="note-box" style="border-color:var(--bad)">
+    <b style="color:var(--bad)">Two traps if you edit a prompt by hand.</b>
+    Every one of them ends with an exact JSON shape. Change that shape and the parser returns
+    nothing — silently, because a failed parse is treated as “the model declined”.
+    And nothing regenerates on its own: bump the matching <code>PROMPT_VERSION</code> beside it, or
+    you get a quiet mix of old reasoning and new.
+  </div>
+
+  <h2>Where to change things — proposed</h2>
+  <p class="lede">
+    Editing TypeScript to tune a sentence is the wrong shape, and it collides with rule 7:
+    nothing hardcoded. The proposal, not yet built:
+  </p>
+  <ul>
+    <li><b>A house-style block per call, edited in the app.</b> The guardrails — return this JSON,
+      do not invent SHAs, decline rather than pad — stay in code where they cannot be broken. Your
+      preferences get appended underneath. <em class="q">“Lead the brief with what is blocking me.
+      Never use the word ‘currently’. Two sentences, not five.”</em></li>
+    <li><b>The house style becomes part of the cache key</b>, so editing it regenerates everything
+      that used it — automatically, no version to remember.</li>
+    <li><b>A full-edit escape hatch</b>, clearly marked, with “restore default” next to it and a
+      visible warning on screen the first time a parse fails.</li>
+  </ul>
+  <p class="lede" style="margin-top:14px">
+    That is stage C of <code>docs/plans/agent-memory-plan.md</code>, arriving from the other
+    direction: there it grows out of feedback on outputs, here out of wanting to set the rules up
+    front. They are the same store.
+  </p>
+
+</div>
+</body>
+</html>

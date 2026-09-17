@@ -236,3 +236,13 @@ test('nothing is awaiting a summary when the advisor is off', () => {
   const s = snap([branch('a')], [], { llm: { enabled: false, pending: 7, errors: [] } });
   assert.equal(tallies(s).awaitingSummary, 0);
 });
+
+test('advisor failures are carried on the snapshot, where a surface can see them', () => {
+  // They used to reach the terminal only: appended to the snapshot but never announced,
+  // then wiped by the next read. A provider error repeating every minute went unseen.
+  const s = snap([branch('a')], [], {
+    llm: { enabled: true, pending: 0, errors: ['the brief: provider returned 400'] },
+  });
+  assert.equal(s.llm.errors.length, 1);
+  assert.equal(tallies(s).awaitingSummary, 0, 'a failure is not the same as work pending');
+});

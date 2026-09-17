@@ -118,6 +118,10 @@ async function enrichInBackground(target: Snapshot): Promise<void> {
     if (assisted.failed > 0) {
       console.error(`assistant: ${assisted.failed} failure(s)`, assisted.errors.join('; '));
       target.llm.errors = [...target.llm.errors, ...assisted.errors];
+      // Say so on screen, not only in the terminal behind start.bat. Appending without
+      // announcing meant the failure was replaced by the next read before the page ever
+      // heard about it — a provider error repeating every minute went unseen for a day.
+      announceIfCurrent();
     }
   } catch (err) {
     console.error('advisor failed:', message(err));
