@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bearing — design explorations</title>
+<link rel="stylesheet" href="fonts.css"><link rel="stylesheet" href="base.css">
+<style>
+  .sheet { max-width: 1000px; margin: 0 auto; padding: 0 36px 150px; position: relative; z-index: 1; }
+  .mast { display: flex; align-items: baseline; gap: 14px; padding: 40px 0 10px; }
+  .mast .word { font-family: var(--serif); font-style: italic; font-size: 30px; }
+  .intro { max-width: 74ch; font-size: 14px; color: var(--body); line-height: 1.65;
+           padding: 14px 0 26px; border-bottom: 1px solid var(--line-2); }
+  .intro em { font-family: var(--serif); color: var(--note); }
+  .x { display: grid; grid-template-columns: 30px 1fr 300px; gap: 20px; align-items: start;
+       padding: 22px 0; border-bottom: 1px solid var(--line); text-decoration: none; }
+  .x:hover { background: #ffffff05; }
+  .x.best { background: #62c9c008; border-bottom-color: transparent; }
+  .x .no { font-family: var(--mono); font-size: 11px; color: var(--muted); padding-top: 4px; }
+  .x.best .no { color: var(--now); }
+  .x h2 { font-family: var(--serif); font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+  .x .one { font-size: 13.5px; color: var(--body); max-width: 60ch; line-height: 1.55; }
+  .x .tag { font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-bottom: 6px; }
+  .x.best .tag { color: var(--now); }
+  .v { font-size: 12.5px; line-height: 1.6; }
+  .v .good, .v .bad { display: block; padding: 2px 0 2px 16px; position: relative; }
+  .v .good { color: var(--good); } .v .bad { color: var(--dim); }
+  .v .good::before { content: "+"; position: absolute; left: 0; font-family: var(--mono); }
+  .v .bad::before { content: "−"; position: absolute; left: 0; font-family: var(--mono); color: var(--muted); }
+  .foot { padding: 30px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.7; max-width: 76ch; }
+  .foot code { font-family: var(--mono); font-size: 11.5px; color: var(--dim); }
+</style></head>
+<body><div class="sheet">
+  <div class="mast"><span class="word">Bearing</span><span class="eyebrow">design explorations</span></div>
+  <div class="intro">
+    Six full interfaces, all speaking the one design language lifted from the prototype's variant C —
+    <em>rows on a rule, a fixed time column, a glyph gutter, mono for facts and serif italic for
+    reflection, and teal used exactly once.</em> The language lives in <code>base.css</code> and never
+    changes between them; what changes is the structure built on top. Every one renders the same
+    sample <code>Snapshot</code> from <code>data.js</code> and computes nothing of its own.
+    <br><br>Use <kbd>←</kbd> <kbd>→</kbd> to flip between them.
+  </div>
+  <div id="list"></div>
+  <div class="foot">
+    Nothing here is wired to the engine yet — these are interfaces over a fixed sample snapshot, so
+    every number, branch name and summary you see is plausible rather than live. The point is the
+    structure and the reading, not the data.
+  </div>
+</div>
+<script>
+const XS = [
+  ['d6.html', 'The Ledger', 'D6', 'The one I would build', true,
+   'One column, one ledger, two spines: the same rows read <b>by thread</b> or <b>by day</b>, because those are the only two questions and they are the same data. The command line is always visible rather than hidden behind a shortcut, and an answer is <i>filed</i> into the ledger as a dated entry instead of scrolling away in a chat.',
+   [['good', 'Densest reading here without feeling crowded'], ['good', 'The two questions, one structure — no second screen'], ['good', 'Agent surface is part of the page, not a panel over it'], ['bad', 'The filed answers need a rule for when they age out']]],
+  ['d1.html', 'The Register', 'D1', 'Purest ledger', false,
+   'One continuous table of every branch, newest first. No nav, no panes: a row opens downward in place. The closest thing to reading a bank statement of your repos.',
+   [['good', 'Fastest scan of everything you have'], ['good', 'Nothing to learn — it is a list'], ['bad', 'No sense of time; a week and a day look identical']]],
+  ['d2.html', 'The Day Book', 'D2', 'Closest to the prototype', false,
+   'Time is the spine. Days descending, every repo interleaved inside a day. The direct descendant of variant C, adapted to commits you were not there to watch.',
+   [['good', 'Answers "what moved while I was away" perfectly'], ['good', 'The interleaving is genuinely pleasurable to read'], ['bad', 'Hard to ask "what is this one branch doing"']]],
+  ['d3.html', 'The Split Ledger', 'D3', 'The workstation', false,
+   'Three panes — repos, register, dossier. The list never moves while you read a branch, so you keep your place. The most conventional, and the most capable per branch.',
+   [['good', 'Deepest per-branch view; the note box has room'], ['good', 'Keeps your place in a long list'], ['bad', 'Three panes is exactly the shape you said felt over-used']]],
+  ['d4.html', 'The Broadsheet', 'D4', 'The most beautiful', false,
+   'No navigation at all. A masthead, a leader column of prose, and a standing register down the side. The only one you could hand to another person and have them understand it.',
+   [['good', 'Puts plain English where it belongs — first and large'], ['good', 'Reads like something, not like a tool'], ['bad', 'Three branches fill a screen. At ~100 branches that hurts']]],
+  ['d5.html', 'The Console', 'D5', 'The agent-native one', false,
+   'Keyboard first. One command line, and everything below is the ledger answering. Answers carry their tool calls and their cost, so you can see what a question actually did.',
+   [['good', 'The clearest model for what the agent is and costs'], ['good', 'Search, filter and ask are one gesture'], ['bad', 'A blank prompt is a bad first screen; you have to know what to type']]],
+];
+document.getElementById('list').innerHTML = XS.map(([href, name, no, tag, best, one, v]) => `
+  <a class="x ${best ? 'best' : ''}" href="${href}">
+    <span class="no">${no}</span>
+    <span><span class="tag">${tag}</span><h2>${name}</h2><div class="one">${one}</div></span>
+    <span class="v">${v.map(([k, t]) => `<span class="${k}">${t}</span>`).join('')}</span>
+  </a>`).join('');
+</script></body></html>

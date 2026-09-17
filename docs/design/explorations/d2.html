@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<!--
+  D2 — THE DAY BOOK
+  Time is the spine. Days descending; inside a day, every repo interleaved. The closest
+  descendant of the prototype's variant C, adapted to the fact that these commits are
+  pushed by agents you were not watching. It answers "what moved while I was away".
+-->
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bearing — D2 The Day Book</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="base.css">
+<style>
+  .wrap { position: relative; z-index: 1; display: flex; align-items: flex-start; padding-bottom: 130px; }
+  .main { flex: 1; min-width: 0; padding: 22px 40px 0; max-width: 980px; }
+  .now-bar { margin-bottom: 30px; }
+  .bchip { font-family: var(--mono); font-size: 10.5px; padding: 1px 8px; border-radius: 6px;
+           border: 1px solid; flex: none; width: 214px; text-align: left; overflow: hidden;
+           text-overflow: ellipsis; white-space: nowrap; }
+  .ev .what .hint { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .day-rule { height: 1px; background: var(--line); margin: 0 0 14px; }
+  .quiet-note { font-size: 12px; color: var(--muted); font-style: italic; padding: 8px 0 0 20px; }
+  .rail .warn { margin: 16px 8px; font-size: 11px; color: var(--bad); line-height: 1.5; font-family: var(--mono); }
+  .rail-item .t { margin-left: auto; flex: none; font-family: var(--mono); font-size: 9.5px; color: var(--faint); }
+  .older { margin-top: 20px; padding: 16px 0 0; border-top: 1px solid var(--line-2); display: flex; align-items: baseline; gap: 14px; }
+  .older .eyebrow { flex: none; }
+  .older p { margin: 0; font-size: 12px; color: var(--muted); }
+</style></head>
+<body>
+<div class="wrap">
+  <nav class="rail">
+    <div class="brand"><div><div class="word">Bearing</div><small>the day book</small></div></div>
+    <div id="nav"></div>
+    <div class="warn" id="warn"></div>
+  </nav>
+  <main class="main">
+    <div class="now-bar" id="now"></div>
+    <div id="dayz"></div>
+    <div class="older">
+      <span class="eyebrow">Before that</span>
+      <p id="older"></p>
+    </div>
+  </main>
+</div>
+<div class="xbar" id="xbar"></div>
+<script src="data.js"></script><script src="frame.js"></script>
+<script>
+const HUE = { 'greensand321/repo_tracker': '#62c9c0', 'greensand321/Project_Management': '#e0aa4e',
+              'greensand321/kimi-mockups': '#9db98a', 'greensand321/homelab': '#74a8e0' };
+
+const bchip = b => `<button class="bchip" style="color:${HUE[b.repoKey]};border-color:${HUE[b.repoKey]}44;background:${HUE[b.repoKey]}0f"
+  title="${b.repoKey}">${b.name}</button>`;
+
+function evRow(e) {
+  if (e.kind === 'commit') {
+    return `<div class="ev commit"><span class="when">${clock(e.at)}</span>${bchip(e.branch)}
+      <span class="what"><span class="msg">${esc(e.commit.message)}</span>
+      ${e.commit.body ? `<span class="reflect">${esc(e.commit.body)}</span>` : ''}</span></div>`;
+  }
+  const cls = e.kind === 'ci' ? 'ci' : 'pr';
+  return `<div class="ev ${cls}"><span class="when">${clock(e.at)}</span>${bchip(e.branch)}
+    <span class="what" style="color:${e.kind === 'ci' ? 'var(--bad)' : 'var(--pr)'}">${esc(e.text)}</span></div>`;
+}
+
+const n = nowThread(), c = counts();
+document.getElementById('now').innerHTML = `
+  <div>
+    <div class="eyebrow now">Happening now</div>
+    <div class="title">${esc(n.title)}</div>
+    <div class="sub">${shortRepo(n.repoKey)} · ${n.name} · ↑${n.ahead} ↓${n.behind} · last commit ${age(n.lastActivity)} ago</div>
+  </div>
+  <div class="right">
+    <div class="counts">
+      <span><b>${c.active}</b> live</span><span><b>${c.failing}</b> red</span>
+      <span><b>${c.open}</b> open PR</span><span><b>${c.quiet}</b> quiet</span>
+    </div>
+    <button class="ask" style="width:auto">Ask about this week <span class="kbd">⌘K</span></button>
+  </div>`;
+
+document.getElementById('nav').innerHTML = SNAP.repos.map(r => {
+  const bs = threads().filter(b => b.repoKey === r.key).sort(byRecency);
+  return `<div class="rail-group">
+    <div class="rail-head"><span class="dot" style="background:${HUE[r.key]}"></span>${r.name}<span class="n">${r.branchCount}</span></div>
+    ${bs.map(b => `<button class="rail-item ${b === n ? 'sel' : ''}">
+      <span class="dot ${b.ci.state === 'failing' ? 'blocked' : b.relevance === 'quiet' ? 'quiet' : b.progress === 'done' ? 'done' : b.progress === 'stalled' ? 'stalled' : 'active'}"></span>
+      <span>${b.name}</span><span class="t">${age(b.lastActivity)}</span></button>`).join('')}
+  </div>`;
+}).join('');
+document.getElementById('warn').innerHTML = SNAP.warnings.map(w => '! ' + esc(w)).join('<br>');
+
+document.getElementById('dayz').innerHTML = days().map(([key, evs]) => {
+  const [name, sub] = dayLabel(key);
+  const repos = [...new Set(evs.map(e => shortRepo(e.branch.repoKey)))];
+  return `<div class="day">
+    <div class="day-head"><span class="d-name">${name}</span><span class="d-sub">${sub} · ${evs.length} events across ${repos.length} ${repos.length === 1 ? 'repo' : 'repos'}</span></div>
+    <div class="day-rule"></div>
+    <div class="stream">${evs.map(evRow).join('')}</div>
+  </div>`;
+}).join('');
+
+document.getElementById('older').innerHTML =
+  `${c.quiet} branches have gone quiet and folded away — the oldest is ${ageLong(quiet().sort(byRecency).pop().lastActivity)}. ` +
+  `${c.folded} more are still tracked but have nothing new to say. Nothing is ever deleted.`;
+</script></body></html>

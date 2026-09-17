@@ -1,0 +1,7 @@
+/* Self-hosted so the explorations render with no network at all. Latin subset only.
+   Fraunces and Inter are variable fonts — declared as weight ranges so the browser
+   actually interpolates instead of snapping to one instance. */
+@font-face{font-family:'Fraunces';font-style:normal;font-weight:100 900;font-display:swap;src:url(fonts/Fraunces-normal-400.woff2) format('woff2');}
+@font-face{font-family:'Fraunces';font-style:italic;font-weight:100 900;font-display:swap;src:url(fonts/Fraunces-italic-400.woff2) format('woff2');}
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url(fonts/Inter-normal-400.woff2) format('woff2');}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:100 800;font-display:swap;src:url(fonts/JetBrainsMono-normal-400.woff2) format('woff2');}

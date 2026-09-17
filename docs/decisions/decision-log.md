@@ -76,6 +76,41 @@ open: [`open-questions.md`](open-questions.md).
 
 ---
 
+### D54 — The interface is built in the prototype's variant C language ("The Logbook")
+
+Supersedes **D22** (build from `dashboard-concept.html`). The owner's words: the ledger
+layout "just felt so professional and like it was just ready for work. The card approach on
+the other hand just look over used and childish by comparison."
+
+The language is extracted once into `docs/design/explorations/base.css` and does not vary:
+rows on a rule and no cards; a fixed-width time column; a glyph gutter; mono for machine
+facts and serif italic for human reflection; teal used exactly once, on whatever is
+happening now. The header comment in that file names all five, so a later revision cannot
+quietly drop one.
+
+Variant A ("The Bridge", card-based) is rejected. Variant B ("The Map") is **postponed at
+the owner's request** — not rejected — to be revisited when the time is right.
+
+### D55 — One ledger, two spines: by thread and by day
+
+Chosen from six explorations (`docs/design/explorations/`, D6 "The Ledger"). "What is each
+branch doing" and "what moved while I was away" are the only two questions the tool has to
+answer, and they are the same rows grouped two ways. So there is **one** ledger with a
+spine toggle, not two screens — the clearest possible expression of rule 4, since a second
+screen would inevitably start computing facts of its own.
+
+Consequences: no nav rail (the repo list is a filter, not a place); a row expands **in
+place** into its dossier rather than opening a third pane; the advisor's command line is
+permanent rather than behind ⌘K; and an answer is **filed into the ledger** as a dated
+entry carrying its tool calls and its cost, not shown in a chat bubble that scrolls away.
+
+### D56 — Fonts are self-hosted
+
+The explorations ship `fonts/` (Fraunces, Inter, JetBrains Mono, latin subset, ~390 KB) and
+`fonts.css` instead of linking Google Fonts. A local-first program that silently degrades
+when the network is down is not local-first, and typography carries the whole hierarchy
+here (D54) — falling back to system faces is not a cosmetic loss.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.
@@ -109,6 +144,7 @@ Kept because the arguments still explain how the current design was reached.
 | ~~Success metric: branch reduction~~ | D7 | The goal is the opposite. |
 | ~~Performance budget: < 5 s across 4 repos, ≤ 3 git calls per branch~~ | — | Written for local subprocess calls. A network-bound budget needs rewriting once the stack is chosen. |
 | ~~`safe-to-delete` is list-only, permanently~~ | Still true, but deprioritized | Follows from D1. Just no longer a feature anyone is waiting for. |
+| ~~Build the dashboard from `dashboard-concept.html`~~ (D22) | **D54** | Wrong file. The three-variant prototype was in `docs/design/prototype/` the whole time; variant C is the design language. Cards are out. |
 
 ---
 

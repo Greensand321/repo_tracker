@@ -1,0 +1,241 @@
+/*
+ * THE LEDGER — design language extracted from the prototype's variant C ("The Logbook").
+ *
+ * What makes it work, so it does not get lost in a later revision:
+ *   1. No cards. Rows on a rule. Density reads as competence; boxes read as toys.
+ *   2. A fixed-width time column, so every row starts at the same x. That single
+ *      constraint is most of the rhythm.
+ *   3. A glyph gutter — ✦ ✗ ⚓ ⚑ ↩ — giving texture without a single border.
+ *   4. Mono for machine facts, serif italic for human reflection. One typographic
+ *      hierarchy carries the whole meaning: if it is in italics, a person thought it.
+ *   5. Teal appears once, on whatever is happening NOW. Everything else is grey.
+ */
+
+:root {
+  --bg: #0e1216;
+  --panel: #101519;
+  --panel-2: #141b21;
+  --panel-3: #19212a;
+  --line: #1d232b;
+  --line-2: #232c35;
+  --line-3: #2c3742;
+
+  --text: #d7dde3;
+  --text-hi: #eef6f4;
+  --body: #b9c2cd;
+  --dim: #8b93a8;
+  --muted: #57616b;
+  --faint: #3d4650;
+
+  --now: #62c9c0;
+  --now-dim: #3d8f88;
+  --warn: #f2c976;
+  --bad: #e2705f;
+  --good: #63c08a;
+  --pr: #74a8e0;
+  --note: #d8c8a8;
+
+  --serif: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--sans); font-size: 14px; line-height: 1.5;
+  color: var(--text); background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(1000px 500px at 85% -8%, rgba(98,201,192,.055), transparent 60%);
+}
+button, input, textarea { font-family: inherit; color: inherit; background: none; border: none; }
+button { cursor: pointer; }
+a { color: inherit; }
+::selection { background: rgba(98,201,192,.26); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #202832; border-radius: 8px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.mono { font-family: var(--mono); }
+.serif { font-family: var(--serif); }
+.hidden { display: none !important; }
+
+/* ---- primitives -------------------------------------------------------- */
+
+/** Tiny letterspaced label. Used for every section heading in the language. */
+.eyebrow {
+  font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase;
+  font-weight: 700; color: var(--muted);
+}
+.eyebrow.now { color: var(--now); }
+
+/** The serif display face, used for names and days — never for data. */
+.display { font-family: var(--serif); font-weight: 600; letter-spacing: .002em; }
+
+/** Human reflection. If it is in italics, a person (or the advisor) thought it. */
+.reflect {
+  font-family: var(--serif); font-style: italic; color: var(--note);
+  font-size: 13px; line-height: 1.5;
+}
+
+/** A hairline pill. Border only — never filled, never a "card". */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 10.5px; line-height: 1.6;
+  padding: 1px 8px; border-radius: 6px; border: 1px solid var(--line-2);
+  color: var(--dim); white-space: nowrap;
+}
+.chip.ci-passing { color: var(--good); border-color: #63c08a3a; }
+.chip.ci-failing { color: var(--bad);  border-color: #e2705f45; }
+.chip.ci-pending { color: var(--warn); border-color: #f2c9763a; }
+.chip.pr-open    { color: var(--pr);   border-color: #74a8e03a; }
+.chip.pr-merged  { color: #a98bdb;     border-color: #a98bdb3a; }
+.chip.prog-progressing { color: var(--good); border-color: #63c08a2e; }
+.chip.prog-stalled     { color: var(--warn); border-color: #f2c9762e; }
+.chip.prog-blocked     { color: var(--bad);  border-color: #e2705f38; }
+.chip.prog-done        { color: #a98bdb;     border-color: #a98bdb2e; }
+
+/** Status dot, for nav lists. */
+.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--faint); }
+.dot.active { background: var(--now); box-shadow: 0 0 7px #62c9c088; }
+.dot.blocked { background: var(--bad); }
+.dot.stalled { background: var(--warn); }
+.dot.done    { background: #a98bdb; }
+.dot.quiet   { background: var(--faint); }
+
+/* ---- the stream: a rule, a glyph gutter, and rows ---------------------- */
+
+.stream { position: relative; padding-left: 20px; }
+.stream::before {
+  content: ""; position: absolute; left: 5px; top: 8px; bottom: 8px;
+  width: 1.5px; background: var(--line-2);
+}
+.ev {
+  position: relative; display: flex; gap: 14px; align-items: baseline;
+  padding: 7px 0;
+}
+.ev::before {
+  content: attr(data-glyph); position: absolute; left: -20px; top: 7px; width: 14px;
+  font-size: 10px; display: flex; justify-content: center; color: var(--muted);
+}
+.ev.commit::before { content: "●"; color: var(--muted); }
+.ev.win::before    { content: "✦"; color: var(--warn); }
+.ev.wrong::before  { content: "✗"; color: var(--bad); }
+.ev.note::before   { content: "✎"; color: var(--warn); }
+.ev.parked::before { content: "⚓"; color: var(--dim); }
+.ev.ci::before     { content: "⚑"; color: var(--bad); }
+.ev.pr::before     { content: "↗"; color: var(--pr); }
+.ev.branch::before { content: "⑂"; color: var(--good); }
+.ev.left::before   { content: "↩"; color: var(--warn); }
+.ev.rest::before   { content: "≈"; color: var(--muted); }
+.ev.now::before    { content: "◉"; color: var(--now); }
+
+/** The fixed time column. This one rule is most of the rhythm. */
+.ev .when {
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  width: 46px; flex: none;
+}
+.ev .what { font-size: 13px; color: var(--body); min-width: 0; }
+.ev .what .msg { font-family: var(--mono); font-size: 12px; color: var(--text); }
+.ev .what .reflect { display: block; margin-top: 2px; }
+
+/* ---- the register: rows, never cards ----------------------------------- */
+
+.reg { width: 100%; border-collapse: collapse; }
+.reg th {
+  text-align: left; font-size: 9.5px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; padding: 0 12px 8px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+.reg td { padding: 11px 12px 11px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.reg tr.row { cursor: pointer; }
+.reg tr.row:hover td { background: #ffffff05; }
+.reg tr.row.open td { background: #62c9c00a; }
+.reg .g { width: 18px; color: var(--muted); font-size: 11px; }
+.reg .name { font-family: var(--mono); font-size: 12.5px; color: var(--text); }
+.reg .repo { color: var(--muted); }
+.reg .title { font-family: var(--serif); font-size: 15px; margin-top: 3px; color: var(--text-hi); }
+.reg .num { font-family: var(--mono); font-size: 11.5px; color: var(--dim); white-space: nowrap; }
+.reg .num .up { color: var(--good); }
+.reg .num .down { color: var(--bad); }
+.reg .age, .age { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* ---- nav rail ---------------------------------------------------------- */
+
+.rail {
+  width: 248px; flex: none; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  padding: 22px 12px 30px 20px; border-right: 1px solid var(--line); background: var(--panel);
+}
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 20px; }
+.brand .word { font-family: var(--serif); font-style: italic; font-size: 20px; }
+.brand small { display: block; font-size: 8.5px; letter-spacing: .22em; color: var(--muted); text-transform: uppercase; }
+.rail-group { margin-bottom: 18px; }
+.rail-head {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  font-family: var(--mono); font-size: 12px; color: var(--dim);
+}
+.rail-head .n { margin-left: auto; font-size: 10px; color: var(--muted); }
+.rail-item {
+  width: 100%; display: flex; align-items: center; gap: 8px; text-align: left;
+  padding: 6px 10px 6px 24px; border-radius: 7px; font-size: 12.5px;
+  color: var(--dim); transition: .12s;
+}
+.rail-item:hover { background: #ffffff0c; color: var(--text); }
+.rail-item.sel { background: #62c9c014; color: var(--text-hi); }
+.rail-item span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- the now bar ------------------------------------------------------- */
+
+.now-bar {
+  position: relative; display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  border: 1px solid var(--line-2); border-radius: 12px; padding: 13px 18px;
+  background: linear-gradient(120deg, var(--panel-2), var(--panel)); overflow: hidden;
+}
+.now-bar::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, var(--now), var(--now-dim)); }
+.now-bar .title { font-family: var(--serif); font-size: 21px; font-weight: 600; margin-top: 2px; }
+.now-bar .sub { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 3px; }
+.now-bar .right { margin-left: auto; display: flex; gap: 14px; align-items: center; }
+
+.counts { display: flex; gap: 16px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.counts b { color: var(--body); font-weight: 500; }
+
+/* ---- ask bar ----------------------------------------------------------- */
+
+.ask {
+  display: flex; align-items: center; gap: 10px; background: var(--panel-2);
+  border: 1px solid var(--line-3); border-radius: 10px; padding: 9px 14px;
+  font-size: 12.5px; color: var(--dim); transition: .15s; width: 100%;
+}
+.ask:hover, .ask:focus-within { border-color: #62c9c077; color: var(--text); }
+.ask input { flex: 1; outline: 0; font-size: 12.5px; color: var(--text); }
+.ask input::placeholder { color: var(--muted); }
+.ask .kbd {
+  font-family: var(--mono); font-size: 10px; background: var(--panel-3);
+  border: 1px solid var(--line-3); border-radius: 5px; padding: 1px 6px; color: var(--dim);
+}
+
+/* ---- day heading ------------------------------------------------------- */
+
+.day-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 12px; }
+.day-head .d-name { font-family: var(--serif); font-size: 18px; font-weight: 600; }
+.day-head .d-sub { font-size: 11px; color: var(--muted); font-style: italic; }
+.day { margin-bottom: 30px; }
+
+/* ---- exploration frame (not part of any design) ------------------------ */
+.xbar {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 900;
+  display: flex; align-items: center; gap: 4px; padding: 5px;
+  background: #05080b; border: 1.5px dashed #3d4650; border-radius: 999px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.6);
+}
+.xbar a {
+  text-decoration: none; font-size: 11.5px; padding: 6px 13px; border-radius: 999px;
+  color: var(--dim);
+}
+.xbar a:hover { background: #ffffff12; color: var(--text); }
+.xbar a.on { background: var(--now); color: #08201e; font-weight: 600; }
+.xbar .lbl { font-size: 8.5px; letter-spacing: .2em; color: var(--muted); padding: 0 10px 0 12px; }

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<!--
+  D6 — THE LEDGER  ★ the one I would build
+  The synthesis. One column, one ledger, two spines: the same rows grouped BY THREAD
+  or BY DAY, because "what is each branch doing" and "what moved while I was away" are
+  the only two questions, and they are the same data read two ways (CLAUDE.md rule 4).
+  The command line is always present rather than hidden behind a shortcut, and an answer
+  is filed into the ledger as a dated entry — not a chat bubble that scrolls away.
+-->
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bearing — D6 The Ledger</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="base.css">
+<style>
+  .sheet { max-width: 1160px; margin: 0 auto; padding: 0 36px 150px; position: relative; z-index: 1; }
+
+  /* --- masthead: a line, not a banner --- */
+  .mast { display: flex; align-items: baseline; gap: 14px; padding: 24px 0 12px; border-bottom: 1px solid var(--line-2); }
+  .mast .word { font-family: var(--serif); font-style: italic; font-size: 22px; }
+  .mast .eyebrow { transform: translateY(-1px); }
+  .mast .read { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+  .mast .read s { text-decoration: none; color: var(--faint); }
+
+  /* --- the command line. always here. this is the agent. --- */
+  .cmd { display: flex; align-items: center; gap: 12px; padding: 15px 2px 13px; border-bottom: 1px solid var(--line-2); }
+  .cmd .caret { font-family: var(--mono); font-size: 15px; color: var(--now); }
+  .cmd input { flex: 1; outline: 0; font-size: 15px; font-family: var(--serif); color: var(--text-hi); }
+  .cmd input::placeholder { color: var(--muted); font-style: italic; }
+  .cmd .kbd { font-family: var(--mono); font-size: 10px; border: 1px solid var(--line-3); border-radius: 5px; padding: 2px 7px; color: var(--muted); }
+  .sug { display: flex; gap: 5px; flex-wrap: wrap; padding: 9px 0 0; }
+  .sug button { font-family: var(--mono); font-size: 10.5px; color: var(--muted); border: 1px solid var(--line-2); border-radius: 6px; padding: 2px 9px; }
+  .sug button:hover { color: var(--text); border-color: var(--line-3); }
+  .sug button b { color: var(--warn); font-weight: 400; }
+
+  /* --- standing line --- */
+  .standing { display: flex; align-items: center; gap: 2px; padding: 12px 0; flex-wrap: wrap; }
+  .st { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 3px 10px; border-radius: 999px; border: 1px solid transparent; }
+  .st b { color: var(--body); font-weight: 500; }
+  .st:hover { background: #ffffff08; color: var(--text); }
+  .st.on { border-color: var(--line-3); background: var(--panel-2); }
+  .st.red b { color: var(--bad); }
+  .find { margin-left: auto; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line-2); padding: 3px 2px; }
+  .find input { font-family: var(--mono); font-size: 11.5px; outline: 0; width: 200px; }
+  .find input::placeholder { color: var(--faint); }
+  .find .kbd { font-family: var(--mono); font-size: 9.5px; color: var(--faint); border: 1px solid var(--line-2); border-radius: 4px; padding: 0 5px; }
+
+  /* --- the now band: flush, ruled, never a card --- */
+  .nowband { position: relative; display: flex; align-items: center; gap: 22px; padding: 16px 0 16px 18px;
+             border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); margin-bottom: 2px; }
+  .nowband::before { content: ""; position: absolute; left: 0; top: -1px; bottom: -1px; width: 2px;
+             background: linear-gradient(180deg, var(--now), var(--now-dim)); }
+  .nowband .ttl { font-family: var(--serif); font-size: 23px; font-weight: 600; margin-top: 3px; letter-spacing: -.008em; }
+  .nowband .sub { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 5px; }
+  .nowband .acts { margin-left: auto; display: flex; gap: 8px; flex: none; }
+  .act { font-family: var(--mono); font-size: 10.5px; color: var(--dim); border: 1px solid var(--line-2);
+         border-radius: 7px; padding: 5px 11px; }
+  .act:hover { border-color: #62c9c066; color: var(--text-hi); }
+
+  /* --- ledger head: the one control that matters --- */
+  .lhead { display: grid; grid-template-columns: 20px 1fr 84px 66px 190px 44px; gap: 14px;
+          align-items: end; padding: 22px 0 9px; border-bottom: 1px solid var(--line-2); }
+  .lhead .spine { grid-column: 1 / 3; }
+  .spine { display: flex; gap: 0; }
+  .spine button { font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; font-weight: 700;
+                  color: var(--faint); padding: 4px 13px; border-bottom: 2px solid transparent; margin-bottom: -10px; }
+  .spine button:hover { color: var(--dim); }
+  .spine button.on { color: var(--text-hi); border-bottom-color: var(--now); }
+  .lhead .col { font-size: 9px; letter-spacing: .18em; text-transform: uppercase;
+                color: var(--faint); font-weight: 700; text-align: right; }
+
+  /* --- rows: a grid, so the columns are exact --- */
+  .row { display: grid; grid-template-columns: 20px 1fr 84px 66px 190px 44px; gap: 14px; align-items: baseline;
+         padding: 12px 0; border-bottom: 1px solid var(--line); cursor: pointer; text-align: left; width: 100%; }
+  .row:hover { background: #ffffff05; }
+  .row.open { background: #62c9c008; border-bottom-color: transparent; }
+  .row .g { font-size: 11px; color: var(--muted); text-align: center; }
+  .row.open .g { color: var(--now); }
+  .row .nm { display: block; font-family: var(--mono); font-size: 12px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .nm b { color: var(--text); font-weight: 400; }
+  .row .tt { display: block; font-family: var(--serif); font-size: 15.5px; color: var(--text-hi); margin-top: 3px; line-height: 1.3; }
+  .row .tt.raw { font-family: var(--mono); font-size: 12px; color: var(--muted); font-style: normal; }
+  .row .num { font-family: var(--mono); font-size: 11.5px; text-align: right; }
+  .row .num .u { color: var(--good); } .row .num .d { color: var(--bad); }
+  .row .chips { display: flex; gap: 5px; justify-content: flex-end; }
+  .row .chips .chip { font-size: 10px; padding: 1px 7px; }
+  .row .age { text-align: right; }
+  .strip { display: flex; gap: 2px; align-items: flex-end; height: 14px; justify-content: flex-end; }
+  .strip i { width: 6px; display: block; background: var(--line-2); border-radius: 1px; }
+  .strip i.on { background: var(--now-dim); }
+  .strip i.today.on { background: var(--now); }
+
+  /* --- expansion: the dossier, in place --- */
+  .drop { border-bottom: 1px solid var(--line); padding: 2px 0 26px 34px; background: #62c9c006; }
+  .drop .why { max-width: 76ch; margin: 4px 0 18px; font-size: 13.5px; }
+  .drop .raw-note { font-size: 12px; color: var(--muted); font-style: italic; margin: 4px 0 18px; }
+  .drop .sub-h { display: block; margin: 20px 0 10px; }
+  .note { border: 1px solid var(--line-2); border-radius: 9px; padding: 11px 13px; background: var(--panel); max-width: 640px; }
+  .note textarea { width: 100%; min-height: 44px; resize: vertical; outline: 0; font-family: var(--serif);
+                   font-style: italic; font-size: 13px; color: var(--note); }
+  .note .plane { font-family: var(--mono); font-size: 9.5px; color: var(--faint); margin-top: 6px; }
+  .prov { font-family: var(--mono); font-size: 10px; color: var(--faint); line-height: 1.9; margin-top: 18px; }
+  .rowacts { display: flex; gap: 7px; margin-top: 16px; }
+
+  /* --- day spine --- */
+  .day-head { padding: 26px 0 10px; border-bottom: 1px solid var(--line-2); margin-bottom: 4px; }
+  .dayrow { display: grid; grid-template-columns: 20px 46px 200px 1fr 44px; gap: 14px; align-items: baseline;
+            padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .dayrow:hover { background: #ffffff04; }
+  .dayrow .g { font-size: 10px; text-align: center; color: var(--muted); }
+  .dayrow .t { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .dayrow .bn { font-family: var(--mono); font-size: 10.5px; padding: 1px 8px; border-radius: 6px; border: 1px solid;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dayrow .tx { font-size: 13px; color: var(--body); min-width: 0; }
+  .dayrow .tx .msg { font-family: var(--mono); font-size: 12px; color: var(--text); }
+  .dayrow .sha { font-family: var(--mono); font-size: 10px; color: var(--faint); text-align: right; }
+
+  /* --- answers filed into the ledger --- */
+  .filed { border-bottom: 1px solid var(--line); padding: 16px 0 18px; }
+  .filed .fh { display: grid; grid-template-columns: 20px 1fr 44px; gap: 14px; align-items: baseline; }
+  .filed .fq { font-family: var(--mono); font-size: 13px; color: var(--text-hi); }
+  .filed .fa { padding-left: 34px; margin-top: 10px; }
+  .filed .lede { font-family: var(--serif); font-size: 17px; line-height: 1.42; color: var(--text-hi); max-width: 60ch; }
+  .filed .bod { font-size: 13px; color: var(--body); max-width: 74ch; margin-top: 9px; line-height: 1.62; }
+  .filed .meta { display: flex; gap: 6px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+  .tool { font-family: var(--mono); font-size: 10px; color: var(--muted); border: 1px solid var(--line-2); border-radius: 5px; padding: 1px 7px; }
+  .tool.free { color: var(--good); border-color: #63c08a26; }
+  .tool.paid { color: var(--warn); border-color: #f2c97626; }
+  .filed .cost { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-left: auto; }
+
+  /* --- fold --- */
+  .fold { display: flex; align-items: center; gap: 14px; width: 100%; padding: 18px 0; margin-top: 8px;
+          border-top: 1px solid var(--line-2); color: var(--muted); }
+  .fold .rule { flex: 1; height: 1px; background: var(--line); }
+  .fold .n { font-family: var(--mono); font-size: 11px; }
+  .keys { font-family: var(--mono); font-size: 10px; color: var(--faint); padding: 22px 0 0; display: flex; gap: 18px; }
+  .keys kbd { border: 1px solid var(--line-2); border-radius: 4px; padding: 0 5px; color: var(--muted); }
+</style></head>
+<body>
+<div class="sheet">
+  <div class="mast">
+    <span class="word">Bearing</span><span class="eyebrow">the ledger</span>
+    <span class="read" id="read"></span>
+  </div>
+
+  <div class="cmd"><span class="caret">›</span>
+    <input id="q" placeholder="Ask about any of this — or type a branch name to find it" autofocus>
+    <span class="kbd">⏎</span></div>
+  <div class="sug" id="sug"></div>
+
+  <div class="standing" id="standing"></div>
+  <div class="nowband" id="nowband"></div>
+
+  <div class="lhead">
+    <div class="spine">
+      <button data-spine="thread" class="on">By thread</button>
+      <button data-spine="day">By day</button>
+    </div>
+    <span class="col" id="c1"></span><span class="col" id="c2"></span>
+    <span class="col" id="c3"></span><span class="col" id="c4"></span>
+  </div>
+
+  <div id="ledger"></div>
+  <div class="keys">
+    <span><kbd>/</kbd> find</span><span><kbd>⏎</kbd> ask</span>
+    <span><kbd>j</kbd> <kbd>k</kbd> move</span><span><kbd>space</kbd> open a thread</span><span><kbd>t</kbd> switch spine</span>
+  </div>
+</div>
+<div class="xbar" id="xbar"></div>
+<script src="data.js"></script><script src="frame.js"></script>
+<script>
+let spine = 'thread', filt = 'all', query = '', unfolded = false;
+const open = new Set();
+const HUE = { 'greensand321/repo_tracker': '#62c9c0', 'greensand321/Project_Management': '#e0aa4e',
+              'greensand321/kimi-mockups': '#9db98a', 'greensand321/homelab': '#74a8e0' };
+const GLYPH = { progressing: '●', stalled: '⚓', blocked: '⚑', done: '✦' };
+const WEEK = ['2026-09-11','2026-09-12','2026-09-13','2026-09-14','2026-09-15','2026-09-16','2026-09-17'];
+
+const c = counts(), n = nowThread();
+
+document.getElementById('read').innerHTML =
+  `Thursday 17 September · read 13:42 UTC · ${SNAP.rateLimit.remaining.toLocaleString()} calls left · <s>next 14:11</s>`;
+
+document.getElementById('sug').innerHTML = [
+  ['what moved while I was away', 0], ['what is red', 0], ['anything merge-ready', 0],
+  ['why is the advisor branch blocked', 1], ['what should I pick up first', 1],
+].map(([t, paid]) => `<button>${paid ? '<b>✦</b> ' : ''}${t}</button>`).join('');
+
+document.getElementById('nowband').innerHTML = `
+  <div style="min-width:0">
+    <div class="eyebrow now">Happening now</div>
+    <div class="ttl">${esc(n.title)}</div>
+    <div class="sub">${n.repoKey} · <span style="color:var(--dim)">${n.name}</span> · ↑${n.ahead} ↓${n.behind} · ${n.commits.length} commits · last one ${age(n.lastActivity)} ago</div>
+  </div>
+  <div class="acts"><button class="act">ask about this</button><button class="act">open on GitHub ↗</button></div>`;
+
+function drawStanding() {
+  const f = [['all', `<b>${c.branches}</b> branches`], ['live', `<b>${c.active}</b> moving`],
+             ['red', `<b>${c.failing}</b> red`, 'red'], ['pr', `<b>${c.open}</b> PRs open`],
+             ['quiet', `<b>${c.quiet}</b> quiet`]];
+  document.getElementById('standing').innerHTML =
+    f.map(([k, label, cls]) => `<button class="st ${cls || ''} ${filt === k ? 'on' : ''}" data-f="${k}">${label}</button>`).join('') +
+    `<span class="st" style="color:var(--faint)">${c.folded} folded away</span>` +
+    `<span class="find">🔍<input id="find" placeholder="branch name, literally" value="${query}"><span class="kbd">/</span></span>`;
+}
+
+function chips(b) {
+  const out = [];
+  if (b.ci.state !== 'none') out.push(`<span class="chip ci-${b.ci.state}">CI ${b.ci.state}</span>`);
+  if (b.pr) out.push(`<span class="chip pr-${b.pr.state}">#${b.pr.number} ${b.pr.state}</span>`);
+  return out.join('');
+}
+const strip = b => `<span class="strip">${WEEK.map(d => {
+  const on = b.activity.includes(d);
+  return `<i class="${on ? 'on' : ''} ${d === '2026-09-17' ? 'today' : ''}" style="height:${on ? 14 : 3}px"></i>`;
+}).join('')}</span>`;
+
+function threadRow(b) {
+  const isOpen = open.has(b.name);
+  return `<button class="row ${isOpen ? 'open' : ''}" data-b="${b.name}">
+    <span class="g">${GLYPH[b.progress] || '·'}</span>
+    <span style="min-width:0;display:block">
+      <span class="nm">${shortRepo(b.repoKey)} / <b>${b.name}</b></span>
+      <span class="tt ${b.title ? '' : 'raw'}">${esc(b.title || b.commits[0].message)}</span>
+    </span>
+    ${strip(b)}
+    <span class="num"><span class="u">↑${b.ahead}</span> <span class="d">↓${b.behind}</span></span>
+    <span class="chips">${chips(b)}</span>
+    <span class="age">${age(b.lastActivity)}</span>
+  </button>
+  ${isOpen ? drop(b) : ''}`;
+}
+
+function drop(b) {
+  return `<div class="drop">
+    ${b.summary
+      ? `<div class="reflect why">${esc(b.summary)}</div>`
+      : `<div class="raw-note">No summary yet — the advisor has not read this head. Its newest commit is shown above instead.</div>`}
+    <span class="eyebrow sub-h" style="margin-top:0">What it did</span>
+    <div class="stream">
+      ${b.commits.map(cm => `<div class="ev commit">
+        <span class="when">${cm.authoredAt.slice(5, 10).replace('-', '/')}</span>
+        <span class="what"><span class="msg">${esc(cm.message)}</span>
+          ${cm.body ? `<span class="reflect">${esc(cm.body)}</span>` : ''}
+          <span style="display:block;font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:3px">${cm.sha.slice(0, 7)} · ${cm.author}</span>
+        </span></div>`).join('')}
+    </div>
+    <span class="eyebrow sub-h">Your note</span>
+    <div class="note"><textarea placeholder="Anything you want to remember about this thread…"></textarea>
+      <div class="plane">Plane B · stored by Bearing, never written to the repo</div></div>
+    <div class="rowacts">
+      <button class="act">ask about this branch</button>
+      <button class="act">open on GitHub ↗</button>
+      ${b.pr ? `<button class="act">PR #${b.pr.number} ↗</button>` : ''}
+    </div>
+    <div class="prov">${b.diff.files} files · +${b.diff.additions} −${b.diff.deletions} · head ${b.headSha.slice(0, 7)}
+      ${b.insight ? `<br>summary by ${b.insight.model}, prompt ${b.insight.promptVersion}, citing ${b.insight.evidence.join(', ')} — each checked against this branch's own commits` : ''}</div>
+  </div>`;
+}
+
+function dayRow(e) {
+  const hue = HUE[e.branch.repoKey];
+  const g = e.kind === 'ci' ? '⚑' : e.kind === 'pr' ? '↗' : '●';
+  const col = e.kind === 'ci' ? 'var(--bad)' : e.kind === 'pr' ? 'var(--pr)' : 'var(--muted)';
+  return `<div class="dayrow">
+    <span class="g" style="color:${col}">${g}</span>
+    <span class="t">${clock(e.at)}</span>
+    <span class="bn" style="color:${hue};border-color:${hue}44;background:${hue}0f">${e.branch.name}</span>
+    <span class="tx">${e.kind === 'commit'
+      ? `<span class="msg">${esc(e.commit.message)}</span>${e.commit.body ? `<span class="reflect" style="display:block;margin-top:2px">${esc(e.commit.body)}</span>` : ''}`
+      : `<span style="color:${col}">${esc(e.text)}</span>`}</span>
+    <span class="sha">${e.kind === 'commit' ? e.commit.sha.slice(0, 7) : ''}</span>
+  </div>`;
+}
+
+const FILED = `
+  <div class="filed">
+    <div class="fh"><span class="g" style="color:var(--now);text-align:center">◉</span>
+      <span class="fq">what moved while I was away</span><span class="age">13:43</span></div>
+    <div class="fa">
+      <div class="lede">Two things, and one of them is waiting on you.</div>
+      <div class="bod">The milestone schema in <span class="mono">Project_Management</span> picked up its backfill migration this morning and is now 17 ahead — that one is just running. The advisor branch pushed the session-header fix at 09:05 and CI went red again on the same test, which is the second time; it reaches the real provider and needs a stub. Nothing else in four repos has moved since Tuesday.</div>
+      <div class="meta">
+        <span class="tool free">read snapshot</span><span class="tool free">list branches ×9</span>
+        <span class="tool free">read commits ×14</span><span class="tool paid">answer ×1</span>
+        <button class="tool" style="color:var(--dim)">✎ this was wrong</button>
+        <span class="cost">3 tool calls · 1 model call · 2.4s · deepseek-v4.1-flash</span>
+      </div>
+    </div>
+  </div>`;
+
+function matches(b) {
+  if (query && !(b.name + ' ' + b.repoKey + ' ' + (b.title || '')).toLowerCase().includes(query)) return false;
+  if (filt === 'red') return b.ci.state === 'failing';
+  if (filt === 'pr') return !!b.pr;
+  if (filt === 'quiet') return b.relevance === 'quiet';
+  if (filt === 'live') return b.relevance === 'active';
+  return true;
+}
+
+function draw() {
+  drawStanding();
+  const heads = spine === 'thread' ? ['7 days', 'Ahead', 'State', 'Last'] : ['', '', '', ''];
+  heads.forEach((h, i) => { document.getElementById('c' + (i + 1)).textContent = h; });
+
+  const led = document.getElementById('ledger');
+  if (spine === 'thread') {
+    const live = active().filter(matches).sort(byRecency);
+    const q = quiet().filter(matches).sort(byRecency);
+    led.innerHTML = FILED + live.map(threadRow).join('') +
+      `<button class="fold" data-fold><span class="eyebrow">Gone quiet</span><span class="rule"></span>
+        <span class="n">${q.length} shown · ${c.folded} folded away · nothing is ever deleted</span>
+        <span class="n" style="color:var(--dim)">${unfolded ? '▾' : '▸'}</span></button>` +
+      (unfolded ? q.map(threadRow).join('') : '');
+  } else {
+    led.innerHTML = FILED + days().map(([key, evs]) => {
+      const keep = evs.filter(e => matches(e.branch));
+      if (!keep.length) return '';
+      const [name, sub] = dayLabel(key);
+      const reps = [...new Set(keep.map(e => shortRepo(e.branch.repoKey)))];
+      return `<div class="day-head">
+          <span class="display" style="font-size:19px">${name}</span>
+          <span style="font-size:11px;color:var(--muted);font-style:italic;margin-left:12px">${sub} · ${keep.length} entries · ${reps.join(', ')}</span>
+        </div>${keep.map(dayRow).join('')}`;
+    }).join('') +
+    `<div class="fold"><span class="eyebrow">Before that</span><span class="rule"></span>
+      <span class="n">${c.quiet} branches have gone quiet · ${c.folded} folded away</span></div>`;
+  }
+}
+
+document.addEventListener('click', e => {
+  const s = e.target.closest('[data-spine]');
+  if (s) { spine = s.dataset.spine; document.querySelectorAll('[data-spine]').forEach(x => x.classList.toggle('on', x === s)); return draw(); }
+  const f = e.target.closest('[data-f]');
+  if (f) { filt = filt === f.dataset.f ? 'all' : f.dataset.f; return draw(); }
+  if (e.target.closest('[data-fold]')) { unfolded = !unfolded; return draw(); }
+  const r = e.target.closest('[data-b]');
+  if (r) { const k = r.dataset.b; open.has(k) ? open.delete(k) : open.add(k); draw(); }
+});
+document.addEventListener('input', e => {
+  if (e.target.id !== 'find') return;
+  query = e.target.value.toLowerCase(); draw();
+  const el = document.getElementById('find'); el.focus(); el.setSelectionRange(el.value.length, el.value.length);
+});
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') { if (e.key === 'Escape') e.target.blur(); return; }
+  if (e.key === '/') { e.preventDefault(); document.getElementById('find').focus(); }
+  if (e.key === 't') { spine = spine === 'thread' ? 'day' : 'thread';
+    document.querySelectorAll('[data-spine]').forEach(x => x.classList.toggle('on', x.dataset.spine === spine)); draw(); }
+});
+draw();
+</script></body></html>

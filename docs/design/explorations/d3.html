@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<!--
+  D3 — THE SPLIT LEDGER
+  Three panes: repos | register | dossier. The register never moves when you read a
+  branch, so you keep your place. It answers "tell me everything about this one thread"
+  without losing the list you were scanning.
+-->
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bearing — D3 The Split Ledger</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="base.css">
+<style>
+  .wrap { display: flex; height: 100vh; position: relative; z-index: 1; }
+  .rail { width: 210px; padding-top: 20px; }
+
+  .list { width: 372px; flex: none; border-right: 1px solid var(--line); height: 100vh; overflow-y: auto; background: #0d1216; }
+  .list-head { position: sticky; top: 0; background: #0d1216; padding: 20px 18px 10px; border-bottom: 1px solid var(--line-2); z-index: 2; }
+  .lrow { display: block; width: 100%; text-align: left; padding: 13px 18px; border-bottom: 1px solid var(--line); position: relative; }
+  .lrow:hover { background: #ffffff05; }
+  .lrow.sel { background: #62c9c00d; }
+  .lrow.sel::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--now); }
+  .lrow .l1 { display: flex; align-items: baseline; gap: 8px; }
+  .lrow .bn { font-family: var(--mono); font-size: 11.5px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lrow .ag { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--faint); flex: none; }
+  .lrow .lt { font-family: var(--serif); font-size: 14.5px; color: var(--text-hi); margin: 4px 0 6px; line-height: 1.3; }
+  .lrow .l3 { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .doss { flex: 1; min-width: 0; height: 100vh; overflow-y: auto; padding: 26px 46px 120px; }
+  .doss .head { border-bottom: 1px solid var(--line-2); padding-bottom: 20px; margin-bottom: 24px; }
+  .doss .gitname { font-family: var(--mono); font-size: 13px; color: var(--dim); }
+  .doss h1 { font-family: var(--serif); font-size: 30px; font-weight: 600; margin: 8px 0 4px; line-height: 1.2; letter-spacing: -.01em; }
+  .gen { display: block; font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: var(--faint); margin-top: 6px; }
+  .doss .sum { max-width: 70ch; font-size: 15px; margin: 14px 0 0; }
+  .facts { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 18px; }
+  .fact .k { font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+  .fact .v { font-family: var(--mono); font-size: 13px; color: var(--text); margin-top: 3px; }
+  .sec { margin-top: 30px; }
+  .sec > .eyebrow { display: block; margin-bottom: 12px; }
+  .spark { display: flex; gap: 3px; align-items: flex-end; height: 22px; }
+  .spark i { width: 7px; background: var(--line-3); border-radius: 1px; display: block; }
+  .spark i.on { background: var(--now-dim); }
+  .note-box { border: 1px solid var(--line-2); border-radius: 10px; padding: 12px 14px; background: var(--panel); }
+  .note-box textarea { width: 100%; min-height: 54px; resize: vertical; outline: 0; font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--note); }
+  .note-box .plane { font-family: var(--mono); font-size: 9.5px; color: var(--faint); margin-top: 6px; }
+</style></head>
+<body>
+<div class="wrap">
+  <nav class="rail">
+    <div class="brand"><div><div class="word">Bearing</div><small>split ledger</small></div></div>
+    <div id="nav"></div>
+  </nav>
+  <div class="list">
+    <div class="list-head">
+      <button class="ask"><span>Ask about these</span><span class="kbd">⌘K</span></button>
+      <div class="counts" style="margin-top:12px" id="counts"></div>
+    </div>
+    <div id="rows"></div>
+  </div>
+  <main class="doss" id="doss"></main>
+</div>
+<div class="xbar" id="xbar"></div>
+<script src="data.js"></script><script src="frame.js"></script>
+<script>
+let sel = nowThread().name, repoFilter = null;
+const get = () => threads().find(b => b.name === sel);
+
+function chips(b) {
+  const out = [];
+  if (b.progress) out.push(`<span class="chip prog-${b.progress}">${b.progress}</span>`);
+  if (b.ci.state !== 'none') out.push(`<span class="chip ci-${b.ci.state}">CI ${b.ci.state}</span>`);
+  if (b.pr) out.push(`<span class="chip pr-${b.pr.state}">#${b.pr.number}</span>`);
+  return out.join('');
+}
+
+function drawList() {
+  const c = counts();
+  document.getElementById('counts').innerHTML =
+    `<span><b>${c.active}</b> live</span><span><b>${c.failing}</b> red</span><span><b>${c.quiet}</b> quiet</span><span><b>${c.folded}</b> folded</span>`;
+  const keep = b => !repoFilter || b.repoKey === repoFilter;
+  const rows = active().filter(keep).sort(byRecency).concat(quiet().filter(keep).sort(byRecency));
+  const liveN = active().filter(keep).length;
+  document.getElementById('rows').innerHTML = rows.map((b, i) => `
+    ${i === liveN ? `<div class="rail-head" style="padding:14px 18px 6px;border-bottom:1px solid var(--line-2)"><span class="eyebrow">Gone quiet</span><span class="n">${c.folded} more folded</span></div>` : ''}
+    <button class="lrow ${b.name === sel ? 'sel' : ''}" data-b="${b.name}">
+      <div class="l1"><span class="dot ${b.ci.state === 'failing' ? 'blocked' : b.progress === 'done' ? 'done' : b.relevance === 'quiet' ? 'quiet' : 'active'}"></span>
+        <span class="bn">${shortRepo(b.repoKey)}/${b.name}</span><span class="ag">${age(b.lastActivity)}</span></div>
+      <div class="lt">${esc(b.title || b.commits[0].message)}</div>
+      <div class="l3">${chips(b)}<span class="chip">↑${b.ahead} ↓${b.behind}</span></div>
+    </button>`).join('');
+}
+
+function drawDossier() {
+  const b = get();
+  const week = ['2026-09-11','2026-09-12','2026-09-13','2026-09-14','2026-09-15','2026-09-16','2026-09-17'];
+  document.getElementById('doss').innerHTML = `
+    <div class="head">
+      <div class="gitname">${b.repoKey} / <span style="color:var(--text)">${b.name}</span></div>
+      ${b.title ? `<h1>${esc(b.title)}<span class="gen">written by the advisor</span></h1>` : `<h1 style="color:var(--muted)">${esc(b.commits[0].message)}<span class="gen">newest commit — no summary yet</span></h1>`}
+      ${b.summary ? `<div class="reflect sum">${esc(b.summary)}</div>` : ''}
+      <div class="facts">
+        <div class="fact"><div class="k">Ahead / behind</div><div class="v"><span style="color:var(--good)">↑${b.ahead}</span> <span style="color:var(--bad)">↓${b.behind}</span></div></div>
+        <div class="fact"><div class="k">Head</div><div class="v">${b.headSha.slice(0, 7)}</div></div>
+        <div class="fact"><div class="k">Diff</div><div class="v">${b.diff.files}f +${b.diff.additions} −${b.diff.deletions}</div></div>
+        <div class="fact"><div class="k">Last commit</div><div class="v">${ageLong(b.lastActivity)}</div></div>
+        <div class="fact"><div class="k">This week</div><div class="v spark">${week.map(d => `<i class="${b.activity.includes(d) ? 'on' : ''}" style="height:${b.activity.includes(d) ? 22 : 5}px"></i>`).join('')}</div></div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:16px">${chips(b)}</div>
+    </div>
+
+    <div class="sec"><span class="eyebrow">What it did, newest first</span>
+      <div class="stream">${b.commits.map(c => `<div class="ev commit">
+        <span class="when">${c.authoredAt.slice(5, 10).replace('-', '/')}</span>
+        <span class="what"><span class="msg">${esc(c.message)}</span>
+          ${c.body ? `<span class="reflect">${esc(c.body)}</span>` : ''}
+          <span style="display:block;font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:3px">${c.sha.slice(0, 7)} · ${c.author}</span>
+        </span></div>`).join('')}</div>
+    </div>
+
+    <div class="sec"><span class="eyebrow">Your note</span>
+      <div class="note-box">
+        <textarea placeholder="Anything you want to remember about this thread…"></textarea>
+        <div class="plane">Plane B · stored by Bearing, never written to the repo</div>
+      </div>
+    </div>
+
+    ${b.insight ? `<div class="sec"><span class="eyebrow">Where the summary came from</span>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.8">
+        ${b.insight.model} · prompt ${b.insight.promptVersion} · read ${b.insight.headSha.slice(0, 7)}<br>
+        cited ${b.insight.evidence.join(', ')} — each checked against this branch's own commits
+      </div></div>` : ''}`;
+}
+
+function drawNav() {
+  document.getElementById('nav').innerHTML = `
+    <button class="rail-item ${repoFilter === null ? 'sel' : ''}" data-r="">
+      <span class="dot ${repoFilter === null ? 'active' : ''}"></span><span>everything</span>
+      <span style="margin-left:auto;flex:none;font-family:var(--mono);font-size:9.5px;color:var(--faint)">${threads().length}</span></button>
+    <div style="height:10px"></div>` +
+    SNAP.repos.map(r => `<button class="rail-item ${repoFilter === r.key ? 'sel' : ''}" data-r="${r.key}">
+      <span class="dot ${threads().some(b => b.repoKey === r.key && b.ci.state === 'failing') ? 'blocked' : 'quiet'}"></span>
+      <span>${r.name}</span>
+      <span style="margin-left:auto;flex:none;font-family:var(--mono);font-size:9.5px;color:var(--faint)">${r.branchCount}</span></button>`).join('') +
+    `<div class="rail-group" style="margin-top:22px;padding:0 10px">
+       <div class="eyebrow" style="display:block;margin-bottom:8px">Reading</div>
+       <div style="font-family:var(--mono);font-size:10px;color:var(--faint);line-height:1.9">
+         13:42 UTC<br>${SNAP.rateLimit.remaining} calls left<br>${SNAP.llm.pending} awaiting summary</div>
+       <div style="font-family:var(--mono);font-size:10px;color:var(--bad);line-height:1.6;margin-top:12px">${SNAP.warnings.map(esc).join('<br>')}</div>
+     </div>`;
+}
+
+document.addEventListener('click', e => {
+  const nav = e.target.closest('[data-r]');
+  if (nav) {
+    repoFilter = nav.dataset.r || null;
+    const first = active().find(b => !repoFilter || b.repoKey === repoFilter);
+    if (first) sel = first.name;
+    drawNav(); drawList(); drawDossier(); return;
+  }
+  const r = e.target.closest('[data-b]');
+  if (r) { sel = r.dataset.b; drawList(); drawDossier(); }
+});
+drawNav(); drawList(); drawDossier();
+</script></body></html>
