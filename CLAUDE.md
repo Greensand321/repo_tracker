@@ -64,6 +64,13 @@ Six single-turn prompts, no tools, all of them Plane B. Before changing any of t
 [`docs/design/ai-map.html`](docs/design/ai-map.html): every path, what each call sees and
 decides, what it may never do, and which `PROMPT_VERSION` to bump when you edit one.
 
+The four background ones are **derived onto a board and run by one dispatcher**
+(`server/work/`), which checks each job against the snapshot rather than believing the
+model, and parks anything that fails twice. Adding a station is adding a row in
+`board.ts`, not a stage in a pipeline. The plan, and what comes next (tools per station,
+then dispatch, then the advisor that can act), is
+[`docs/plans/workroom.md`](docs/plans/workroom.md).
+
 ## Before adding anything
 
 Check [`docs/decisions/decision-log.md`](docs/decisions/decision-log.md) — §3 lists what

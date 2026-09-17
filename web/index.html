@@ -53,6 +53,11 @@
       </div>
 
       <div class="stand">
+        <h3>The floor <span class="n" id="floorCount"></span></h3>
+        <div id="floor"></div>
+      </div>
+
+      <div class="stand">
         <h3>The register <span class="n" id="registerCount"></span><button id="newGoal">+ goal</button></h3>
         <div id="register"></div>
       </div>
@@ -156,6 +161,11 @@
         <label for="maxOpenQuestions">Questions waiting at once</label>
         <input id="maxOpenQuestions" type="number" min="0" max="40">
         <div class="hint">A wall of them is a chore list. 0 switches them off.</div>
+      </div>
+      <div>
+        <label for="workers">Jobs at once</label>
+        <input id="workers" type="number" min="1" max="8">
+        <div class="hint">How many the assistant works on in parallel. Watch it on The floor.</div>
       </div>
     </div>
 

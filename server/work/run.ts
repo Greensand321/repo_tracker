@@ -49,6 +49,19 @@ const MAX_ATTEMPTS = 2;
 const attempts = new Map<string, number>();
 const parked = new Map<string, Job>();
 
+/**
+ * Put a parked job back on the board.
+ *
+ * Parking is not a verdict on the work, only on two attempts at it, so "try again" has to
+ * exist — otherwise the honest thing (D67: say it failed) becomes a dead end. Clearing the
+ * attempt count is enough: the job is derived again on the next pass, because it was never
+ * stored anywhere in the first place.
+ */
+export function unpark(id: string): boolean {
+  attempts.delete(id);
+  return parked.delete(id);
+}
+
 /** Tests and the debug CLI want a clean room. */
 export function resetBoardState(): void {
   attempts.clear();

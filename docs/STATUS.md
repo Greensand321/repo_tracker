@@ -1,10 +1,30 @@
 # Status — where the project stands
 
-**Updated:** 17 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant's stage A** · **Branch:** `claude/kind-meitner-cpis9v`
+**Updated:** 17 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant · the board** · **Branch:** `claude/kind-meitner-cpis9v`
 
 > Keep this short and current. It is the first thing to read after any time away.
 
 ---
+
+## The room is built (workroom steps 1–2)
+
+The assistant's work is no longer three loops with three ideas of the budget. Every station
+derives what it has outstanding onto **one board**, a dispatcher runs it N at a time, and a
+worker's claim to have finished is **checked against the snapshot** before it counts (D68,
+D69). Anything that fails twice **parks** — visible in *Waiting on you*, with a *try again* —
+instead of repeating quietly forever.
+
+**The floor** is the new panel under the advisor: who is working, on what, how long, what is
+queued behind them, and what gave up. The count also sits in the dateline. `workers` in
+settings decides how many run at once (default 2).
+
+Writing the plan found a live cost bug: a vision the model correctly *declined* to draft was
+never recorded, so the job was derived again every read and paid for again — every minute,
+for every declined branch, forever (D70). The rule that caught it, before a line was built:
+**a job whose predicate can never become true is a job that runs forever.**
+
+Plan and what is next: [`plans/workroom.md`](plans/workroom.md) — tools per station (step 3–4),
+dispatch (step 5), then the advisor that can act (step 6). D68–D74.
 
 ## The assistant is built (stage A)
 
@@ -19,9 +39,10 @@ doing and what is going on. Under the register, **Waiting on you** carries the q
 capped and answerable in place. Drift always offers both its causes (D62), and a goal is
 never silently marked done (D64).
 
-**Where it could go next:** [`design/agent-shapes.html`](design/agent-shapes.html) — five
-shapes the assistant could take, which turn out to be layers rather than alternatives, plus
-the answer to "how does the program know when an agent is done". Nothing in it is built.
+**Where it came from:** [`design/agent-shapes.html`](design/agent-shapes.html) — five shapes
+the assistant could take, which turn out to be layers rather than alternatives, plus the
+answer to "how does the program know when an agent is done". Shapes ② and ③ are being built
+(the owner chose them and skipped ④); ⑤ is step 6.
 
 **How it works, end to end:** [`design/ai-map.html`](design/ai-map.html) — every path from
 the clock firing to what gets written, all six prompts with what each one sees, decides and
@@ -52,11 +73,11 @@ recommendation there was D6; the owner chose D4 and the reasons are in D57.
 | **Stage 1** | Built. Every branch across your repos, with its real commit history, PR and CI state. ETag change detection; a repo that has not moved costs nothing. |
 | **Stage 2 engine** | Built. Per-branch plain-English title, summary, and progress judgement, cached so an idle branch is never re-summarised. |
 | **Stage 2 surfaces** | Deliberately not built — the comment tool, the chat panel, and "what changed since I last looked" all wait for the real design. |
-| Tests | 63, no network. Recorded GitHub fixtures and a stubbed provider. |
+| Tests | 179, no network. Recorded GitHub fixtures and a stubbed provider. |
 
 ## Try it without the GUI
 
-The interface is a placeholder, so there is a debug CLI (D44 — **not** a product surface):
+There is a debug CLI (D44 — **not** a product surface; the GUI is the product):
 
 ```
 npm run config     # what is configured, secrets redacted
@@ -66,21 +87,25 @@ npm run brief -- --no-llm    # deterministic only, no provider calls
 ```
 
 Settings live in `data/settings.json` and can be hand-edited: `llmApiKey`, `llmBaseUrl`
-(defaults to `https://opencode.ai/zen/v1`), `llmModel`, `llmMaxPerRun`.
+(defaults to `https://opencode.ai/zen/v1`), `llmModel`, `llmMaxPerRun`, `workers`.
 
 **`llmModel` is empty on purpose.** Run `npm run models` and pick one — a guessed model ID
 would fail at the worst moment.
 
 ## The next concrete action
 
-**Run `npm run probe`.** It is two provider calls and a few hundred tokens, and it is the
-last thing standing between the current single-turn advisor (D60) and the tool-calling
-agent in `docs/plans/agent-plan.md`. Everything else in Stage 2 is now built.
+**Workroom step 3 — the tool layer.** The contract, the JSON-protocol loop, the free tools
+(`sibling_branches`, `what_changed` — which finally reads the dated history nothing has ever
+read), and a per-job tool budget. Tools are safe to let loose now that a job's result is
+checked rather than believed.
 
-
+**Run `npm run probe` alongside it.** Two provider calls. It decides native tool calling
+versus the JSON protocol — *which*, not *whether*, since the protocol floor works on any
+model that can return JSON, which yours demonstrably can.
 
 After that, in order:
 
+- **Step 5, dispatch**, then **step 6, the desk** — see `plans/workroom.md`.
 - **Milestones above goals.** `Goal.milestone` is a plain string today so the idea could
   be used before the structure exists. The register already groups by goal; grouping goals
   by milestone is the same move one level up.
@@ -111,6 +136,13 @@ After that, in order:
 - **Fonts are served from `web/fonts/`**, not Google Fonts (D56).
 - **`complete()` sets `x-opencode-session` itself** (D66). Never add a provider call that
   bypasses it — a test enforces this.
+- **Job ids are derived, not minted** — `kind:repo:branch:headSha`. That is what makes a read
+  landing mid-flight find a job already claimed, and what retries a parked job at exactly the
+  right moment: when the branch moves, and never before.
+- **The board lives in `server/work/`.** `board.ts` derives it (pure-ish, the stations are
+  rows), `run.ts` spends the budget. Nothing under `server/advise/` may read `llmMaxPerRun` —
+  a test enforces that too.
+- **Adding a station is adding a row in `board.ts`**, with its `run` and its `doneWhen`.
 - **Advisor failures show in the dateline as well as Notices** (D67).
 - **One budget per read, not one per step.** `llmMaxPerRun` is spent across summarising,
   drafting and assessing together. It used to cap the first two and not the third.
@@ -136,4 +168,5 @@ After that, in order:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 17 Sep 2026 | **The workroom, steps 1–2**: work derived onto a board, done checked rather than claimed, failures park, and the floor shows the room working. A declined vision was being re-paid every read. D68–D74 |
 | 17 Sep 2026 | **D4 "The Broadsheet" chosen and built** — `web/` rebuilt from scratch against it. Goals land as Plane B with their own store, API and tests; the advisor answers questions single-turn. D57–D60 recorded |

@@ -267,6 +267,32 @@ a:hover { color: var(--text-hi); }
 .listing .t { flex: none; width: 52px; text-align: right; color: var(--faint); }
 .listing.sel .nm { color: var(--now); }
 
+/* ---- the floor: what the assistant is doing right now (D73) -------------
+   Rows on a rule, like everything else in the register. The glyph gutter carries the
+   state so the eye can skim it; the title is plain English and the machinery is the
+   small grey line under it (rule 3). Teal marks live work — the same teal the "happening
+   now" band uses, and the only place it appears in this column. */
+
+.jrow {
+  display: flex; align-items: baseline; gap: 9px;
+  padding: 6px 0; border-bottom: 1px solid var(--line);
+}
+.jrow:last-child { border-bottom: 0; }
+.jglyph { flex: none; width: 10px; font-size: 9px; color: var(--now); line-height: 1.7; }
+.jglyph.dim { color: var(--faint); }
+.jrow.bad .jglyph { color: var(--bad); }
+.jbody { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.jtitle {
+  font-size: 12px; color: var(--text); line-height: 1.35;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.jtitle.dim { color: var(--muted); font-style: italic; }
+.jmeta { font-family: var(--mono); font-size: 9.5px; color: var(--faint); letter-spacing: .02em; }
+.jrow.bad .jmeta { color: var(--bad); opacity: .8; }
+.jclock { flex: none; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.jrow.live .jclock { color: var(--now); }
+.jrow.bad .jclock { color: var(--bad); }
+
 .weather { font-family: var(--mono); font-size: 11px; line-height: 1.95; color: var(--muted); }
 .weather b { color: var(--body); font-weight: 500; display: inline-block; min-width: 26px; }
 .weather .bad b { color: var(--bad); }

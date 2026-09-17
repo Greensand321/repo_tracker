@@ -59,6 +59,18 @@ export function countdown(iso: string | null, now: Date = new Date()): string {
   return `in ${Math.round(hours / 24)}d`;
 }
 
+/**
+ * How long something has been running, as m:ss. For the floor, where the question is
+ * "has this one stuck?" rather than "when did it start" — so it counts up, not down.
+ */
+export function elapsed(iso: string | null, now: Date = new Date()): string {
+  if (!iso) return '';
+  const seconds = Math.max(0, Math.floor((now.getTime() - Date.parse(iso)) / 1000));
+  if (!Number.isFinite(seconds)) return '';
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
 /** Time of day only. The date is already on the line beside it. */
 export function clockTime(iso: string | null): string {
   if (!iso) return '';

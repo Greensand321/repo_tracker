@@ -9,7 +9,7 @@
 import { refKey, type Snapshot, type SnapshotResponse } from '../shared/types.ts';
 import { applyAssist } from './advise/assist.ts';
 import { applyCached, llmReady } from './advise/enrich.ts';
-import { applyWork, runBoard } from './work/run.ts';
+import { applyWork, runBoard, unpark } from './work/run.ts';
 import { collect } from './collect.ts';
 import { applyGoals, pruneGoals } from './goals.ts';
 import { recordHistory } from './history.ts';
@@ -172,6 +172,21 @@ export function reapplyVisions(): void {
   // takes one off. The floor should show that the moment you type it, not a minute later.
   applyWork(snapshot, settings);
   announce('snapshot');
+}
+
+/**
+ * Take a parked job off the shelf and work it now, rather than at the next read.
+ *
+ * "Try again" that waits a minute to visibly do anything is indistinguishable from a
+ * button that did nothing.
+ */
+export function retryJob(id: string): boolean {
+  if (!snapshot) return false;
+  const found = unpark(id);
+  applyWork(snapshot, loadSettings());
+  announce('snapshot');
+  if (found && llmReady(loadSettings())) void workInBackground(snapshot);
+  return found;
 }
 
 /** Fresh on open, then keep going. `refreshSeconds: 0` turns polling off. */
