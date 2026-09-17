@@ -33,6 +33,7 @@
   <div class="cols">
     <main class="leader">
       <div id="firstRun" class="hidden"></div>
+      <section id="brief" class="brief"></section>
       <section id="nowBand" class="nowband"></section>
       <div class="leader-head" id="leaderHead"></div>
       <div id="leaderList"></div>
@@ -57,6 +58,11 @@
       </div>
 
       <div class="stand">
+        <h3>Waiting on you <button id="describeMany">+ describe several</button></h3>
+        <div id="questions"></div>
+      </div>
+
+      <div class="stand">
         <h3>Conditions</h3>
         <div class="weather" id="conditions"></div>
       </div>
@@ -70,6 +76,7 @@
 </div>
 
 <div id="filing"></div>
+<div id="proposals"></div>
 
 <div class="sheet-modal hidden" id="settingsSheet">
   <div class="panel">
@@ -145,7 +152,20 @@
         <input id="askBranchCap" type="number" min="1" max="400">
         <div class="hint">How much of the register a question may show the model.</div>
       </div>
+      <div>
+        <label for="maxOpenQuestions">Questions waiting at once</label>
+        <input id="maxOpenQuestions" type="number" min="0" max="40">
+        <div class="hint">A wall of them is a chore list. 0 switches them off.</div>
+      </div>
     </div>
+
+    <label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--body);font-weight:400">
+      <input id="visionAutoDraft" type="checkbox" style="width:auto">
+      Let the assistant propose what each branch is for
+    </label>
+    <div class="hint">It only proposes when it can be specific — a purpose nothing could
+      contradict is worthless as a yardstick, so it says nothing rather than padding.
+      Proposals are always marked until you confirm them.</div>
 
     <div class="err" id="settingsErr"></div>
     <div class="actions">

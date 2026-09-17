@@ -46,6 +46,8 @@ function branch(overrides: Partial<Branch> = {}): Branch {
     relevance: 'active',
     isBase: false,
     goalId: null,
+    vision: null,
+    assessment: null,
     title: null,
     summary: null,
     progress: null,

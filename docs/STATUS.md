@@ -1,10 +1,27 @@
 # Status — where the project stands
 
-**Updated:** 17 Sep 2026 · **Stage 1 built · Stage 2 built · interface rebuilt** · **Branch:** `claude/kind-meitner-cpis9v`
+**Updated:** 17 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant's stage A** · **Branch:** `claude/kind-meitner-cpis9v`
 
 > Keep this short and current. It is the first thing to read after any time away.
 
 ---
+
+## The assistant is built (stage A)
+
+Every branch can carry a **vision** — one falsifiable sentence saying what it is *for*. The
+assistant drafts one where it can be specific, marks it as a proposal until you confirm, and
+then compares it against what the branch actually did: *on track*, *drifted*, *done — vision
+met*, *overtaken by another branch*, or *unclear*. That comparison is the two-line **For /
+Now** block on every branch.
+
+Above it sits **the brief** — three to five sentences on what looks done, what still needs
+doing and what is going on. Under the register, **Waiting on you** carries the questions,
+capped and answerable in place. Drift always offers both its causes (D62), and a goal is
+never silently marked done (D64).
+
+Plan: [`plans/vision-ux.md`](plans/vision-ux.md) (the walkthrough) and
+[`plans/agent-memory-plan.md`](plans/agent-memory-plan.md) (stage A of the build order).
+Decisions D61–D65.
 
 ## The interface is built
 
@@ -52,6 +69,8 @@ would fail at the worst moment.
 last thing standing between the current single-turn advisor (D60) and the tool-calling
 agent in `docs/plans/agent-plan.md`. Everything else in Stage 2 is now built.
 
+
+
 After that, in order:
 
 - **Milestones above goals.** `Goal.milestone` is a plain string today so the idea could
@@ -82,6 +101,13 @@ After that, in order:
   announce goal changes, but only while the event stream is up, and it reconnects on a
   three-second timer — leaning on it alone meant a click in that window silently did nothing.
 - **Fonts are served from `web/fonts/`**, not Google Fonts (D56).
+- **The assistant costs almost nothing on an unchanged fleet.** An assessment is cached on
+  head SHA + vision text; the brief and every goal judgement share one cache key hashed over
+  every branch, vision and verdict. Nothing moves, nothing is spent.
+- **Declining to draft a vision is a success.** `npm run brief` will show branches with none;
+  that means the model could not be specific, which is the correct answer.
+- **`data/visions.json`** holds visions and assessments, **`data/assist.json`** the brief and
+  its judgements. Both Plane B, both gitignored.
 
 ## Log
 
@@ -95,4 +121,5 @@ After that, in order:
 | 16 Sep 2026 | Five provider gates debugged live (D45–D50); agent plan written (D51–D53) |
 | 17 Sep 2026 | **The prototype was right all along** — the re-sent files are byte-identical to `docs/design/prototype/`. The wrong file was `dashboard-concept.html`, which `web/` was built from. D22 overturned |
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
+| 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
 | 17 Sep 2026 | **D4 "The Broadsheet" chosen and built** — `web/` rebuilt from scratch against it. Goals land as Plane B with their own store, API and tests; the advisor answers questions single-turn. D57–D60 recorded |

@@ -168,6 +168,72 @@ prompt — and the cost of every question — grows with the register. Every ans
 how many branches and goals it actually saw, so a wrong answer is debuggable rather than
 mysterious.
 
+### D61 — Vision: one falsifiable sentence per branch, and it is what everything is judged against
+
+Built. `docs/plans/vision-ux.md` is the walkthrough; this is what the decision rests on.
+
+Inference gives the **is**; only the owner gives the **ought**. A model reading commits can
+say accurately what a branch did — it cannot say whether that is what was wanted, because
+"wanted" is not in the data. The vision is that missing half, stated once.
+
+**A vision must be falsifiable or it is worthless.** "Improve the UI" can never be
+contradicted, so it can never detect drift or be satisfied. The drafting prompt is told to
+**decline rather than pad**, and declining is recorded as a normal outcome, not a failure.
+
+Four states, and the distinction between two of them is load-bearing: `yours` and
+`confirmed` are authoritative; `proposed` is the assistant's draft and is marked everywhere
+it appears, never the basis for calling anything done. A draft silently treated as the
+owner's intent makes every assessment downstream inherit a guess nobody saw.
+
+An assessment is cached on **head SHA plus the vision text**: either moving makes the
+comparison stale. Rewriting a vision therefore discards its assessment; merely confirming
+one does not, because the words did not change.
+
+### D62 — Drift is reported with both its causes, never resolved by guessing
+
+When a branch diverges from its vision it is either that the branch wandered, or that the
+owner changed their mind. The assistant cannot tell, and guessing is worse than asking — so
+every drift report offers **"that's the new plan"** (which rewrites the vision in one click)
+alongside "it wandered".
+
+Without that path the mechanism rots inside a month: visions get written once, work
+legitimately evolves, and everything reads as drifted forever.
+
+"It wandered" deliberately writes nothing. The vision was right and the branch is the
+problem, and fixing a branch is work on GitHub — Plane A is read-only forever (rule 1).
+
+### D63 — `overtaken` is a fleet-level verdict, and the per-branch prompt may not return it
+
+A branch made pointless because another branch satisfied its purpose first is the finding
+that pays for the whole vision mechanism: nothing in git records it, and only stated intent
+compared across the fleet can see it.
+
+It is therefore produced by the brief — the one pass that sees everything — and the
+per-branch assessment prompt has `overtaken` **stripped** from its allowed verdicts, because
+a branch judged alone cannot know. A model that returns it anyway is downgraded to
+`unclear` rather than believed.
+
+### D64 — Goal judgement is proposed, never applied
+
+`Goal.done` stays the owner's boolean. The assistant writes a separate `judgement` —
+`progressing`, `at-risk`, `stalled`, `looks-done`, `needs-you` — with its reasoning and the
+branches it rests on. `looks-done` surfaces as a question with an **accept** button and
+nothing else flips it.
+
+A wrong "done" is the single most damaging output the assistant has, because it is the one
+the owner will never go back and check.
+
+### D65 — Questions are derived, capped, and never asked about quiet branches
+
+What is waiting on the owner is computed from the snapshot every read, never stored, so it
+cannot go stale and answering one makes it disappear because the state changed rather than
+because a flag was set.
+
+Ordered by what it costs to leave alone: drift, overtaken, a goal that looks done, then the
+setup questions. Capped by `maxOpenQuestions` (default 3) and **quiet branches are never
+asked about** — most of a hundred branches are quiet, and an unasked question is not a
+failure.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

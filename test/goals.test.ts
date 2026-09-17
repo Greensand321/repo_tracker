@@ -38,6 +38,7 @@ function snapshotOf(...branchNames: string[]): Snapshot {
     warnings: [],
     rateLimit: null,
     goals: [],
+    brief: null,
     llm: { enabled: false, pending: 0, errors: [] },
     branches: branchNames.map((name) => ({
       repoKey: 'greensand321/repo_tracker',
@@ -55,6 +56,8 @@ function snapshotOf(...branchNames: string[]): Snapshot {
       relevance: 'active',
       isBase: false,
       goalId: null,
+      vision: null,
+      assessment: null,
       title: null,
       summary: null,
       progress: null,

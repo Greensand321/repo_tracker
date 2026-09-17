@@ -10,7 +10,7 @@
 
 import { refKey, type Branch, type BranchRef, type Goal, type Snapshot } from '../../shared/types.ts';
 import { esc, relativeTime } from '../format.ts';
-import { byRecency, glyph, groupByGoal, headline, matches, nowThread, threads } from '../derive.ts';
+import { byRecency, glyph, groupByGoal, headline, matches, nowThread, threads, verdictChip, verdictLabel, visionLine } from '../derive.ts';
 
 export type Grouping = 'goal' | 'branch';
 
@@ -31,6 +31,25 @@ export function parseBranchKey(key: string): BranchRef | null {
 }
 
 export const shortRepo = (key: string): string => key.split('/')[1] ?? key;
+
+// ---------------------------------------------------------------------------
+// The brief — the standing answer to what is done, what is left, what is going on
+// ---------------------------------------------------------------------------
+
+export function renderBrief(snapshot: Snapshot): string {
+  if (!snapshot.brief || !snapshot.brief.text) {
+    // Said plainly rather than shown as an empty space. Nothing here is faked while the
+    // assistant is still reading, or while it is switched off.
+    const why = snapshot.llm.enabled
+      ? 'The assistant has not written a brief for this state yet.'
+      : 'The assistant is off, so there is no brief. Turn it on in settings.';
+    return `<div class="eyebrow">The brief</div><div class="waiting">${esc(why)}</div>`;
+  }
+  return `
+    <div class="eyebrow">The brief</div>
+    <div class="brief-text">${esc(snapshot.brief.text)}</div>
+    <div class="brief-prov">${esc(snapshot.brief.model)} · ${relativeTime(snapshot.brief.generatedAt)}</div>`;
+}
 
 // ---------------------------------------------------------------------------
 // Happening now
@@ -54,13 +73,40 @@ export function renderNow(snapshot: Snapshot): string {
       <b>${esc(branch.repoKey)}</b> · ${esc(branch.name)} · ${statusWords(branch)}
       ${goal ? ` · toward <b>${esc(goal.title)}</b>` : ''}
     </div>
-    ${branch.summary ? `<div class="reflect say">${esc(branch.summary)}</div>` : ''}
+    ${forNow(branch)}
     <div class="acts">
       ${chips(branch)}
       <a class="act" href="${esc(branch.url)}" target="_blank" rel="noreferrer noopener">open on GitHub &#8599;</a>
       ${branch.pr ? `<a class="act" href="${esc(branch.pr.url)}" target="_blank" rel="noreferrer noopener">PR #${branch.pr.number} &#8599;</a>` : ''}
       <button class="act" data-file="${esc(branchKey(branch))}">${goal ? 'refile' : 'file under a goal'}</button>
     </div>`;
+}
+
+/**
+ * The yardstick and the reality, on two lines. The comparison needs no explaining once
+ * they sit next to each other — which is the whole argument for stating a vision at all.
+ */
+export function forNow(branch: Branch): string {
+  const vision = visionLine(branch);
+  const out: string[] = [];
+
+  out.push(
+    vision.known
+      ? `<div class="fn"><span class="k">For</span><span class="v reflect">${esc(vision.text)}` +
+        (vision.proposed ? ' <span class="proposed">my guess — not confirmed</span>' : '') +
+        `</span></div>`
+      : `<div class="fn"><span class="k">For</span><span class="v unsaid">${esc(vision.text)}
+          <button class="link" data-say="${esc(branchKey(branch))}">say what it is for</button></span></div>`,
+  );
+
+  const now = branch.assessment
+    ? `<span class="verdict v-${branch.assessment.verdict}">${verdictLabel(branch.assessment.verdict)}</span> ${esc(branch.assessment.because)}`
+    : branch.summary
+      ? esc(branch.summary)
+      : '';
+  if (now) out.push(`<div class="fn"><span class="k">Now</span><span class="v">${now}</span></div>`);
+
+  return `<div class="fornow">${out.join('')}</div>`;
 }
 
 /** Plain English first; the counts are supporting metadata and stay small (rule 3). */
@@ -74,7 +120,13 @@ function statusWords(branch: Branch): string {
 
 function chips(branch: Branch): string {
   const out: string[] = [];
-  if (branch.progress) out.push(`<span class="chip prog-${branch.progress}">${branch.progress}</span>`);
+  if (branch.assessment) {
+    out.push(
+      `<span class="chip verd-${branch.assessment.verdict}" title="${esc(branch.assessment.because)}">${verdictChip(branch.assessment.verdict)}</span>`,
+    );
+  } else if (branch.progress) {
+    out.push(`<span class="chip prog-${branch.progress}">${branch.progress}</span>`);
+  }
   if (branch.ci.state !== 'none') out.push(`<span class="chip ci-${branch.ci.state}">CI ${branch.ci.state}</span>`);
   if (branch.pr) {
     out.push(
@@ -106,15 +158,29 @@ function byGoal(snapshot: Snapshot, visible: Branch[]): string {
     .join('');
 }
 
+const GOAL_WORDS: Record<string, string> = {
+  progressing: 'In progress',
+  'at-risk': 'At risk',
+  stalled: 'Stalled',
+  'looks-done': 'Looks done',
+  'needs-you': 'Needs you',
+};
+
 function goalItem(goal: Goal, branches: Branch[]): string {
   const red = branches.filter((b) => b.ci.state === 'failing').length;
+  const judged = goal.judgement;
+
+  // The assistant's read leads when it has one — but `looks-done` stays a proposal in
+  // the kicker and is only ever accepted from the questions panel, never silently.
   const kicker = goal.done
     ? '<span class="eyebrow">Done</span>'
-    : red > 0
-      ? `<span class="eyebrow bad">${red} red</span>`
-      : branches.length === 0
-        ? '<span class="eyebrow">No branches yet</span>'
-        : '<span class="eyebrow">In progress</span>';
+    : judged
+      ? `<span class="eyebrow ${judged.state === 'at-risk' || judged.state === 'needs-you' ? 'bad' : ''}">${GOAL_WORDS[judged.state] ?? judged.state}</span>`
+      : red > 0
+        ? `<span class="eyebrow bad">${red} red</span>`
+        : branches.length === 0
+          ? '<span class="eyebrow">No branches yet</span>'
+          : '<span class="eyebrow">In progress</span>';
 
   return `<article class="goal-item ${goal.done ? 'is-done' : ''}">
     ${kicker}
@@ -124,6 +190,7 @@ function goalItem(goal: Goal, branches: Branch[]): string {
       · <button class="act" style="padding:2px 8px" data-edit-goal="${esc(goal.id)}">edit</button>
     </div>
     ${goal.note ? `<div class="reflect note">${esc(goal.note)}</div>` : ''}
+    ${judged?.because ? `<div class="judged">${esc(judged.because)}</div>` : ''}
     <div class="members">
       ${
         branches.length === 0
@@ -171,7 +238,7 @@ function byBranch(visible: Branch[]): string {
           <span><b>${esc(branch.repoKey)}</b> · ${esc(branch.name)}</span>
           <span>${statusWords(branch)}</span>
         </div>
-        ${branch.summary ? `<div class="reflect say">${esc(branch.summary)}</div>` : ''}
+        ${forNow(branch)}
         <div class="acts">
           ${chips(branch)}
           <a class="act" href="${esc(branch.url)}" target="_blank" rel="noreferrer noopener">open &#8599;</a>
@@ -183,6 +250,10 @@ function byBranch(visible: Branch[]): string {
 }
 
 function kickerFor(branch: Branch): string {
+  // A branch doing the wrong thing matters more than a branch failing at the right one.
+  if (branch.assessment?.verdict === 'overtaken') return '<span class="eyebrow bad">Already done elsewhere</span>';
+  if (branch.assessment?.verdict === 'drifted') return '<span class="eyebrow bad">Drifted from its vision</span>';
+  if (branch.assessment?.verdict === 'done') return '<span class="eyebrow">Vision met</span>';
   if (branch.ci.state === 'failing') return '<span class="eyebrow bad">CI is red</span>';
   if (branch.progress === 'done') return '<span class="eyebrow">Finished</span>';
   if (branch.relevance === 'quiet') return '<span class="eyebrow">Gone quiet</span>';

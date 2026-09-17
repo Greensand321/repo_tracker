@@ -8,12 +8,12 @@
  */
 
 import type { Answer } from '../server/advise/ask.ts';
-import type { Goal, SafeSettings, SnapshotResponse } from '../shared/types.ts';
+import type { BranchRef, Goal, SafeSettings, SnapshotResponse } from '../shared/types.ts';
 import { createPicker, type Picker } from './components/picker.ts';
 import { tallies, threads } from './derive.ts';
 import { clockTime, countdown, esc, exactTime, relativeTime } from './format.ts';
-import { branchKey, parseBranchKey, renderLeaderList, renderNow, type Grouping } from './views/leader.ts';
-import { renderConditions, renderNotices, renderRegister } from './views/side.ts';
+import { branchKey, parseBranchKey, renderBrief, renderLeaderList, renderNow, type Grouping } from './views/leader.ts';
+import { renderConditions, renderNotices, renderQuestions, renderRegister } from './views/side.ts';
 
 type Asked = { question: string; answer: Answer | null; error: string | null; pending: boolean };
 
@@ -26,6 +26,11 @@ const state = {
   filingError: '',
   /** Newest first. Kept in the page only — a question is not worth a database. */
   asked: [] as Asked[],
+  /** How many questions the assistant may have waiting. Read from settings. */
+  maxQuestions: 3,
+  /** Proposals from a paragraph, awaiting confirmation. Nothing is written until then. */
+  proposals: [] as { ref: BranchRef; vision: string; suggest: 'done' | 'close' | null }[],
+  describing: false,
 };
 
 const $ = <T extends HTMLElement>(sel: string): T => {
@@ -118,7 +123,9 @@ function draw(): void {
   if (!snapshot) {
     $('#firstRun').classList.remove('hidden');
     $('#firstRun').innerHTML = firstRun(data);
-    for (const id of ['#nowBand', '#leaderHead', '#leaderList', '#register']) $(id).innerHTML = '';
+    for (const id of ['#brief', '#nowBand', '#leaderHead', '#leaderList', '#register', '#questions']) {
+      $(id).innerHTML = '';
+    }
     $('#ruleLine').innerHTML = '';
     $('#conditions').innerHTML = '';
     $('#notices').innerHTML = data?.error ? `<div class="notice">${esc(data.error)}</div>` : '';
@@ -138,12 +145,14 @@ function draw(): void {
     .map((s) => `<span>${s}</span>`)
     .join('');
 
+  $('#brief').innerHTML = renderBrief(snapshot);
   $('#nowBand').innerHTML = renderNow(snapshot);
   renderLeaderHead(snapshot);
   $('#leaderList').innerHTML = renderLeaderList(snapshot, state.grouping, state.search);
 
   $('#registerCount').textContent = String(t.branches);
   $('#register').innerHTML = renderRegister(snapshot, state.search, state.filing);
+  $('#questions').innerHTML = renderQuestions(snapshot, state.maxQuestions);
   $('#conditions').innerHTML = renderConditions(snapshot);
   $('#notices').innerHTML = renderNotices(snapshot, { error: data?.error ?? null });
 
@@ -156,6 +165,7 @@ function draw(): void {
 
   renderAnswers();
   renderFiling();
+  renderProposals();
 }
 
 function renderDateline(data: SnapshotResponse | null): void {
@@ -287,6 +297,164 @@ async function askAdvisor(): Promise<void> {
     $<HTMLButtonElement>('#askGo').disabled = false;
     renderAnswers();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Vision — what a branch is FOR
+// ---------------------------------------------------------------------------
+
+async function postVision(path: string, body: unknown, method = 'POST'): Promise<void> {
+  try {
+    const res = await fetch(path, {
+      method,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const payload = (await res.json()) as { error?: string };
+      throw new Error(payload.error ?? 'that did not save');
+    }
+    // Re-read rather than waiting for the push, for the same reason filing does: the
+    // event stream reconnects on a timer and a click inside that window must not
+    // silently do nothing.
+    await loadSnapshot();
+  } catch (err) {
+    showFailure('Could not save that:', err);
+  }
+}
+
+/**
+ * Writing a vision by hand. A prompt rather than a panel, because it is one sentence and
+ * a panel would cost more than it is worth — pre-filled so you are correcting a draft
+ * rather than composing from nothing.
+ */
+async function sayVision(key: string): Promise<void> {
+  const ref = parseBranchKey(key);
+  if (!ref) return;
+  const snapshot = requireSnapshot();
+  const branch = threads(snapshot).find((b) => b.repoKey === ref.repoKey && b.name === ref.branch);
+
+  const text = window.prompt(
+    `What is ${ref.branch} for?\n\nOne sentence. Specific enough that future commits could contradict it.`,
+    branch?.vision?.text ?? '',
+  );
+  if (text === null) return;
+  if (!text.trim()) {
+    await postVision('/api/vision', ref, 'DELETE');
+    return;
+  }
+  await postVision('/api/vision', { ...ref, text, state: 'yours' }, 'PUT');
+}
+
+/**
+ * Drift has two causes and only the owner knows which. "That's the new plan" rewrites
+ * the vision to match what the branch is actually doing; "it wandered" leaves the vision
+ * alone and the flag standing.
+ */
+async function newPlan(key: string, alsoDone: boolean): Promise<void> {
+  const ref = parseBranchKey(key);
+  if (!ref) return;
+  const snapshot = requireSnapshot();
+  const branch = threads(snapshot).find((b) => b.repoKey === ref.repoKey && b.name === ref.branch);
+
+  const suggested = alsoDone
+    ? branch?.vision?.text ?? ''
+    : branch?.assessment?.because ?? branch?.summary ?? '';
+
+  const text = window.prompt(
+    alsoDone
+      ? `Closing out ${ref.branch}. Record what it ended up being for:`
+      : `New plan for ${ref.branch}. What is it for now?`,
+    suggested,
+  );
+  if (text === null || !text.trim()) return;
+  await postVision('/api/vision', { ...ref, text, state: 'yours' }, 'PUT');
+}
+
+/**
+ * "It wandered" is an answer, not a no-op — but there is nothing to write, because the
+ * vision was right and the branch is the problem. Saying so is the owner's job with the
+ * branch, not Bearing's: Plane A is read-only forever.
+ */
+function wandered(key: string): void {
+  const ref = parseBranchKey(key);
+  if (!ref) return;
+  window.alert(
+    `Noted — ${ref.branch} has wandered from what it was for.\n\n` +
+      'Bearing never writes to your repos, so the fix is over on GitHub. ' +
+      'The flag stays until the branch moves back toward its vision.',
+  );
+}
+
+/**
+ * Describing several branches at once, in one paragraph. The route whose cost does not
+ * scale with branch count — and nothing is written until the proposals are confirmed.
+ */
+async function describeMany(): Promise<void> {
+  const text = window.prompt(
+    'Tell me what you are working on, in your own words.\n\n' +
+      'Mention as many branches as you like — I will split it into one purpose each and ' +
+      'show you before anything is saved.',
+    '',
+  );
+  if (text === null || !text.trim()) return;
+
+  state.describing = true;
+  render();
+  try {
+    const res = await fetch('/api/vision/distribute', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const payload = (await res.json()) as { proposals?: typeof state.proposals; error?: string };
+    if (!res.ok || !payload.proposals) throw new Error(payload.error ?? 'could not read that');
+    state.proposals = payload.proposals;
+    if (state.proposals.length === 0) {
+      window.alert('I could not match that to any branch confidently, so I have written nothing.');
+    }
+  } catch (err) {
+    showFailure('Could not split that up:', err);
+  } finally {
+    state.describing = false;
+    render();
+  }
+}
+
+/** Applying the proposals, one round trip each. Small numbers; clarity beats a batch API. */
+async function applyProposals(): Promise<void> {
+  const list = state.proposals;
+  state.proposals = [];
+  for (const proposal of list) {
+    await postVision('/api/vision', { ...proposal.ref, text: proposal.vision, state: 'yours' }, 'PUT');
+  }
+}
+
+function renderProposals(): void {
+  const host = $('#proposals');
+  if (state.proposals.length === 0) {
+    host.innerHTML = '';
+    return;
+  }
+  host.innerHTML = `<div class="filing"><div class="box">
+    <div class="eyebrow">From what you said</div>
+    <h4>I would set these</h4>
+    <div class="opts">
+      ${state.proposals
+        .map(
+          (p) => `<div class="prop">
+            <div class="mono">${esc(p.ref.repoKey.split('/')[1] ?? p.ref.repoKey)} / ${esc(p.ref.branch)}</div>
+            <div class="reflect">${esc(p.vision)}</div>
+            ${p.suggest ? `<div class="q-from">you said this one is ${p.suggest === 'done' ? 'finished' : 'dead'}</div>` : ''}
+          </div>`,
+        )
+        .join('')}
+    </div>
+    <div class="new" style="justify-content:flex-end">
+      <button class="btn primary" id="applyProposals">Apply all</button>
+      <button class="btn" id="dropProposals">No, let me redo that</button>
+    </div>
+  </div></div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -458,6 +626,9 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#commitsPerBranch').value = String(settings.commitsPerBranch);
     $<HTMLInputElement>('#llmMaxPerRun').value = String(settings.llmMaxPerRun);
     $<HTMLInputElement>('#askBranchCap').value = String(settings.askBranchCap);
+    $<HTMLInputElement>('#maxOpenQuestions').value = String(settings.maxOpenQuestions);
+    $<HTMLInputElement>('#visionAutoDraft').checked = settings.visionAutoDraft;
+    state.maxQuestions = settings.maxOpenQuestions;
     $<HTMLInputElement>('#token').value = '';
     $<HTMLInputElement>('#token').placeholder = settings.hasToken
       ? 'a token is set — leave blank to keep it'
@@ -502,6 +673,8 @@ async function saveSettings(): Promise<void> {
       commitsPerBranch: Number($<HTMLInputElement>('#commitsPerBranch').value),
       llmMaxPerRun: Number($<HTMLInputElement>('#llmMaxPerRun').value),
       askBranchCap: Number($<HTMLInputElement>('#askBranchCap').value),
+      maxOpenQuestions: Number($<HTMLInputElement>('#maxOpenQuestions').value),
+      visionAutoDraft: $<HTMLInputElement>('#visionAutoDraft').checked,
       llmBaseUrl: $<HTMLInputElement>('#llmBaseUrl').value.trim(),
       llmModel: ensureModelPicker().getValue(),
     };
@@ -555,6 +728,43 @@ async function loadModels(): Promise<void> {
 function wire(): void {
   document.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
+
+    const say = target.closest<HTMLElement>('[data-say]');
+    if (say) { void sayVision(say.dataset['say'] ?? ''); return; }
+
+    const confirmV = target.closest<HTMLElement>('[data-confirm]');
+    if (confirmV) {
+      const ref = parseBranchKey(confirmV.dataset['confirm'] ?? '');
+      if (ref) void postVision('/api/vision/confirm', ref);
+      return;
+    }
+
+    const clearV = target.closest<HTMLElement>('[data-clearvision]');
+    if (clearV) {
+      const ref = parseBranchKey(clearV.dataset['clearvision'] ?? '');
+      if (ref) void postVision('/api/vision', ref, 'DELETE');
+      return;
+    }
+
+    const plan = target.closest<HTMLElement>('[data-newplan]');
+    if (plan) { void newPlan(plan.dataset['newplan'] ?? '', plan.dataset['done'] === '1'); return; }
+
+    const wander = target.closest<HTMLElement>('[data-wandered]');
+    if (wander) { wandered(wander.dataset['wandered'] ?? ''); return; }
+
+    const gdone = target.closest<HTMLElement>('[data-goaldone]');
+    if (gdone) {
+      void fetch(`/api/goals/${encodeURIComponent(gdone.dataset['goaldone'] ?? '')}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ done: true }),
+      }).then(() => loadSnapshot());
+      return;
+    }
+
+    if (target.closest('#applyProposals')) { void applyProposals(); return; }
+    if (target.closest('#dropProposals')) { state.proposals = []; renderProposals(); return; }
+    if (target.closest('#describeMany')) { void describeMany(); return; }
 
     const file = target.closest<HTMLElement>('[data-file]');
     if (file) {
@@ -651,5 +861,15 @@ function wire(): void {
 }
 
 wire();
-void loadSnapshot();
+// The question cap lives in settings; read it before the first draw so the panel is
+// never briefly wrong.
+void fetch('/api/settings')
+  .then((res) => res.json())
+  .then((settings: SafeSettings) => {
+    state.maxQuestions = settings.maxOpenQuestions;
+  })
+  .catch(() => {
+    /* the default stands; the snapshot load will report if the program is not running */
+  })
+  .finally(() => void loadSnapshot());
 listen();

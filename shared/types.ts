@@ -13,6 +13,8 @@ export type Snapshot = {
    * two sources itself.
    */
   goals: Goal[];
+  /** The assistant's standing answer. Null until it has been written at least once. */
+  brief: Brief | null;
   warnings: string[]; // one unreachable repo must never cost you the others
   rateLimit: RateLimit | null;
   llm: LlmStatus;
@@ -63,6 +65,15 @@ export type Branch = {
   /** Plane B. The goal this branch belongs to, or null while it is unfiled. */
   goalId: string | null;
 
+  /**
+   * Plane B. What this branch is FOR — the yardstick the work is measured against.
+   * Null means nobody has said and the assistant has not drafted one. That is a normal
+   * state, not an error, and it is stated rather than guessed around.
+   */
+  vision: Vision | null;
+  /** The comparison of that vision against what the branch actually did. */
+  assessment: Assessment | null;
+
   // --- Stage 2. Null until the LLM has read this branch; every view renders without them. ---
   /** LLM-written title, shown ALONGSIDE `name` and marked as generated. Never instead of it. */
   title: string | null;
@@ -73,6 +84,81 @@ export type Branch = {
 };
 
 export type Progress = 'progressing' | 'stalled' | 'blocked' | 'done';
+
+// ---------------------------------------------------------------------------
+// Vision — what a branch is FOR (Plane B). See docs/plans/vision-ux.md.
+// ---------------------------------------------------------------------------
+
+/**
+ * Inference gives the *is*; only the owner gives the *ought*. A model can read a branch
+ * and say accurately what it did — it cannot say whether that is what was wanted. The
+ * vision is that missing half, said once, after which every assessment is a comparison
+ * rather than a guess.
+ */
+export type Vision = {
+  /** One or two sentences. Must be falsifiable or it cannot detect anything. */
+  text: string;
+  state: VisionState;
+  /** What a draft was drawn from, so thin reasoning is visible before it is accepted. */
+  from: string;
+  /** The head SHA a draft was made at. Null when the owner wrote it. */
+  draftedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * `proposed` is load-bearing. The assistant may draft — that is the point — but a draft
+ * silently treated as the owner's intent makes every assessment downstream inherit a
+ * guess nobody saw. So a proposal is used, marked, and never the basis for "done".
+ */
+export type VisionState = 'yours' | 'confirmed' | 'proposed';
+
+export type Verdict = 'on-track' | 'drifted' | 'done' | 'overtaken' | 'unclear';
+
+export type Assessment = {
+  verdict: Verdict;
+  /** One sentence. For `drifted` it must name what the branch is doing instead. */
+  because: string;
+  /** Short SHAs, validated against the branch's own commits. */
+  evidence: string[];
+  /** For `overtaken`: the branch that satisfied this one's vision first. */
+  overtakenBy: BranchRef | null;
+  model: string;
+  promptVersion: string;
+  generatedAt: string;
+  /** Stale the moment either of these moves, which is what the cache key is built on. */
+  headSha: string;
+  visionText: string;
+};
+
+// ---------------------------------------------------------------------------
+// Judgement and the brief
+// ---------------------------------------------------------------------------
+
+export type GoalState = 'progressing' | 'at-risk' | 'stalled' | 'looks-done' | 'needs-you';
+
+/**
+ * A judgement has no predicate — you cannot write one for "is this goal done". So it is
+ * proposed, evidenced, and provisional until accepted. A wrong "done" is the single most
+ * damaging thing the assistant can produce, because it is the one never gone back to.
+ */
+export type GoalJudgement = {
+  state: GoalState;
+  because: string;
+  evidence: BranchRef[];
+  model: string;
+  promptVersion: string;
+  generatedAt: string;
+};
+
+/** The standing answer to what is done, what is left, and what is going on. */
+export type Brief = {
+  text: string;
+  generatedAt: string;
+  model: string;
+  promptVersion: string;
+};
 
 // ---------------------------------------------------------------------------
 // Goals (Plane B — the tool's own data, never written into a git repo)
@@ -99,6 +185,8 @@ export type Goal = {
   branches: BranchRef[];
   /** Done goals fold away exactly as quiet branches do — never deleted (rule 10). */
   done: boolean;
+  /** The assistant's read on this goal. Never flips `done` on its own — see GoalJudgement. */
+  judgement: GoalJudgement | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -188,6 +276,14 @@ export type Settings = {
    * register does not need to be in the prompt to answer "what is red".
    */
   askBranchCap: number;
+  /**
+   * Whether the assistant drafts a vision for a branch nobody has described yet. It only
+   * drafts when it can be specific — a vision that cannot be contradicted is worthless as
+   * a yardstick, so it declines rather than writing "improve the UI".
+   */
+  visionAutoDraft: boolean;
+  /** How many questions may be waiting at once. A wall of them is a chore list, not help. */
+  maxOpenQuestions: number;
 };
 
 /** What the settings screen is allowed to see: never a secret, only whether one is set. */
@@ -208,6 +304,8 @@ export const DEFAULT_SETTINGS: Settings = {
   llmEnabled: true,
   llmMaxPerRun: 40,
   askBranchCap: 60,
+  visionAutoDraft: true,
+  maxOpenQuestions: 3,
 };
 
 // ---------------------------------------------------------------------------

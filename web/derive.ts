@@ -11,7 +11,7 @@
  * a browser (rule 5).
  */
 
-import type { Branch, Goal, Snapshot } from '../shared/types.ts';
+import type { Branch, Goal, Snapshot, Verdict } from '../shared/types.ts';
 
 /** A branch thread of work. The base branch is a reference point, not a thread. */
 export const threads = (snapshot: Snapshot): Branch[] => snapshot.branches.filter((b) => !b.isBase);
@@ -151,4 +151,83 @@ export function headline(branch: Branch): { text: string; generated: boolean } {
   const newest = branch.commits[0]?.message;
   if (newest) return { text: newest, generated: false };
   return { text: 'Nothing of its own yet', generated: false };
+}
+
+// ---------------------------------------------------------------------------
+// Vision, and the questions it raises
+// ---------------------------------------------------------------------------
+
+/**
+ * What is waiting on the owner.
+ *
+ * Derived, never stored — so it cannot go stale, and answering one makes it disappear
+ * because the underlying state changed rather than because a flag was set.
+ *
+ * Ordered by what it costs to leave alone: work going wrong first (drift, a branch made
+ * pointless, a goal that looks finished), then the setup questions. Capped, because a
+ * hundred branches could raise a hundred questions and a wall of them is a chore list,
+ * not help. An unasked question is not a failure.
+ */
+export type Question =
+  | { kind: 'drift'; branch: Branch }
+  | { kind: 'overtaken'; branch: Branch }
+  | { kind: 'goal-done'; goal: Goal }
+  | { kind: 'confirm-vision'; branch: Branch }
+  | { kind: 'no-vision'; branch: Branch };
+
+const QUESTION_ORDER: Question['kind'][] = [
+  'drift',
+  'overtaken',
+  'goal-done',
+  'confirm-vision',
+  'no-vision',
+];
+
+export function questions(snapshot: Snapshot, cap: number): Question[] {
+  const found: Question[] = [];
+
+  for (const branch of threads(snapshot)) {
+    // Quiet branches are not worth asking about. Most of a hundred branches are quiet,
+    // and that is exactly the noise this cap exists to prevent.
+    if (branch.relevance !== 'active') continue;
+
+    if (branch.assessment?.verdict === 'overtaken') found.push({ kind: 'overtaken', branch });
+    else if (branch.assessment?.verdict === 'drifted') found.push({ kind: 'drift', branch });
+
+    if (branch.vision?.state === 'proposed') found.push({ kind: 'confirm-vision', branch });
+    else if (!branch.vision && branch.commits.length > 0) found.push({ kind: 'no-vision', branch });
+  }
+
+  for (const goal of snapshot.goals) {
+    if (!goal.done && goal.judgement?.state === 'looks-done') found.push({ kind: 'goal-done', goal });
+  }
+
+  found.sort((a, b) => QUESTION_ORDER.indexOf(a.kind) - QUESTION_ORDER.indexOf(b.kind));
+  return cap > 0 ? found.slice(0, cap) : [];
+}
+
+/**
+ * How a verdict reads on screen. `done` is deliberately never the word "merged" — a
+ * branch can be done and unmerged, or merged and not done, and conflating them is how a
+ * board starts lying.
+ */
+export function verdictLabel(verdict: Verdict): string {
+  switch (verdict) {
+    case 'on-track': return 'on track';
+    case 'drifted': return 'drifted';
+    case 'done': return 'done — vision met';
+    case 'overtaken': return 'overtaken';
+    default: return 'unclear';
+  }
+}
+
+/** The same verdict where there is only room for a chip. Never truncated into nonsense. */
+export function verdictChip(verdict: Verdict): string {
+  return verdict === 'done' ? 'vision met' : verdictLabel(verdict);
+}
+
+/** The one line that says what a branch is for, however much is known. */
+export function visionLine(branch: Branch): { text: string; proposed: boolean; known: boolean } {
+  if (!branch.vision) return { text: 'nobody has said what this is for', proposed: false, known: false };
+  return { text: branch.vision.text, proposed: branch.vision.state === 'proposed', known: true };
 }
