@@ -10,7 +10,7 @@
  * Cached on everything it looked at, so an unmoved fleet regenerates nothing.
  */
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import {
   refKey,
@@ -131,6 +131,8 @@ export async function writeBrief(snapshot: Snapshot, settings: Settings): Promis
     system: SYSTEM,
     user: buildBriefPrompt(snapshot, settings.askBranchCap),
     maxTokens: 1200,
+    // One call, its own batch. Nothing shares a prefix with the brief.
+    sessionId: randomUUID(),
   });
   return parseBrief(raw, snapshot, settings);
 }

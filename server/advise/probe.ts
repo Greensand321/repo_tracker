@@ -160,7 +160,12 @@ If you can answer without a tool, reply with {"answer": "..."} instead.`;
 async function probeJsonProtocol(settings: Settings): Promise<{ outcome: ProbeOutcome; detail: string }> {
   let raw: string;
   try {
-    raw = await complete(settings, { system: PROTOCOL_SYSTEM, user: ASK, maxTokens: 300 });
+    raw = await complete(settings, {
+      system: PROTOCOL_SYSTEM,
+      user: ASK,
+      maxTokens: 300,
+      sessionId: `probe-${Date.now()}`,
+    });
   } catch (err) {
     return { outcome: 'error', detail: err instanceof Error ? err.message : String(err) };
   }

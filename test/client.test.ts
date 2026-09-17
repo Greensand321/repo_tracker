@@ -337,3 +337,30 @@ test('a prose reply is not mistaken for a tool call', () => {
   assert.equal(findToolCall({ content: [{ type: 'text', text: 'I would look it up.' }] }), null);
   assert.equal(findToolCall({}), null);
 });
+
+test('the session header is sent to OpenCode even when no caller asked for one', async () => {
+  // It used to be sent only when a caller remembered to pass a session id, and three did
+  // not — so the brief 400'd on every read for as long as the program was open. On Go the
+  // header is mandatory, which means it cannot be a caller's responsibility to remember.
+  const { headers } = captureHeaders({ choices: [{ message: { content: 'ok' } }] });
+  const config: Settings = { ...settings('kimi-k3'), llmBaseUrl: 'https://opencode.ai/zen/go/v1' };
+
+  await complete(config, request); // no sessionId
+
+  const sent = headers[0]!.get('x-opencode-session');
+  assert.ok(sent && sent.length > 0, 'a session id is minted rather than omitted');
+});
+
+test('every advisor call site reaches a provider through complete()', async () => {
+  // The guarantee above only holds while nothing calls fetch directly. probe.ts has its
+  // own poster for tool-calling, which is why it is named here rather than forbidden.
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../server/advise/', import.meta.url);
+  const offenders: string[] = [];
+
+  for (const file of readdirSync(dir)) {
+    if (!file.endsWith('.ts') || file === 'client.ts' || file === 'probe.ts') continue;
+    if (/\bfetch\s*\(/.test(readFileSync(new URL(file, dir), 'utf8'))) offenders.push(file);
+  }
+  assert.deepEqual(offenders, [], 'these bypass complete() and would miss its headers');
+});

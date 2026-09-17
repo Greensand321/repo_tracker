@@ -8,6 +8,8 @@
  * fleet. A model that invents a branch gets that line dropped, not applied.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import { refKey, type Branch, type BranchRef, type Verdict } from '../../shared/types.ts';
 import { complete } from './client.ts';
 import { extractJson, shortSha, validEvidence } from './prompt.ts';
@@ -194,6 +196,7 @@ export async function distributeVisions(
     system: DISTRIBUTE_SYSTEM,
     user: `Branches that exist:\n${list}\n\nWhat the owner said:\n${paragraph.trim()}`,
     maxTokens: 700,
+    sessionId: randomUUID(),
   });
   return parseDistribution(raw, branches);
 }

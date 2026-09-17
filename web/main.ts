@@ -184,6 +184,15 @@ function renderDateline(data: SnapshotResponse | null): void {
 
   const bits: string[] = [];
   if (data?.refreshing) bits.push('<span class="live">reading…</span>');
+
+  // The dateline is the only thing always in view, so a repeating provider failure
+  // belongs here as well as in Notices — which sits at the bottom of a long column.
+  const failures = snapshot?.llm.errors.length ?? 0;
+  if (failures > 0) {
+    bits.push(
+      `<span class="bad" title="${esc(snapshot!.llm.errors.join(' · '))}">${failures} advisor ${failures === 1 ? 'failure' : 'failures'} — see Notices</span>`,
+    );
+  }
   const rate = snapshot?.rateLimit;
   if (rate) {
     const low = rate.remaining < rate.limit * 0.1;

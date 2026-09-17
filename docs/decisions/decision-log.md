@@ -234,6 +234,37 @@ setup questions. Capped by `maxOpenQuestions` (default 3) and **quiet branches a
 asked about** — most of a hundred branches are quiet, and an unasked question is not a
 failure.
 
+### D66 — A header the provider requires is set by the client, not by its callers
+
+`x-opencode-session` is mandatory on OpenCode Go — a request without it is a flat 400
+(D49). It was sent only when a caller passed a session id, and three of the six call sites
+did not: **the brief failed on every single read**, for as long as the program was open,
+and the only sign was a line in the terminal behind `start.bat`.
+
+`complete()` now sets it unconditionally for an OpenCode base URL, minting one when the
+caller has no batch to name. Callers that *do* have a batch still pass theirs, which is
+what keeps a run's shared prompt prefix on one provider.
+
+The general rule, which is the reason this is a decision and not just a fix: **a
+requirement of the protocol belongs in the one place that speaks the protocol.** If every
+call site has to remember, some of them will not, and the failure will look like a model
+problem rather than a plumbing one.
+
+A test now also asserts that nothing under `server/advise/` reaches a provider except
+through `complete()`, because the guarantee only holds while that is true.
+
+### D67 — A failure the owner cannot see is a failure that goes unfixed
+
+The same bug ran for a day unnoticed. Its errors *were* appended to the snapshot, but
+nothing announced them, so the page was never told — and the next read replaced the
+snapshot before anyone looked. It was visible only in the terminal, which rule 2 says is
+not a product surface.
+
+Two changes: the refresh loop announces after appending advisor errors, and the count
+appears in the dateline — the one line always in view — as well as in Notices, which sits
+at the bottom of a long column. This is D50 applied to the background rather than to the
+page: anything that breaks should say so on screen.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.
