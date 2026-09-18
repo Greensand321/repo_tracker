@@ -81,13 +81,22 @@ async function main(): Promise<void> {
   startPolling();
 }
 
-/** Best-effort. If it fails, the URL is on stdout and nothing is lost. */
+/**
+ * Best-effort. If it fails, the URL is on stdout and nothing is lost.
+ *
+ * The `catch` alone did not deliver that promise: a missing opener fails *asynchronously*,
+ * as an `error` event on the child, and an unhandled one of those takes the whole program
+ * down after it has already said it is running. Being unable to open a browser must never
+ * cost you the program that was going to serve the page.
+ */
 function openBrowser(url: string): void {
   const command =
     process.platform === 'win32' ? 'cmd' : process.platform === 'darwin' ? 'open' : 'xdg-open';
   const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
   try {
-    spawn(command, args, { detached: true, stdio: 'ignore' }).unref();
+    const child = spawn(command, args, { detached: true, stdio: 'ignore' });
+    child.on('error', () => console.log(`Could not open a browser — go to ${url}`));
+    child.unref();
   } catch {
     // Nothing to do: the address is already printed.
   }

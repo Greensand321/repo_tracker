@@ -9,8 +9,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { Branch, Goal, Snapshot } from '../shared/types.ts';
-import { dotClass, glyph, groupByGoal, headline, matches, nowThread, tallies, threads } from '../web/derive.ts';
+import type { Branch, Goal, Job, JobKind, Snapshot } from '../shared/types.ts';
+import {
+  dotClass,
+  floor,
+  glyph,
+  groupByGoal,
+  headline,
+  jobKindLabel,
+  matches,
+  nowThread,
+  questions,
+  tallies,
+  threads,
+} from '../web/derive.ts';
+import { elapsed } from '../web/format.ts';
 
 function branch(name: string, over: Partial<Branch> = {}): Branch {
   return {
@@ -65,6 +78,7 @@ function snap(branches: Branch[], goals: Goal[] = [], over: Partial<Snapshot> = 
     warnings: [],
     rateLimit: null,
     brief: null,
+    work: { jobs: [], workers: 2 },
     llm: { enabled: false, pending: 0, errors: [] },
     ...over,
   };
@@ -245,4 +259,74 @@ test('advisor failures are carried on the snapshot, where a surface can see them
   });
   assert.equal(s.llm.errors.length, 1);
   assert.equal(tallies(s).awaitingSummary, 0, 'a failure is not the same as work pending');
+});
+
+// ---------------------------------------------------------------------------
+// The floor (D73)
+// ---------------------------------------------------------------------------
+
+const job = (over: Partial<Job> = {}): Job => ({
+  id: 'summarise:o/r:a:abc',
+  kind: 'summarise',
+  title: 'Reading what a is doing',
+  subject: { kind: 'branch', repoKey: 'o/r', branch: 'a' },
+  origin: 'routine',
+  state: 'waiting',
+  startedAt: null,
+  attempts: 0,
+  toolCalls: 0,
+  doing: null,
+  error: null,
+  ...over,
+});
+
+test('the floor separates what is running from what is queued and what gave up', () => {
+  const s = snap([branch('a')]);
+  s.work = {
+    workers: 2,
+    jobs: [
+      job({ id: '1', state: 'working', startedAt: '2026-09-17T13:42:00Z' }),
+      job({ id: '2', state: 'waiting' }),
+      job({ id: '3', state: 'waiting', kind: 'assess' }),
+      job({ id: '4', state: 'waiting', kind: 'assess' }),
+      job({ id: '5', state: 'parked', error: 'provider returned 400' }),
+    ],
+  };
+
+  const board = floor(s);
+  assert.equal(board.working.length, 1);
+  assert.equal(board.waiting.length, 3);
+  assert.equal(board.parked.length, 1);
+  assert.deepEqual(board.queued, [
+    { kind: 'summarise', count: 1 },
+    { kind: 'assess', count: 2 },
+  ]);
+});
+
+test('a job that gave up is something waiting on you, and it comes first', () => {
+  // Everything else in that panel is the assistant asking for context. This is the
+  // assistant saying it could not do its job, which outranks all of it.
+  const s = snap([branch('a', { vision: { text: 'x', state: 'proposed', from: '', draftedAt: null, createdAt: '', updatedAt: '' } })]);
+  s.work = { workers: 2, jobs: [job({ state: 'parked', error: 'provider returned 400' })] };
+
+  const list = questions(s, 3);
+  assert.equal(list[0]?.kind, 'stuck');
+  assert.ok(list.some((q) => q.kind === 'confirm-vision'), 'it does not crowd everything out');
+});
+
+test('every job kind has words a person would use', () => {
+  const kinds: JobKind[] = ['summarise', 'draft-vision', 'assess', 'brief'];
+  for (const kind of kinds) {
+    const label = jobKindLabel(kind);
+    assert.ok(label && !label.includes('-'), `${kind}: ${label}`);
+  }
+});
+
+test('elapsed counts up from when a job was claimed', () => {
+  const now = new Date('2026-09-17T13:42:08Z');
+  assert.equal(elapsed('2026-09-17T13:42:04Z', now), '0:04');
+  assert.equal(elapsed('2026-09-17T13:40:38Z', now), '1:30');
+  assert.equal(elapsed(null, now), '');
+  // A clock that disagrees with the server must not render "-1:-3".
+  assert.equal(elapsed('2026-09-17T13:42:20Z', now), '0:00');
 });

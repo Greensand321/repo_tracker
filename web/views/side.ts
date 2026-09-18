@@ -7,8 +7,19 @@
  */
 
 import type { Branch, Snapshot } from '../../shared/types.ts';
-import { esc, relativeTime } from '../format.ts';
-import { dotClass, groupByGoal, matches, questions, tallies, threads, type Question } from '../derive.ts';
+import { elapsed, esc, plural, relativeTime } from '../format.ts';
+import {
+  dotClass,
+  floor,
+  groupByGoal,
+  jobKindLabel,
+  matches,
+  questions,
+  tallies,
+  threads,
+  toolLabel,
+  type Question,
+} from '../derive.ts';
 import { branchKey, shortRepo } from './leader.ts';
 
 export function renderRegister(snapshot: Snapshot, search: string, selected: string | null): string {
@@ -92,6 +103,90 @@ export function renderNotices(snapshot: Snapshot, response: { error: string | nu
 }
 
 // ---------------------------------------------------------------------------
+// The floor — who is working, on what, and what is queued behind them
+// ---------------------------------------------------------------------------
+
+/**
+ * The honest view of what the assistant is doing (D73).
+ *
+ * The headline of every row is the job's own plain-English title; the kind and the clock
+ * are supporting metadata (rule 3). Nothing is computed here — `floor()` groups what the
+ * Snapshot already carries.
+ *
+ * "Nothing to do" is the most common state and the correct one, so it says that rather
+ * than rendering an empty box that looks broken.
+ */
+const MAX_PARKED_ROWS = 6;
+
+export function renderFloor(snapshot: Snapshot, now = new Date()): string {
+  const board = floor(snapshot);
+
+  if (board.working.length === 0 && board.waiting.length === 0 && board.parked.length === 0) {
+    return `<div class="quietnote">${
+      snapshot.llm.enabled
+        ? 'Nothing to do — everything on screen is up to date.'
+        : 'The advisor is off, so there is nothing for the room to do.'
+    }</div>`;
+  }
+
+  const rows: string[] = [];
+
+  for (const job of board.working) {
+    // What it is doing right now beats what kind of job it is: "reading the branches next
+    // to it" is the answer to the question the panel exists to answer.
+    const meta = [
+      job.doing ? toolLabel(job.doing) : jobKindLabel(job.kind),
+      job.toolCalls > 0 && !job.doing ? plural(job.toolCalls, 'lookup') : '',
+      job.origin === 'dispatched' ? 'you asked for this' : '',
+    ].filter(Boolean);
+
+    rows.push(`<div class="jrow live">
+      <span class="jglyph">&#9670;</span>
+      <span class="jbody">
+        <span class="jtitle">${esc(job.title)}</span>
+        <span class="jmeta">${esc(meta.join(' \u00b7 '))}</span>
+      </span>
+      <span class="jclock">${esc(elapsed(job.startedAt, now))}</span>
+    </div>`);
+  }
+
+  if (board.waiting.length > 0) {
+    const detail = board.queued
+      .map((q) => `${esc(jobKindLabel(q.kind))} ${q.count}`)
+      .join(' · ');
+    rows.push(`<div class="jrow">
+      <span class="jglyph dim">&middot;</span>
+      <span class="jbody">
+        <span class="jtitle dim">${plural(board.waiting.length, 'job')} waiting</span>
+        <span class="jmeta">${detail}</span>
+      </span>
+    </div>`);
+  }
+
+  // A provider outage can park a great many at once, and forty identical rows is a wall
+  // rather than a panel. The first few say what is wrong; the count says how wide it is.
+  for (const job of board.parked.slice(0, MAX_PARKED_ROWS)) {
+    rows.push(`<div class="jrow bad">
+      <span class="jglyph">&#9873;</span>
+      <span class="jbody">
+        <span class="jtitle">${esc(job.title)}</span>
+        <span class="jmeta">${esc(job.error ?? 'failed twice')}</span>
+      </span>
+      <span class="jclock">parked</span>
+    </div>`);
+  }
+
+  if (board.parked.length > MAX_PARKED_ROWS) {
+    rows.push(`<div class="jrow bad">
+      <span class="jglyph">&#9873;</span>
+      <span class="jbody"><span class="jtitle dim">${plural(board.parked.length - MAX_PARKED_ROWS, 'more')} parked</span></span>
+    </div>`);
+  }
+
+  return rows.join('');
+}
+
+// ---------------------------------------------------------------------------
 // Waiting on you
 // ---------------------------------------------------------------------------
 
@@ -112,6 +207,16 @@ export function renderQuestions(snapshot: Snapshot, cap: number): string {
 
 function card(q: Question): string {
   switch (q.kind) {
+    case 'stuck':
+      return `<div class="q">
+        <div class="q-head"><span class="eyebrow bad">Could not finish</span></div>
+        <div class="q-who">${esc(q.job.title)}</div>
+        <div class="q-from">${esc(q.job.error ?? 'it failed twice and stopped trying')}</div>
+        <div class="q-acts">
+          <button class="q-btn yes" data-retry="${esc(q.job.id)}">try again</button>
+        </div>
+      </div>`;
+
     case 'drift':
       return ask(
         q.branch,

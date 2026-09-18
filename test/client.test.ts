@@ -286,8 +286,9 @@ test('every branch in one run shares a session, and runs differ', async () => {
   }) as typeof fetch;
 
   const advise = await import('../server/advise/enrich.ts');
+  const { runBoard, resetBoardState } = await import('../server/work/run.ts');
   const makeSnapshot = () => ({
-    generatedAt: '2026-09-16T12:00:00Z', repos: [], warnings: [], rateLimit: null, goals: [], brief: null,
+    generatedAt: '2026-09-16T12:00:00Z', repos: [], warnings: [], rateLimit: null, goals: [], brief: null, work: { jobs: [], workers: 2 },
     llm: { enabled: false, pending: 0, errors: [] },
     branches: ['a', 'b'].map((name) => ({
       repoKey: 'o/r', name, headSha: `sha-${name}-${Math.random()}`, url: 'u',
@@ -299,20 +300,26 @@ test('every branch in one run shares a session, and runs differ', async () => {
     })),
   });
 
-  const config: Settings = { ...settings('kimi-k3'), llmBaseUrl: 'https://opencode.ai/zen/go/v1' };
+  // Only the summarise station here; drafting a vision is its own batch of work.
+  const config: Settings = {
+    ...settings('kimi-k3'),
+    llmBaseUrl: 'https://opencode.ai/zen/go/v1',
+    visionAutoDraft: false,
+  };
 
+  resetBoardState();
   const first = makeSnapshot();
   advise.applyCached(first, config);
-  await advise.enrich(first, config);
+  await runBoard(first, config);
   const runOne = seen.splice(0);
 
   const second = makeSnapshot();
   advise.applyCached(second, config);
-  await advise.enrich(second, config);
+  await runBoard(second, config);
   const runTwo = seen.splice(0);
 
-  assert.equal(runOne.length, 2);
-  assert.ok(runOne[0] && runOne[0] === runOne[1], 'one session across the run');
+  assert.ok(runOne.length >= 2, 'both branches were summarised');
+  assert.equal(new Set(runOne).size, 1, 'one session across the whole run, every station');
   assert.notEqual(runOne[0], runTwo[0], 'a later run is a different session');
 });
 

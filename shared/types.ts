@@ -15,6 +15,11 @@ export type Snapshot = {
   goals: Goal[];
   /** The assistant's standing answer. Null until it has been written at least once. */
   brief: Brief | null;
+  /**
+   * What the assistant is doing and has left to do. Derived every read from this same
+   * structure plus what is already on disk — never stored, never queued (D68).
+   */
+  work: WorkState;
   warnings: string[]; // one unreachable repo must never cost you the others
   rateLimit: RateLimit | null;
   llm: LlmStatus;
@@ -124,6 +129,12 @@ export type Assessment = {
   evidence: string[];
   /** For `overtaken`: the branch that satisfied this one's vision first. */
   overtakenBy: BranchRef | null;
+  /**
+   * What it went and looked at before deciding, by tool name. Empty means it judged from
+   * what it was handed — which is a real difference in how much the verdict is worth, and
+   * one the owner should be able to see rather than infer.
+   */
+  looked: string[];
   model: string;
   promptVersion: string;
   generatedAt: string;
@@ -158,6 +169,54 @@ export type Brief = {
   generatedAt: string;
   model: string;
   promptVersion: string;
+};
+
+// ---------------------------------------------------------------------------
+// The board — what the assistant is working on. See docs/plans/workroom.md.
+// ---------------------------------------------------------------------------
+
+export type JobKind = 'summarise' | 'draft-vision' | 'assess' | 'brief';
+
+/** `waiting` is on the board, `working` is claimed, `parked` failed twice and needs you. */
+export type JobState = 'waiting' | 'working' | 'parked';
+
+/** Routine work is derived. Dispatched work exists only because the owner asked for it. */
+export type JobOrigin = 'routine' | 'dispatched';
+
+export type JobSubject =
+  | { kind: 'branch'; repoKey: string; branch: string }
+  | { kind: 'fleet' };
+
+/**
+ * One piece of work.
+ *
+ * The id is **derived, not minted** — `kind:repo:branch:headSha` — so the same job derived
+ * on the next read is the same job, and a read landing mid-flight finds it already claimed
+ * instead of starting a second one. It also means a branch that moves gets a new id, which
+ * is what retries a parked job at exactly the right moment and never before.
+ */
+export type Job = {
+  id: string;
+  kind: JobKind;
+  /** Plain English, because this goes on screen (rule 3). The kind is supporting metadata. */
+  title: string;
+  subject: JobSubject;
+  origin: JobOrigin;
+  state: JobState;
+  startedAt: string | null;
+  attempts: number;
+  /** Lookups this job has made. On screen, so "what is it doing" has a real answer. */
+  toolCalls: number;
+  /** The tool it is running right now, if any. */
+  doing: string | null;
+  /** Set when parked: what it tried and what came back. */
+  error: string | null;
+};
+
+export type WorkState = {
+  jobs: Job[];
+  /** How many routine jobs may run at once. From settings, so the floor can say so. */
+  workers: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -284,6 +343,24 @@ export type Settings = {
   visionAutoDraft: boolean;
   /** How many questions may be waiting at once. A wall of them is a chore list, not help. */
   maxOpenQuestions: number;
+  /**
+   * Whether a station may look things up before answering (workroom step 3).
+   *
+   * Off is a real setting, not a panic button: it costs you evidence and saves you calls,
+   * and every answer stays correct either way. Switching it changes what each station can
+   * see, so the answers it already wrote are regenerated (D74) — one cheap pass.
+   */
+  toolsEnabled: boolean;
+  /** Lookups one job may make. The ceiling, not the expectation: two tools rarely need 8. */
+  toolCallsPerJob: number;
+  /** And a clock, because a cheap tool can still be asked for forty times slowly. */
+  toolSeconds: number;
+  /**
+   * How many routine jobs run at once (D71). Small on purpose: the only real burst is the
+   * first import, after which the fleet moves every few minutes and this has all night.
+   * More workers make a runaway bill arrive faster, not later.
+   */
+  workers: number;
 };
 
 /** What the settings screen is allowed to see: never a secret, only whether one is set. */
@@ -306,6 +383,10 @@ export const DEFAULT_SETTINGS: Settings = {
   askBranchCap: 60,
   visionAutoDraft: true,
   maxOpenQuestions: 3,
+  toolsEnabled: true,
+  toolCallsPerJob: 8,
+  toolSeconds: 60,
+  workers: 2,
 };
 
 // ---------------------------------------------------------------------------

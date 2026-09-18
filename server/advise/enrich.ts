@@ -1,24 +1,23 @@
 /**
- * Puts LLM summaries onto a Snapshot.
+ * The summarise station, and the free pass that applies what it already wrote.
  *
  * Two passes, on purpose:
- *   applyCached()  — free, synchronous, runs before the snapshot is ever served.
- *   enrich()       — the paid pass, in the background, announcing as it goes.
+ *   applyCached()      — free, synchronous, runs before the snapshot is ever served.
+ *   summariseBranch()  — the paid one, run by a worker off the board (server/work/).
  *
  * The deterministic snapshot is never held up waiting for a model, and a provider that
  * is down, out of credit or slow costs you nothing but the summaries. Everything the
  * page needs to be useful is already there without this file.
+ *
+ * The loop that used to live here is gone: every station's work is now derived onto one
+ * board and run by one dispatcher (D68), so the budget, the concurrency and the "is it
+ * actually done" check are decided in one place rather than three.
  */
-
-import { randomUUID } from 'node:crypto';
 
 import type { Branch, Settings, Snapshot } from '../../shared/types.ts';
 import { LlmError, complete } from './client.ts';
 import { PROMPT_VERSION, SYSTEM_PROMPT, buildUserPrompt, parseInsight } from './prompt.ts';
-import { getInsight, insightKey, pruneInsights, putInsight, type StoredInsight } from './store.ts';
-
-/** One at a time by default: this runs in the background and has all refresh cycle to work. */
-const CONCURRENCY = 2;
+import { getInsight, putInsight, type StoredInsight } from './store.ts';
 
 export function llmReady(settings: Settings): boolean {
   return Boolean(settings.llmEnabled && settings.llmApiKey && settings.llmModel);
@@ -51,80 +50,18 @@ export function applyCached(snapshot: Snapshot, settings: Settings): void {
   snapshot.llm = { enabled: true, pending, errors: [] };
 }
 
-export type EnrichResult = {
-  summarised: number;
-  failed: number;
-  errors: string[];
-};
-
 /**
- * Summarises the branches that still need it, newest first — the ones you are most
- * likely to be looking at get their summary soonest.
+ * One branch, one call, one summary written to the store.
  *
- * `onProgress` fires after each branch so the page can fill in as it goes rather than
- * sitting blank until every branch is done.
+ * Writing to the store is what makes this job checkable: the predicate is "an insight
+ * exists at this head SHA", which reads the same file the cache reads and cannot be
+ * satisfied by a model merely saying it is finished (D69).
  */
-export async function enrich(
-  snapshot: Snapshot,
-  settings: Settings,
-  onProgress?: () => void,
-): Promise<EnrichResult> {
-  const result: EnrichResult = { summarised: 0, failed: 0, errors: [] };
-  if (!llmReady(settings)) return result;
-
-  // Housekeeping: branches that no longer exist should not keep their summaries forever.
-  pruneInsights(new Set(snapshot.branches.map((b) => insightKey(b.repoKey, b.name))));
-
-  const todo = snapshot.branches
-    .filter((branch) => worthSummarising(branch) && branch.insight === null)
-    .slice(0, settings.llmMaxPerRun);
-
-  if (todo.length === 0) return result;
-
-  // One session per run: every branch in a run shares an identical system prompt, so
-  // routing them together is exactly what the header is for. Runs stay distinct.
-  const sessionId = randomUUID();
-
-  let cursor = 0;
-  let stop = false;
-
-  const worker = async (): Promise<void> => {
-    while (!stop && cursor < todo.length) {
-      const branch = todo[cursor++];
-      if (!branch) continue;
-      try {
-        const stored = await summariseBranch(branch, settings, sessionId);
-        putInsight(branch.repoKey, branch.name, stored);
-        assign(branch, stored);
-        result.summarised++;
-      } catch (err) {
-        result.failed++;
-        const message = err instanceof Error ? err.message : String(err);
-        result.errors.push(`${branch.repoKey}/${branch.name}: ${message}`);
-        // A bad key or an exhausted balance fails identically for every branch, so
-        // burning through ninety-nine more requests to learn that is pure waste.
-        if (err instanceof LlmError && isFatal(err)) {
-          stop = true;
-          result.errors.push('stopped early — this failure will repeat for every branch');
-        }
-      } finally {
-        snapshot.llm.pending = Math.max(0, snapshot.llm.pending - 1);
-        onProgress?.();
-      }
-    }
-  };
-
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, todo.length) }, worker));
-
-  snapshot.llm.errors = result.errors;
-  return result;
-}
-
-async function summariseBranch(
+export async function summariseBranch(
   branch: Branch,
   settings: Settings,
   sessionId: string,
-): Promise<StoredInsight> {
+): Promise<void> {
   const raw = await complete(settings, {
     system: SYSTEM_PROMPT,
     user: buildUserPrompt(branch, new Date()),
@@ -132,7 +69,7 @@ async function summariseBranch(
   });
   const insight = parseInsight(raw, branch);
 
-  return {
+  const stored: StoredInsight = {
     title: insight.title,
     summary: insight.summary,
     progress: insight.progress,
@@ -144,6 +81,13 @@ async function summariseBranch(
       headSha: branch.headSha,
     },
   };
+  putInsight(branch.repoKey, branch.name, stored);
+  assign(branch, stored);
+}
+
+/** The predicate for a summarise job: the summary really does exist at this head. */
+export function isSummarised(branch: Branch, settings: Settings): boolean {
+  return getInsight(branch.repoKey, branch.name, branch.headSha, PROMPT_VERSION, settings.llmModel) !== null;
 }
 
 /**
@@ -151,7 +95,7 @@ async function summariseBranch(
  * no commits of its own has nothing to summarise. Quiet branches DO get summarised —
  * being able to see what a branch was about is most of the value of keeping a hundred.
  */
-function worthSummarising(branch: Branch): boolean {
+export function worthSummarising(branch: Branch): boolean {
   return !branch.isBase && branch.commits.length > 0;
 }
 
@@ -163,7 +107,7 @@ function assign(branch: Branch, stored: StoredInsight): void {
 }
 
 /** Auth, billing and a bad model are settings problems; retrying cannot fix them. */
-function isFatal(err: LlmError): boolean {
+export function isFatal(err: LlmError): boolean {
   if (err.status === 401 || err.status === 402 || err.status === 403) return true;
   // A model that answers on no known endpoint will fail identically for every branch.
   return /no API key|no model chosen|did not answer on any known endpoint/i.test(err.message);

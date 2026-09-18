@@ -11,7 +11,7 @@
  * a browser (rule 5).
  */
 
-import type { Branch, Goal, Snapshot, Verdict } from '../shared/types.ts';
+import type { Branch, Goal, Job, JobKind, Snapshot, Verdict } from '../shared/types.ts';
 
 /** A branch thread of work. The base branch is a reference point, not a thread. */
 export const threads = (snapshot: Snapshot): Branch[] => snapshot.branches.filter((b) => !b.isBase);
@@ -168,7 +168,62 @@ export function headline(branch: Branch): { text: string; generated: boolean } {
  * hundred branches could raise a hundred questions and a wall of them is a chore list,
  * not help. An unasked question is not a failure.
  */
+// ---------------------------------------------------------------------------
+// The floor — what the assistant is doing, and what it has left
+// ---------------------------------------------------------------------------
+
+export type Floor = {
+  working: Job[];
+  waiting: Job[];
+  parked: Job[];
+  /** What is queued, by kind, so a long tail reads as one line rather than forty. */
+  queued: { kind: JobKind; count: number }[];
+};
+
+export function floor(snapshot: Snapshot): Floor {
+  const jobs = snapshot.work?.jobs ?? [];
+  const waiting = jobs.filter((j) => j.state === 'waiting');
+
+  const queued = new Map<JobKind, number>();
+  for (const job of waiting) queued.set(job.kind, (queued.get(job.kind) ?? 0) + 1);
+
+  return {
+    working: jobs.filter((j) => j.state === 'working'),
+    waiting,
+    parked: jobs.filter((j) => j.state === 'parked'),
+    queued: [...queued].map(([kind, count]) => ({ kind, count })),
+  };
+}
+
+/**
+ * What a worker is doing this second, in the owner's language.
+ *
+ * Tool names are for the model; this line is for you. An unknown name falls back to
+ * itself rather than to nothing — a new tool should look odd on screen, not invisible.
+ */
+export const toolLabel = (name: string): string =>
+  ({
+    sibling_branches: 'reading the branches next to it',
+    what_changed: 'reading what changed lately',
+  })[name] ?? `using ${name}`;
+
+/**
+ * The job kind in the owner's language, for the small grey line under the title.
+ *
+ * The headline is the job's own `title` — "Reading what claude/foo is doing" — because
+ * plain English is the headline and the machinery is the supporting metadata (rule 3).
+ */
+export const jobKindLabel = (kind: JobKind): string =>
+  ({
+    summarise: 'summary',
+    'draft-vision': 'what it is for',
+    assess: 'against its vision',
+    brief: 'the brief',
+  })[kind];
+
 export type Question =
+  /** A job that failed twice. It is not an error message; it is something waiting on you. */
+  | { kind: 'stuck'; job: Job }
   | { kind: 'drift'; branch: Branch }
   | { kind: 'overtaken'; branch: Branch }
   | { kind: 'goal-done'; goal: Goal }
@@ -176,6 +231,7 @@ export type Question =
   | { kind: 'no-vision'; branch: Branch };
 
 const QUESTION_ORDER: Question['kind'][] = [
+  'stuck',
   'drift',
   'overtaken',
   'goal-done',
@@ -185,6 +241,10 @@ const QUESTION_ORDER: Question['kind'][] = [
 
 export function questions(snapshot: Snapshot, cap: number): Question[] {
   const found: Question[] = [];
+
+  // Work that gave up comes first: everything else here is the assistant asking for
+  // context, and this is the assistant admitting it could not do its job.
+  for (const job of floor(snapshot).parked) found.push({ kind: 'stuck', job });
 
   for (const branch of threads(snapshot)) {
     // Quiet branches are not worth asking about. Most of a hundred branches are quiet,

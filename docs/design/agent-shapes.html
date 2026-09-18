@@ -405,20 +405,37 @@
     floor, and the floor works everywhere.
   </div>
 
-  <h2>Open questions</h2>
-  <ul>
-    <li><b>Q68 — How many workers at once?</b> Two is what the summariser uses today. More is faster
-      and makes a runaway cost arrive faster too.</li>
-    <li><b>Q69 — Should you see the board?</b> It is the honest view of what the assistant is doing
-      and about to do. It is also one more thing to look at. Leaning: a count in the dateline, the
-      full board behind a click.</li>
-    <li><b>Q70 — What happens to a job you cancel mid-flight?</b> There is a real difference between
-      "stop" and "undo", and Plane B is reversible, so both are possible. Worth deciding before it
-      matters rather than after.</li>
-    <li><b>Q71 — Does the advisor tell you when dispatched work finishes?</b> A notification is a
-      product decision, not a technical one. The alternative is that it simply appears, which is
-      quieter and matches everything else here.</li>
-  </ul>
+  <h2>Open questions — all four answered, 17 Sep</h2>
+  <p class="lede">
+    Answered by the owner the same day, and built into
+    <a href="../plans/workroom.md" style="color:var(--now)">plans/workroom.md</a>, which is
+    the build order for ③ with ② inside it. ④ is skipped; ⑤ is step 6.
+  </p>
+  <table>
+    <thead><tr><th style="width:26%">Question</th><th style="width:34%">Answer</th><th>What it decided</th></tr></thead>
+    <tbody>
+      <tr><td class="m">Q68 · how many workers</td>
+        <td>Configurable, <b>2 by default</b>. Work you dispatched must never queue behind background work.</td>
+        <td>Two lanes rather than one pool. The only real burst is the first import; after that the fleet moves every few minutes and a machine left running overnight finishes everything.</td></tr>
+      <tr><td class="m">Q69 · should you see the board</td>
+        <td><b>Yes</b> — how many are working, and what each is doing.</td>
+        <td>The floor is a product surface: a count in the dateline, a panel under the advisor. Parked jobs join <i>Waiting on you</i>.</td></tr>
+      <tr><td class="m">Q70 · cancel mid-flight</td>
+        <td>Would never cancel. But closing the program or shutting the machine down must not lose work.</td>
+        <td>Crash recovery, not cancellation — and routine work needs none of it, because a derived board re-derives an unfinished job for free. Only <i>dispatched</i> work is written down.</td></tr>
+      <tr><td class="m">Q71 · tell you when it finishes</td>
+        <td><b>Dispatched work yes; routine work no.</b></td>
+        <td>One-way, as in ⑤. Forty summaries do not each deserve a notice; the thing you asked for and stopped watching does.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note-box">
+    <b>Writing the plan found a live bug.</b> <code>draft vision</code> is derived as "active,
+    has commits, no vision yet". When the model correctly <i>declines</i> to draft one, nothing
+    is recorded — so the job is derived again on the very next read and paid for again, every
+    minute, forever. The rule that catches it is the one this whole shape rests on:
+    <i>a job whose predicate can never become true is a job that runs forever.</i>
+  </div>
 
 </div>
 </body>

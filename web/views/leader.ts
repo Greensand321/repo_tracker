@@ -10,7 +10,7 @@
 
 import { refKey, type Branch, type BranchRef, type Goal, type Snapshot } from '../../shared/types.ts';
 import { esc, relativeTime } from '../format.ts';
-import { byRecency, glyph, groupByGoal, headline, matches, nowThread, threads, verdictChip, verdictLabel, visionLine } from '../derive.ts';
+import { byRecency, glyph, groupByGoal, headline, matches, nowThread, threads, toolLabel, verdictChip, verdictLabel, visionLine } from '../derive.ts';
 
 export type Grouping = 'goal' | 'branch';
 
@@ -99,14 +99,26 @@ export function forNow(branch: Branch): string {
           <button class="link" data-say="${esc(branchKey(branch))}">say what it is for</button></span></div>`,
   );
 
+  // What it checked before deciding, when it checked anything. A verdict drawn from the
+  // branches next to this one is worth more than one drawn from commit subjects, and that
+  // difference should be visible rather than inferred.
+  const looked = branch.assessment?.looked?.length
+    ? ` <span class="looked">${esc(lookedWords(branch.assessment.looked))}</span>`
+    : '';
   const now = branch.assessment
-    ? `<span class="verdict v-${branch.assessment.verdict}">${verdictLabel(branch.assessment.verdict)}</span> ${esc(branch.assessment.because)}`
+    ? `<span class="verdict v-${branch.assessment.verdict}">${verdictLabel(branch.assessment.verdict)}</span> ${esc(branch.assessment.because)}${looked}`
     : branch.summary
       ? esc(branch.summary)
       : '';
   if (now) out.push(`<div class="fn"><span class="k">Now</span><span class="v">${now}</span></div>`);
 
   return `<div class="fornow">${out.join('')}</div>`;
+}
+
+/** "after reading the branches next to it" — plain English, never a tool name (rule 3). */
+function lookedWords(names: string[]): string {
+  const unique = [...new Set(names)].map(toolLabel);
+  return `after ${unique.join(' and ')}`;
 }
 
 /** Plain English first; the counts are supporting metadata and stay small (rule 3). */

@@ -10,10 +10,10 @@
 import type { Answer } from '../server/advise/ask.ts';
 import type { BranchRef, Goal, SafeSettings, SnapshotResponse } from '../shared/types.ts';
 import { createPicker, type Picker } from './components/picker.ts';
-import { tallies, threads } from './derive.ts';
+import { floor, tallies, threads } from './derive.ts';
 import { clockTime, countdown, esc, exactTime, relativeTime } from './format.ts';
 import { branchKey, parseBranchKey, renderBrief, renderLeaderList, renderNow, type Grouping } from './views/leader.ts';
-import { renderConditions, renderNotices, renderQuestions, renderRegister } from './views/side.ts';
+import { renderConditions, renderFloor, renderNotices, renderQuestions, renderRegister } from './views/side.ts';
 
 type Asked = { question: string; answer: Answer | null; error: string | null; pending: boolean };
 
@@ -91,6 +91,19 @@ async function loadSnapshot(): Promise<void> {
 
 /** The server pushes; the page does not poll. Reconnects on its own if dropped. */
 function listen(): void {
+  // The clock on a working job counts up between events, and a job with no lookups sends
+  // none for a minute. One second of ticking, and only the panel that moves is redrawn —
+  // re-reading a hundred branches to advance a timer would be absurd.
+  setInterval(() => {
+    const snapshot = state.data?.snapshot;
+    if (!snapshot || floor(snapshot).working.length === 0) return;
+    try {
+      $('#floor').innerHTML = renderFloor(snapshot);
+    } catch {
+      // A tick must never be the thing that breaks the page.
+    }
+  }, 1000);
+
   const events = new EventSource('/api/events');
   events.addEventListener('snapshot', () => void loadSnapshot());
   events.addEventListener('state', () => void loadSnapshot());
@@ -150,6 +163,10 @@ function draw(): void {
   renderLeaderHead(snapshot);
   $('#leaderList').innerHTML = renderLeaderList(snapshot, state.grouping, state.search);
 
+  const board = floor(snapshot);
+  $('#floor').innerHTML = renderFloor(snapshot);
+  $('#floorCount').textContent = board.working.length > 0 ? `${board.working.length} at work` : '';
+
   $('#registerCount').textContent = String(t.branches);
   $('#register').innerHTML = renderRegister(snapshot, state.search, state.filing);
   $('#questions').innerHTML = renderQuestions(snapshot, state.maxQuestions);
@@ -184,6 +201,17 @@ function renderDateline(data: SnapshotResponse | null): void {
 
   const bits: string[] = [];
   if (data?.refreshing) bits.push('<span class="live">reading…</span>');
+
+  // What the room is doing belongs on the one line always in view (D73), not only in a
+  // panel halfway down a long column.
+  if (snapshot) {
+    const board = floor(snapshot);
+    if (board.working.length > 0) {
+      bits.push(`<span class="live">${board.working.length} at work</span>`);
+    } else if (board.waiting.length > 0) {
+      bits.push(`<span>${board.waiting.length} waiting</span>`);
+    }
+  }
 
   // The dateline is the only thing always in view, so a repeating provider failure
   // belongs here as well as in Notices — which sits at the bottom of a long column.
@@ -337,6 +365,27 @@ async function postVision(path: string, body: unknown, method = 'POST'): Promise
  * a panel would cost more than it is worth — pre-filled so you are correcting a draft
  * rather than composing from nothing.
  */
+/**
+ * Try a parked job again. The board is derived, so there is nothing to un-write — the
+ * server only forgets that this job failed twice, and the next pass picks it up.
+ */
+async function retryJob(id: string): Promise<void> {
+  if (!id) return;
+  try {
+    const res = await fetch('/api/work/retry', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'could not retry');
+    // Re-read rather than waiting for the push: the stream reconnects on a timer, and a
+    // click inside that window must not silently do nothing.
+    await loadSnapshot();
+  } catch (err) {
+    showFailure('Could not try that again:', err);
+  }
+}
+
 async function sayVision(key: string): Promise<void> {
   const ref = parseBranchKey(key);
   if (!ref) return;
@@ -636,6 +685,9 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#llmMaxPerRun').value = String(settings.llmMaxPerRun);
     $<HTMLInputElement>('#askBranchCap').value = String(settings.askBranchCap);
     $<HTMLInputElement>('#maxOpenQuestions').value = String(settings.maxOpenQuestions);
+    $<HTMLInputElement>('#workers').value = String(settings.workers);
+    $<HTMLInputElement>('#toolCallsPerJob').value = String(settings.toolCallsPerJob);
+    $<HTMLInputElement>('#toolsEnabled').checked = settings.toolsEnabled;
     $<HTMLInputElement>('#visionAutoDraft').checked = settings.visionAutoDraft;
     state.maxQuestions = settings.maxOpenQuestions;
     $<HTMLInputElement>('#token').value = '';
@@ -683,6 +735,9 @@ async function saveSettings(): Promise<void> {
       llmMaxPerRun: Number($<HTMLInputElement>('#llmMaxPerRun').value),
       askBranchCap: Number($<HTMLInputElement>('#askBranchCap').value),
       maxOpenQuestions: Number($<HTMLInputElement>('#maxOpenQuestions').value),
+      workers: Number($<HTMLInputElement>('#workers').value),
+      toolCallsPerJob: Number($<HTMLInputElement>('#toolCallsPerJob').value),
+      toolsEnabled: $<HTMLInputElement>('#toolsEnabled').checked,
       visionAutoDraft: $<HTMLInputElement>('#visionAutoDraft').checked,
       llmBaseUrl: $<HTMLInputElement>('#llmBaseUrl').value.trim(),
       llmModel: ensureModelPicker().getValue(),
@@ -737,6 +792,9 @@ async function loadModels(): Promise<void> {
 function wire(): void {
   document.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
+
+    const retry = target.closest<HTMLElement>('[data-retry]');
+    if (retry) { void retryJob(retry.dataset['retry'] ?? ''); return; }
 
     const say = target.closest<HTMLElement>('[data-say]');
     if (say) { void sayVision(say.dataset['say'] ?? ''); return; }

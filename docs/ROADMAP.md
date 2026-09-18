@@ -93,6 +93,26 @@ without you reading a single commit.
 
 ---
 
+## The assistant — the workroom  **steps 1–3 built**
+
+Not a stage of its own: it runs across Stages 2 and 3 and is what makes 3.6 and 3.7
+possible at all. Planned in full at [`plans/workroom.md`](plans/workroom.md); the shapes it
+could have taken, and why these, are in [`design/agent-shapes.html`](design/agent-shapes.html).
+
+| | Step | Status |
+|---|---|---|
+| 1 | **The board and the dispatcher** — work derived, claimed, and checked against the snapshot rather than believed; failures park | ✅ built (D68–D70) |
+| 2 | **The floor** — how many are working, on what, and what gave up | ✅ built (D73) |
+| 3 | **The tool layer** — the contract, the JSON-protocol loop, the free tools, a per-job budget, `assess` wired to use them | ✅ built (D75–D78) |
+| 4 | **Tools at the stations** — `repo_readme`, `commit_files`: new GitHub collection, cached, for `summarise` and `draft-vision` | next |
+| 5 | **Dispatch** — a second lane for work you asked for, persisted and rebooted on the next start (D71, D72) | after 2 |
+| 6 | **The desk** — the advisor may act: regroup the register, rank by your criteria, go and check something | after 3–5 |
+
+**Exit:** the assistant answers from evidence it went and got, you can watch it do it, and
+nothing it starts is lost when you close the program.
+
+---
+
 ## Stage 3 — The organizing layer
 
 **What you get:** your structure over their work. Branches become threads under goals,

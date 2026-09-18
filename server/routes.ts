@@ -11,7 +11,16 @@ import { GitHubError, splitRepoKey, verifyToken } from './github.ts';
 import { GoalError, assignBranch, createGoal, deleteGoal, listGoals, updateGoal } from './goals.ts';
 import { VisionError, clearVision, confirmVision, setVision } from './vision.ts';
 import { loadSettings, saveSettings, toSafe } from './settings.ts';
-import { currentResponse, reapplyGoals, reapplyVisions, refresh, startPolling, subscribe } from './state.ts';
+import { resetBoardState } from './work/run.ts';
+import {
+  currentResponse,
+  reapplyGoals,
+  reapplyVisions,
+  refresh,
+  retryJob,
+  startPolling,
+  subscribe,
+} from './state.ts';
 
 export const api = new Hono();
 
@@ -68,6 +77,9 @@ api.put('/settings', async (c) => {
     'llmMaxPerRun',
     'askBranchCap',
     'maxOpenQuestions',
+    'workers',
+    'toolCallsPerJob',
+    'toolSeconds',
   ] as const) {
     if (body[key] !== undefined) patch[key] = Number(body[key]);
   }
@@ -76,11 +88,16 @@ api.put('/settings', async (c) => {
   }
   if (typeof body.llmEnabled === 'boolean') patch.llmEnabled = body.llmEnabled;
   if (typeof body.visionAutoDraft === 'boolean') patch.visionAutoDraft = body.visionAutoDraft;
+  if (typeof body.toolsEnabled === 'boolean') patch.toolsEnabled = body.toolsEnabled;
   if (typeof body.llmApiKey === 'string' && body.llmApiKey.trim()) {
     patch.llmApiKey = body.llmApiKey.trim();
   }
 
   const saved = saveSettings(patch);
+  // A job parked because of a rejected key, a missing model or a wrong endpoint — the
+  // three things most likely to have just been edited on this screen. Keeping it parked
+  // on the strength of a problem that was just fixed is the opposite of helpful.
+  resetBoardState();
   // Settings changed what or how often we fetch, so restart the loop rather than
   // waiting out the old interval.
   startPolling();
@@ -227,6 +244,18 @@ api.post('/vision/distribute', async (c) => {
   } catch (err) {
     return c.json({ error: describe(err) }, 400);
   }
+});
+
+/**
+ * Try a parked job again. The only write the board surface has: everything else about the
+ * board is derived, so there is nothing else to change.
+ */
+api.post('/work/retry', async (c) => {
+  const body = (await c.req.json()) as { id?: unknown };
+  const id = String(body.id ?? '');
+  if (!id) return c.json({ error: 'which job?' }, 400);
+  if (!retryJob(id)) return c.json({ error: 'that job is no longer on the board' }, 400);
+  return c.json({ ok: true });
 });
 
 api.delete('/settings/token', (c) => c.json(toSafe(saveSettings({ token: '' }))));

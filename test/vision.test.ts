@@ -70,7 +70,7 @@ function snap(branches: Branch[], goals: Goal[] = []): Snapshot {
   return {
     generatedAt: '2026-09-17T13:42:08Z',
     repos: [{ key: 'greensand321/repo_tracker', owner: 'greensand321', name: 'repo_tracker', defaultBranch: 'main', branchCount: 9, url: '' }],
-    branches, goals, brief: null, warnings: [], rateLimit: null,
+    branches, goals, brief: null, work: { jobs: [], workers: 2 }, warnings: [], rateLimit: null,
     llm: { enabled: true, pending: 0, errors: [] },
   };
 }
@@ -97,7 +97,7 @@ test('confirming keeps the words, so the assessment drawn against them survives'
   store.clearVision(REF);
   store.setVision(REF, 'Build the broadsheet', 'proposed');
   store.putAssessment(REF, {
-    verdict: 'on-track', because: 'it is', evidence: [], overtakenBy: null,
+    verdict: 'on-track', because: 'it is', evidence: [], overtakenBy: null, looked: [],
     model: 'test-model', promptVersion: 'v1', generatedAt: '', headSha: 'head1',
     visionText: 'Build the broadsheet',
   });
@@ -115,7 +115,7 @@ test('rewriting the vision throws away the assessment drawn against the old one'
   store.clearVision(REF);
   store.setVision(REF, 'Build the broadsheet', 'proposed');
   store.putAssessment(REF, {
-    verdict: 'on-track', because: 'it is', evidence: [], overtakenBy: null,
+    verdict: 'on-track', because: 'it is', evidence: [], overtakenBy: null, looked: [],
     model: 'test-model', promptVersion: 'v1', generatedAt: '', headSha: 'head1',
     visionText: 'Build the broadsheet',
   });
@@ -133,7 +133,7 @@ test('an assessment of a head you have moved past is not served', () => {
   store.clearVision(REF);
   store.setVision(REF, 'A vision', 'yours');
   store.putAssessment(REF, {
-    verdict: 'done', because: '', evidence: [], overtakenBy: null,
+    verdict: 'done', because: '', evidence: [], overtakenBy: null, looked: [],
     model: 'test-model', promptVersion: 'v1', generatedAt: '', headSha: 'old',
     visionText: 'A vision',
   });
@@ -144,7 +144,7 @@ test('applyVisions drops an assessment that no longer matches, rather than showi
   store.clearVision(REF);
   store.setVision(REF, 'A vision', 'yours');
   store.putAssessment(REF, {
-    verdict: 'done', because: '', evidence: [], overtakenBy: null,
+    verdict: 'done', because: '', evidence: [], overtakenBy: null, looked: [],
     model: 'test-model', promptVersion: 'v1', generatedAt: '', headSha: 'old',
     visionText: 'A vision',
   });
@@ -325,7 +325,7 @@ test('the brief cache key is stable when nothing has changed', () => {
 const proposed = { text: 'A guess', state: 'proposed' as const, from: '', draftedAt: null, createdAt: '', updatedAt: '' };
 const mine = { text: 'Mine', state: 'yours' as const, from: '', draftedAt: null, createdAt: '', updatedAt: '' };
 const drifted = {
-  verdict: 'drifted' as const, because: 'doing something else', evidence: [], overtakenBy: null,
+  verdict: 'drifted' as const, because: 'doing something else', evidence: [], overtakenBy: null, looked: [],
   model: 'm', promptVersion: 'v1', generatedAt: '', headSha: 'aaaaaaa1111', visionText: 'Mine',
 };
 
@@ -378,18 +378,18 @@ test('the chip form of a verdict is never truncated into nonsense', () => {
   }
 });
 
-test('the paid pass shares one budget rather than one per step', async () => {
+test('one budget for the whole read, and only the dispatcher may spend it', async () => {
   // Drafting was capped and assessing was not, so a read that had just been given forty
   // visions would then assess all forty — past the ceiling that exists so a first run
-  // cannot surprise you with a bill.
-  const src = await import('node:fs').then((fs) =>
-    fs.readFileSync(new URL('../server/advise/assist.ts', import.meta.url), 'utf8'),
-  );
-  assert.match(src, /let budget = settings\.llmMaxPerRun/, 'one budget');
-  assert.equal(
-    (src.match(/slice\(0, settings\.llmMaxPerRun\)/g) ?? []).length,
-    0,
-    'no step slices its own cap out from under the shared budget',
-  );
-  assert.equal((src.match(/!spend\(\)/g) ?? []).length, 2, 'both paid per-branch steps draw on it');
+  // cannot surprise you with a bill. Now there is one budget, in one place, and a station
+  // that helped itself to its own cap is the bug this is here to prevent coming back.
+  const fs = await import('node:fs');
+  const stations = new URL('../server/advise/', import.meta.url);
+  for (const file of fs.readdirSync(stations)) {
+    const src = fs.readFileSync(new URL(file, stations), 'utf8');
+    assert.doesNotMatch(src, /llmMaxPerRun/, `${file} must not cap spending itself`);
+  }
+
+  const dispatcher = fs.readFileSync(new URL('../server/work/run.ts', import.meta.url), 'utf8');
+  assert.match(dispatcher, /let budget = settings\.llmMaxPerRun/, 'one budget, in the dispatcher');
 });

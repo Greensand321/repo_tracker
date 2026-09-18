@@ -43,6 +43,13 @@ function sanitise(settings: Settings): Settings {
     askBranchCap: clamp(settings.askBranchCap, 1, 400, DEFAULT_SETTINGS.askBranchCap),
     visionAutoDraft: settings.visionAutoDraft !== false,
     maxOpenQuestions: clamp(settings.maxOpenQuestions, 0, 40, DEFAULT_SETTINGS.maxOpenQuestions),
+    toolsEnabled: settings.toolsEnabled !== false,
+    // The worst case for a read is llmMaxPerRun jobs times this plus one, so it is capped
+    // well below anything that could run away quietly.
+    toolCallsPerJob: clamp(settings.toolCallsPerJob, 0, 20, DEFAULT_SETTINGS.toolCallsPerJob),
+    toolSeconds: clamp(settings.toolSeconds, 5, 300, DEFAULT_SETTINGS.toolSeconds),
+    // Capped low on purpose: more workers make a runaway bill arrive faster, not later.
+    workers: clamp(settings.workers, 1, 8, DEFAULT_SETTINGS.workers),
   };
 }
 

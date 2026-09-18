@@ -96,6 +96,16 @@
     <span>6 model calls · 0 tools · every call single-turn</span>
   </div>
 
+  <div class="note-box">
+    <b>Partly superseded, 17 Sep (evening).</b> The four background calls are no longer run by
+    three separate loops: they are <b>derived onto one board</b> and run by one dispatcher that
+    checks each job against the snapshot before counting it done (D68, D69). What each call
+    <i>sees, decides and may never do</i> — the whole point of this page — is unchanged, and so
+    is the cost model. What changed is who runs them, in what order, and what happens when one
+    fails: it parks, visibly, instead of repeating. See
+    <a href="../plans/workroom.md" style="color:var(--now)">plans/workroom.md</a>.
+  </div>
+
   <h2>The short answer</h2>
   <p class="lede">
     There is no agent loop and no tool use yet. The assistant is <b>six separate prompts</b>,
@@ -323,11 +333,17 @@
     cannot look at a second branch. Whatever it needs is written into the prompt before it runs.
   </p>
   <div class="note-box">
-    <b>Why:</b> a tool-using agent needs a model that reliably calls tools, and that has never been
-    verified on the OpenCode Go plan. Five provider gates in a row came from building on exactly
-    that kind of assumption. <code>npm run probe</code> answers it in two calls and a few hundred
-    tokens — it is still unrun. The tool catalogue is designed in
-    <code>docs/plans/agent-plan.md</code> §3 and waits on that.
+    <b>Why — and a correction, 17 Sep.</b> The caution here was over-calibrated. It came from one
+    real burn (<code>response_format</code> failing whole requests on some Zen models) and was
+    generalised further than that evidence supports: modern models handle a handful of tool calls
+    without difficulty, and the turn counts here are tiny. The floor that matters is not the
+    model's capability but the <b>provider being swappable by design</b> (D32) — so tools ship with
+    native calling where it works and a plain JSON protocol where it does not, same catalogue
+    either way. <code>npm run probe</code> decides <i>which</i>, not <i>whether</i>.
+    <br><br>
+    What tools actually wait on is the predicate check, which now exists: tools without a way to
+    tell whether the job worked is just a longer guess. The catalogue and the order are in
+    <a href="../plans/workroom.md" style="color:var(--now)">plans/workroom.md</a> §4 and §8.
   </div>
 
   <h2>Where to change things — today</h2>
