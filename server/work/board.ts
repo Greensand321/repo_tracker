@@ -129,7 +129,7 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
           branch,
           `Reading what ${branch.name} is doing`,
           settings,
-          (handle) => summariseBranch(branch, settings, handle.sessionId),
+          (handle) => summariseBranch(branch, snapshot, settings, handle),
           () => isSummarised(branch, settings),
         ),
       );
@@ -138,15 +138,15 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
 
   if (settings.visionAutoDraft) {
     for (const branch of branches) {
-      if (worthAVision(branch) && branch.summary !== null && !isDescribed(branch)) {
+      if (worthAVision(branch) && branch.summary !== null && !isDescribed(branch, settings)) {
         jobs.push(
           forBranch(
             'draft-vision',
             branch,
             `Working out what ${branch.name} is for`,
             settings,
-            (handle) => draftFor(branch, settings, handle.sessionId),
-            () => isDescribed(branch),
+            (handle) => draftFor(branch, snapshot, settings, handle),
+            () => isDescribed(branch, settings),
           ),
         );
       }

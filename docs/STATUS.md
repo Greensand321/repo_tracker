@@ -6,7 +6,7 @@
 
 ---
 
-## The room is built (workroom steps 1–3)
+## The room is built (workroom steps 1–4)
 
 The assistant's work is no longer three loops with three ideas of the budget. Every station
 derives what it has outstanding onto **one board**, a dispatcher runs it N at a time, and a
@@ -23,9 +23,17 @@ never recorded, so the job was derived again every read and paid for again — e
 for every declined branch, forever (D70). The rule that caught it, before a line was built:
 **a job whose predicate can never become true is a job that runs forever.**
 
-**Stations can look things up.** `assess` — the station whose verdicts are claims about
-intent — can now read the branches next to this one and how things moved this week, instead
-of inferring both from commit subjects. It is the JSON protocol, so it needs no tool support
+**Stations can look things up.** Three of them do:
+
+| | it can read | so that |
+|---|---|---|
+| **summarise** | which files a commit touched | the messages are written by the same agent whose work is in question; the files are the independent record |
+| **draft a vision** | the README, the files, the branches beside it | purpose is the hardest thing to infer and the one nothing in git records — and everything downstream is measured against it |
+| **assess** | the files, what moved this week, the siblings | *drifted* and *already done elsewhere* are claims that cannot be checked from one branch alone |
+
+Nothing is collected in advance: a worker asks for the one commit it cares about and the
+answer is cached on the SHA, where it is true for ever (D79). A README is one call per repo,
+kept — and `CLAUDE.md` is read instead when there is no README. It is the JSON protocol, so it needs no tool support
 from the provider: the model replies with `{"tool": …}`, we run it and ask again. A reply
 with no `tool` key is the answer, handed to the station's own parser unchanged — no prompt
 and no parser changed to gain tools.
@@ -35,8 +43,12 @@ the clock does. An unknown tool is a correction, a repeated one is answered from
 already have, and a model that never answers **fails the job** rather than having its last
 tool call parsed into a verdict.
 
-Plan and what is next: [`plans/workroom.md`](plans/workroom.md) — GitHub tools at the other
-stations (step 4), dispatch (step 5), then the advisor that can act (step 6). D68–D78.
+> **The first read after this regenerates every summary and every assessment.** A station's
+> tool list is part of its cache key (D74), and they were written without tools. It is one
+> pass at `llmMaxPerRun` a read, and then the fleet is quiet again.
+
+Plan and what is next: [`plans/workroom.md`](plans/workroom.md) — dispatch (step 5), then
+the advisor that can act (step 6). D68–D80.
 
 ## The assistant is built (stage A)
 
@@ -85,7 +97,7 @@ recommendation there was D6; the owner chose D4 and the reasons are in D57.
 | **Stage 1** | Built. Every branch across your repos, with its real commit history, PR and CI state. ETag change detection; a repo that has not moved costs nothing. |
 | **Stage 2 engine** | Built. Per-branch plain-English title, summary, and progress judgement, cached so an idle branch is never re-summarised. |
 | **Stage 2 surfaces** | Deliberately not built — the comment tool, the chat panel, and "what changed since I last looked" all wait for the real design. |
-| Tests | 208, no network. Recorded GitHub fixtures and a stubbed provider. |
+| Tests | 221, no network. Recorded GitHub fixtures and a stubbed provider. |
 
 ## Try it without the GUI
 
@@ -158,8 +170,14 @@ After that, in order:
   `stage` and its `reserve`.
 - **`llmMaxPerRun` counts provider calls, not jobs** (D75). A job is claimed only when the
   read can pay for it in full — a lookup costs the same as an answer.
-- **A tool is handed `SafeSettings`, never `Settings`** (D77). It cannot leak a token it
-  never had, and a test enforces that nothing under `server/tools/` reaches for one.
+- **A tool is handed `SafeSettings` and a two-method GitHub reader, never the token** (D77,
+  D79). Nothing under `server/tools/` may name a credential or call `fetch`, and a test
+  enforces both.
+- **`data/evidence.json`** holds what the tools fetched: READMEs per repo, file lists per
+  commit SHA. Both permanently true, so it is one call ever. Plane B, gitignored.
+- **A tool error the worker can fix goes back to it; anything else fails the job** (D80).
+- **Two workers wanting the same README make one call.** They miss the cache in the same
+  millisecond otherwise — measured, and it doubled every GitHub call.
 - **Announcements to the page are coalesced at 300ms.** The page re-reads the whole snapshot
   on every one, and the board announces on every job claimed, every lookup and every job
   done — several hundred full reads a run, for a panel whose unit of meaning is "something
@@ -191,6 +209,7 @@ After that, in order:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 18 Sep 2026 | **The workroom, step 4**: `repo_readme` and `commit_files` — fetched on demand, cached for ever, and wired into summarise, draft-vision and assess. A tool gets a reader, never the token. D79, D80 |
 | 17 Sep 2026 | **The workroom, step 3 and an audit**: stations can look things up (the JSON protocol, two free tools, `assess` wired). The audit found four: a bad key parked the whole fleet, the call budget could be overshot ninefold, a parked job blocked the brief for ever, and a model that never answered had its tool call stored as a verdict. D75–D78 |
 | 17 Sep 2026 | **The workroom, steps 1–2**: work derived onto a board, done checked rather than claimed, failures park, and the floor shows the room working. A declined vision was being re-paid every read. D68–D74 |
 | 17 Sep 2026 | **D4 "The Broadsheet" chosen and built** — `web/` rebuilt from scratch against it. Goals land as Plane B with their own store, API and tests; the advisor answers questions single-turn. D57–D60 recorded |

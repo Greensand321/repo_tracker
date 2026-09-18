@@ -130,15 +130,22 @@ export function clearVision(ref: BranchRef): void {
 // Declines — the assistant looked and could not be specific
 // ---------------------------------------------------------------------------
 
-/** True when the assistant already declined to describe this exact state of the branch. */
-export function wasDeclined(ref: BranchRef, headSha: string): boolean {
-  return entry(load(), refKey(ref.repoKey, ref.branch)).declinedAt === headSha;
+/**
+ * True when the assistant already declined to describe this exact state of the branch,
+ * with the evidence it has now.
+ *
+ * Both halves matter. The SHA, so a branch that moves is worth asking about again. The
+ * version, because "I could not be specific" was only ever true of what it could see —
+ * give the station the README and the question is a different question.
+ */
+export function wasDeclined(ref: BranchRef, headSha: string, version: string): boolean {
+  return entry(load(), refKey(ref.repoKey, ref.branch)).declinedAt === `${headSha}@${version}`;
 }
 
-export function recordDecline(ref: BranchRef, headSha: string): void {
+export function recordDecline(ref: BranchRef, headSha: string, version: string): void {
   const all = load();
   const key = refKey(ref.repoKey, ref.branch);
-  all[key] = { ...entry(all, key), declinedAt: headSha };
+  all[key] = { ...entry(all, key), declinedAt: `${headSha}@${version}` };
   persist(all);
 }
 

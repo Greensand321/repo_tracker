@@ -159,11 +159,14 @@ test('the base branch and empty branches are never sent to the model', async () 
 });
 
 test('llmMaxPerRun caps the whole read, across every station', async () => {
+  // Lookups off, so this measures the budget itself rather than the reserve a station
+  // with tools claims against — that has its own test below.
+  const config = settings({ llmMaxPerRun: 3, toolsEnabled: false });
   const snap = snapshot(Array.from({ length: 10 }, (_, i) => branch(`b${i}`)));
   const calls = stubProvider(insight());
 
-  enrich.applyCached(snap, settings());
-  const result = await work.runBoard(snap, settings({ llmMaxPerRun: 3 }));
+  enrich.applyCached(snap, config);
+  const result = await work.runBoard(snap, config);
   assert.equal(calls.calls, 3);
   assert.equal(result.budgetSpent, true);
 });

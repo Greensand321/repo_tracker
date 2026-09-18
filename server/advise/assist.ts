@@ -15,7 +15,7 @@ import { join } from 'node:path';
 
 import { type Assessment, type Branch, type BranchRef, type Settings, type Snapshot } from '../../shared/types.ts';
 import { DATA_DIR, ensureDirs } from '../paths.ts';
-import { toSafe } from '../settings.ts';
+import { contextFor } from '../tools/context.ts';
 import {
   applyVisions,
   getAssessment,
@@ -26,7 +26,7 @@ import {
 } from '../vision.ts';
 import type { RunHandle } from '../work/handle.ts';
 import { BRIEF_PROMPT_VERSION, briefKey, writeBrief, type BriefResult } from './brief.ts';
-import { VISION_PROMPT_VERSION, assessBranch, assessVersion, draftVision } from './vision.ts';
+import { VISION_PROMPT_VERSION, assessBranch, assessVersion, draftVersion, draftVision } from './vision.ts';
 
 // ---------------------------------------------------------------------------
 // The fleet-level store: one brief, its judgements, its overtaken findings
@@ -111,15 +111,29 @@ export function applyAssist(snapshot: Snapshot, settings: Settings): void {
 // Station: draft a vision for a branch nobody has described
 // ---------------------------------------------------------------------------
 
-export async function draftFor(branch: Branch, settings: Settings, sessionId: string): Promise<void> {
+export async function draftFor(
+  branch: Branch,
+  snapshot: Snapshot,
+  settings: Settings,
+  handle: RunHandle,
+): Promise<void> {
   const ref: BranchRef = { repoKey: branch.repoKey, branch: branch.name };
-  const draft = await draftVision(branch, settings, sessionId);
+  const draft = await draftVision(branch, settings, {
+    sessionId: handle.sessionId,
+    ctx: contextFor(snapshot, settings, branch),
+    onTool: handle.onTool,
+    spend: handle.spend,
+  });
 
   if (draft.text === null) {
     // Declining is a correct outcome, not a failure: a vision that cannot be contradicted
     // is worse than none. But it has to be *recorded*, or this job is derived again on the
     // next read and paid for again, every minute, forever (D70).
-    recordDecline(ref, branch.headSha);
+    //
+    // Recorded against the evidence it was made on, not just the head SHA: "I could not be
+    // specific" was true of the commit messages alone, and a station since given the
+    // README deserves to be asked again.
+    recordDecline(ref, branch.headSha, draftVersion(settings));
     return;
   }
 
@@ -130,8 +144,13 @@ export async function draftFor(branch: Branch, settings: Settings, sessionId: st
 }
 
 /** Done means the question has been settled either way — a vision, or a recorded decline. */
-export function isDescribed(branch: Branch): boolean {
-  return branch.vision !== null || wasDeclined({ repoKey: branch.repoKey, branch: branch.name }, branch.headSha);
+export function isDescribed(branch: Branch, settings: Settings): boolean {
+  if (branch.vision !== null) return true;
+  return wasDeclined(
+    { repoKey: branch.repoKey, branch: branch.name },
+    branch.headSha,
+    draftVersion(settings),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -151,9 +170,7 @@ export async function assessFor(
   const verdict = await assessBranch(branch, vision.text, settings, {
     sessionId: handle.sessionId,
     // The worker's whole world: the fleet it can look at, and the one branch it is about.
-    // `toSafe` is not decoration — a tool's output lands in a prompt, so it is never given
-    // the GitHub token or the provider key to put there.
-    ctx: { snapshot, settings: toSafe(settings), branch, now: new Date() },
+    ctx: contextFor(snapshot, settings, branch),
     onTool: handle.onTool,
     spend: handle.spend,
   });

@@ -416,6 +416,39 @@ works the lowest stage that has anything *runnable* in it, and work that has giv
 filtered out before that choice is made. Ordering stays a number, so there is still no
 foreman deciding it.
 
+### D79 — Commit contents are fetched by a tool, never collected
+
+Collecting the files every commit touched with everything else would be five thousand calls
+a read at a hundred branches with fifty commits each. So it is not collected: a worker asks
+for the one commit it cares about, and the answer is cached on the SHA — where it is true
+for ever, because a commit's file list cannot change.
+
+The same goes for the README: one call per repo, kept, and re-read only if the repo is
+removed and added again. A repo with neither a README nor a `CLAUDE.md` records *that*, so
+nothing asks a second time.
+
+This is the first thing in the program that fetches from GitHub outside `collect`, and the
+rule that keeps it honest is D77's: the tool is handed a **reader**, not the token. Two
+methods, bound on the server, and no way to make a call nobody designed. `server/tools/`
+may not name a credential or call `fetch`, and a test enforces both.
+
+One measured surprise, worth keeping: two workers summarising two branches of the same repo
+miss the cache in the same millisecond and both call GitHub, because the cache only closes
+after the first write. On a two-branch fleet that doubled every GitHub call; with eight
+workers it would be eightfold. The second asker now waits for the first.
+
+### D80 — A tool failure the worker can fix goes back to it; anything else fails the job
+
+A `ToolError` — a bad argument, a SHA that is not on this branch — is handed back as the
+tool's result, and the conversation continues. The worker can read the complaint and fix
+its own call, which is the whole point of having one.
+
+Everything else is rethrown: a rate limit, an outage, a rejected token. Fed back as a
+result, each of the read's forty jobs would discover the same outage separately, pay full
+price for the privilege, and then answer *without* the evidence it asked for while looking
+exactly as confident as it would with it. The job fails instead and the next read tries
+again — which is what parking and retrying are for.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

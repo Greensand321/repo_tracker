@@ -15,9 +15,22 @@
  */
 
 import type { Branch, Settings, Snapshot } from '../../shared/types.ts';
-import { LlmError, complete } from './client.ts';
+import { toolSetTag, toolsFor } from '../tools/catalog.ts';
+import type { RunHandle } from '../work/handle.ts';
+import { contextFor } from '../tools/context.ts';
+import { LlmError } from './client.ts';
+import { converse } from './converse.ts';
 import { PROMPT_VERSION, SYSTEM_PROMPT, buildUserPrompt, parseInsight } from './prompt.ts';
 import { getInsight, putInsight, type StoredInsight } from './store.ts';
+
+/**
+ * The version a summary is cached under, **including the tools the station had** (D74).
+ * A summary written after reading which files a commit touched is a different thing from
+ * one written from the messages alone, and the store must not hold both under one key.
+ */
+export function summariseVersion(settings: Settings): string {
+  return PROMPT_VERSION + toolSetTag(toolsFor('summarise', settings));
+}
 
 export function llmReady(settings: Settings): boolean {
   return Boolean(settings.llmEnabled && settings.llmApiKey && settings.llmModel);
@@ -37,7 +50,7 @@ export function applyCached(snapshot: Snapshot, settings: Settings): void {
       branch.repoKey,
       branch.name,
       branch.headSha,
-      PROMPT_VERSION,
+      summariseVersion(settings),
       settings.llmModel,
     );
     if (stored) {
@@ -59,13 +72,18 @@ export function applyCached(snapshot: Snapshot, settings: Settings): void {
  */
 export async function summariseBranch(
   branch: Branch,
+  snapshot: Snapshot,
   settings: Settings,
-  sessionId: string,
+  handle: RunHandle,
 ): Promise<void> {
-  const raw = await complete(settings, {
+  const { text: raw } = await converse(settings, {
     system: SYSTEM_PROMPT,
     user: buildUserPrompt(branch, new Date()),
-    sessionId,
+    tools: toolsFor('summarise', settings),
+    ctx: contextFor(snapshot, settings, branch),
+    sessionId: handle.sessionId,
+    onTool: handle.onTool,
+    spend: handle.spend,
   });
   const insight = parseInsight(raw, branch);
 
@@ -76,7 +94,7 @@ export async function summariseBranch(
     meta: {
       evidence: insight.evidence,
       model: settings.llmModel,
-      promptVersion: PROMPT_VERSION,
+      promptVersion: summariseVersion(settings),
       generatedAt: new Date().toISOString(),
       headSha: branch.headSha,
     },
@@ -87,7 +105,10 @@ export async function summariseBranch(
 
 /** The predicate for a summarise job: the summary really does exist at this head. */
 export function isSummarised(branch: Branch, settings: Settings): boolean {
-  return getInsight(branch.repoKey, branch.name, branch.headSha, PROMPT_VERSION, settings.llmModel) !== null;
+  return (
+    getInsight(branch.repoKey, branch.name, branch.headSha, summariseVersion(settings), settings.llmModel) !==
+    null
+  );
 }
 
 /**

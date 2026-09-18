@@ -205,6 +205,8 @@ export const toolLabel = (name: string): string =>
   ({
     sibling_branches: 'reading the branches next to it',
     what_changed: 'reading what changed lately',
+    repo_readme: 'reading what the repo is for',
+    commit_files: 'reading what a commit touched',
   })[name] ?? `using ${name}`;
 
 /**

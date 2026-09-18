@@ -73,6 +73,30 @@ export type GhCombinedStatus = {
   statuses: { state: string; target_url: string | null }[];
 };
 
+/**
+ * One commit with the files it touched. Not collected with everything else: it is fetched
+ * on demand by a tool, for the one commit a worker asks about, and cached on the SHA — so
+ * it is one call ever per commit rather than one per read.
+ */
+export type GhCommitDetail = {
+  sha: string;
+  files?: {
+    filename: string;
+    /** added | removed | modified | renamed | copied | changed | unchanged */
+    status: string;
+    additions: number;
+    deletions: number;
+    previous_filename?: string;
+  }[];
+};
+
+/** The repo's own description of itself, base64 in the API's own envelope. */
+export type GhReadme = {
+  content?: string;
+  encoding?: string;
+  name?: string;
+};
+
 export type GhRepo = {
   name: string;
   owner: { login: string };
