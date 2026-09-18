@@ -203,7 +203,7 @@ function config(): number {
   console.log(`  provider key       ${settings.llmApiKey ? green('set') : red('not set')}`);
   console.log(`  model              ${settings.llmModel || red('not chosen')}`);
   console.log(`  calls per read     ${settings.llmMaxPerRun}`);
-  console.log(`  jobs at once       ${settings.workers}`);
+  console.log(`  jobs at once       ${settings.workers} routine, ${settings.dispatchWorkers} you asked for`);
   console.log(
     `  lookups            ${settings.toolsEnabled ? `on, up to ${settings.toolCallsPerJob} a job` : 'off'}`,
   );
