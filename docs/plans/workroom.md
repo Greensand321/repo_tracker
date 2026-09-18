@@ -285,7 +285,7 @@ Each step is useful alone and leaves the program working.
 | **2** ✅ | **The floor** | Jobs on the Snapshot; the count in the dateline; the floor panel; parked work joins *Waiting on you* | 1 |
 | **3** ✅ | **The tool layer** | `Tool` contract, the JSON-protocol loop, the free tools (`sibling_branches`, `what_changed`), a per-job lookup budget, the disagreement counter — and `assess` wired to use them | 1 |
 | **4** ✅ | **Tools at the stations** | `repo_readme` + `commit_files`, fetched on demand and cached for ever (D79); wired into draft-vision, assess and summarise; each station's tool list folded into its prompt version (D74) | 3 |
-| **5** | **Dispatch** | `dispatch()` as an internal call, the dispatched lane, `data/dispatched.json`, reboot-on-start, "you asked for this" in the floor, the finished notice | 1, 2 |
+| **5** ✅ | **Dispatch** | asking from the page, the second lane with its own purse (D82), `data/dispatched.json` and reboot-on-start (D72, D83), "you asked for this" and the finished notice on the floor | 1, 2 |
 | **6** | **The desk** | The advisor may dispatch: reorganise the register, rank by your criteria, go and check something and come back with it on the page | 3, 4, 5 |
 
 Steps 1 and 2 need no tool calling and no probe, and they are what makes everything after
@@ -329,19 +329,18 @@ moved** 4. The economics of D39 survive tools intact.
 
 ## 11. Open questions
 
-**Q72 — Does a dispatched job outrank a routine one for the same subject?** If you ask for
-a branch to be re-assessed while a routine assessment of it is in flight, the predicate is
-satisfied by the routine one and yours never runs. Assumed: a dispatched job **supersedes**
-the routine job for the same subject, because you asked for the fresher answer.
+**Q72 — Does a dispatched job outrank a routine one for the same subject?** ✅ Built as
+**yes, it supersedes it** (D81). The routine job for that subject is dropped from the board
+while yours stands, so the two cannot both run and write.
 
 **Q73 — What may one job spend?** ✅ Built as **8 lookups and 60s**, both settings, on top of
 the read's own call budget which is the real ceiling (D75). Still worth your eye on the
 numbers: 8 is a ceiling rather than an expectation — with two tools available a job makes
 one or two.
 
-**Q74 — Does the floor show finished work, or only live work?** A rolling "last five things
-done" makes the room feel alive and gives the run log somewhere to be seen. It is also five
-more lines you did not ask for. Assumed: **live only**, with the log behind a click later.
+**Q74 — Does the floor show finished work, or only live work?** ✅ Half-built and worth your
+eye: it shows **what you asked for**, for ten minutes after it lands, and nothing else.
+Routine work still just appears. The rolling log of everything is still not built.
 
 **Q75 — Should `repo_readme` read anything else?** ✅ Built as: the README, and `CLAUDE.md`
 **only when there is no README** — so it costs a second call exactly where the first one

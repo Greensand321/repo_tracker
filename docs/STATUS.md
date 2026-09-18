@@ -6,7 +6,7 @@
 
 ---
 
-## The room is built (workroom steps 1–4)
+## The room is built (workroom steps 1–5)
 
 The assistant's work is no longer three loops with three ideas of the budget. Every station
 derives what it has outstanding onto **one board**, a dispatcher runs it N at a time, and a
@@ -43,12 +43,28 @@ the clock does. An unknown tool is a correction, a repeated one is answered from
 already have, and a model that never answers **fails the job** rather than having its last
 tool call parsed into a verdict.
 
-> **The first read after this regenerates every summary and every assessment.** A station's
+**You can ask for things.** *Read it again* on any branch, *check it again* where there is
+a verdict, *have a go* where nothing has said what a branch is for, *write it again* on the
+brief. It queues; it does not do — the page comes back at once and the floor shows the rest,
+then tells you when it lands.
+
+Two things make that more than a button. The routine board derives from what is *missing*,
+so it can never produce "read this again" — a dispatched job is decided by **freshness**
+instead: done when the answer on disk is newer than the question (D81). And it runs in its
+own lane with its own workers and its own purse (D82), because a read that has just spent
+its budget on summaries must still be able to do the one thing you actually asked for.
+
+What you ask for is the only work written to disk (D72): nothing in the fleet implies it, so
+if the program closes mid-job it lives in `data/dispatched.json` or nowhere. It comes back
+on the next start, twice, and then parks where you can see it.
+
+> **The first read after tools regenerates every summary and every assessment.** A station's
 > tool list is part of its cache key (D74), and they were written without tools. It is one
 > pass at `llmMaxPerRun` a read, and then the fleet is quiet again.
 
-Plan and what is next: [`plans/workroom.md`](plans/workroom.md) — dispatch (step 5), then
-the advisor that can act (step 6). D68–D80.
+Plan and what is next: [`plans/workroom.md`](plans/workroom.md) — step 6, the desk: the
+advisor may dispatch on your behalf, so "regroup the register" and "rank these by my
+criteria" become things you can say. D68–D83.
 
 ## The assistant is built (stage A)
 
@@ -97,7 +113,7 @@ recommendation there was D6; the owner chose D4 and the reasons are in D57.
 | **Stage 1** | Built. Every branch across your repos, with its real commit history, PR and CI state. ETag change detection; a repo that has not moved costs nothing. |
 | **Stage 2 engine** | Built. Per-branch plain-English title, summary, and progress judgement, cached so an idle branch is never re-summarised. |
 | **Stage 2 surfaces** | Deliberately not built — the comment tool, the chat panel, and "what changed since I last looked" all wait for the real design. |
-| Tests | 221, no network. Recorded GitHub fixtures and a stubbed provider. |
+| Tests | 233, no network. Recorded GitHub fixtures and a stubbed provider. |
 
 ## Try it without the GUI
 
@@ -176,6 +192,11 @@ After that, in order:
 - **`data/evidence.json`** holds what the tools fetched: READMEs per repo, file lists per
   commit SHA. Both permanently true, so it is one call ever. Plane B, gitignored.
 - **A tool error the worker can fix goes back to it; anything else fails the job** (D80).
+- **`data/dispatched.json`** holds what you asked for, and only that. Routine work is
+  derived, so it needs no recovery; asked-for work is implied by nothing (D72).
+- **A lane decides what is claimed, never what is shown** (D82). Both lanes publish the
+  whole board, and a claim is re-checked at the moment of claiming — the two run side by
+  side and would otherwise both pay for the same job.
 - **Two workers wanting the same README make one call.** They miss the cache in the same
   millisecond otherwise — measured, and it doubled every GitHub call.
 - **Announcements to the page are coalesced at 300ms.** The page re-reads the whole snapshot
@@ -209,6 +230,7 @@ After that, in order:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 18 Sep 2026 | **The workroom, step 5**: you can ask for a second opinion, in its own lane, surviving a restart. Work asked for is decided by freshness rather than by what is missing. D81–D83 |
 | 18 Sep 2026 | **The workroom, step 4**: `repo_readme` and `commit_files` — fetched on demand, cached for ever, and wired into summarise, draft-vision and assess. A tool gets a reader, never the token. D79, D80 |
 | 17 Sep 2026 | **The workroom, step 3 and an audit**: stations can look things up (the JSON protocol, two free tools, `assess` wired). The audit found four: a bad key parked the whole fleet, the call budget could be overshot ninefold, a parked job blocked the brief for ever, and a model that never answered had its tool call stored as a verdict. D75–D78 |
 | 17 Sep 2026 | **The workroom, steps 1–2**: work derived onto a board, done checked rather than claimed, failures park, and the floor shows the room working. A declined vision was being re-paid every read. D68–D74 |

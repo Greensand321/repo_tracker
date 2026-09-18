@@ -230,3 +230,8 @@ export function isBriefed(snapshot: Snapshot, settings: Settings): boolean {
   const stored = loadStored();
   return stored !== null && stored.key === briefKey(snapshot, settings);
 }
+
+/** When the brief on disk was written. What a re-write the owner asked for turns on (D81). */
+export function briefWrittenAt(): string | null {
+  return loadStored()?.generatedAt ?? null;
+}

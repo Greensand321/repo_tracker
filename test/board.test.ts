@@ -74,7 +74,7 @@ function branch(name: string, over: Partial<Branch> = {}): Branch {
 
 const snapshot = (branches: Branch[]): Snapshot => ({
   generatedAt: '2026-09-16T12:00:00Z', repos: [], branches, warnings: [], rateLimit: null, goals: [], brief: null,
-  work: { jobs: [], workers: 2 },
+  work: { jobs: [], workers: 2, finished: [] },
   llm: { enabled: false, pending: 0, errors: [] },
 });
 
@@ -262,16 +262,16 @@ test('done is checked against the snapshot, not taken on the worker\'s word', as
     doneWhen: () => false,
   }];
 
-  const first = await work.runBoard(snap, settings(), undefined, liar);
+  const first = await work.runBoard(snap, settings(), { derive: liar });
   assert.equal(first.done, 0, 'it claimed done and produced nothing');
   assert.equal(first.claimedButNotDone, 1, 'counted, every time it happens');
 
-  const second = await work.runBoard(snap, settings(), undefined, liar);
+  const second = await work.runBoard(snap, settings(), { derive: liar });
   assert.equal(second.claimedButNotDone, 1);
   assert.equal(second.parked, 1);
   assert.equal(ran, 2, 'tried twice, then parked — never forever');
 
-  const third = await work.runBoard(snap, settings(), undefined, liar);
+  const third = await work.runBoard(snap, settings(), { derive: liar });
   assert.equal(ran, 2, 'and not a third time');
   assert.equal(third.claimedButNotDone, 0);
   assert.equal(calls.calls, 0);
@@ -405,11 +405,14 @@ test('an assessment can look things up, and the floor sees it happen', async () 
   assert.equal(onlyAssess(snap, config).length, 1, 'one branch with a vision and no assessment');
 
   const seen: { doing: string | null; toolCalls: number }[] = [];
-  const result = await work.runBoard(snap, config, () => {
-    for (const job of snap.work.jobs) {
-      if (job.state === 'working') seen.push({ doing: job.doing, toolCalls: job.toolCalls });
-    }
-  }, onlyAssess);
+  const result = await work.runBoard(snap, config, {
+    derive: onlyAssess,
+    onProgress: () => {
+      for (const job of snap.work.jobs) {
+        if (job.state === 'working') seen.push({ doing: job.doing, toolCalls: job.toolCalls });
+      }
+    },
+  });
 
   assert.equal(result.done, 1);
   assert.equal(snap.branches[0]!.assessment?.verdict, 'drifted');
@@ -430,14 +433,18 @@ test('the same assessment is not re-paid when tools are left alone', async () =>
   const first = snapshot([subject]);
   enrich.applyCached(first, config);
   assist.applyAssist(first, config);
-  await work.runBoard(first, config, undefined, (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'assess'));
+  await work.runBoard(first, config, {
+    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'assess'),
+  });
   assert.equal(calls.calls, 1);
 
   const again = snapshot([branch('a')]);
   enrich.applyCached(again, config);
   assist.applyAssist(again, config);
   assert.equal(again.branches[0]!.assessment?.verdict, 'on-track', 'served from disk, free');
-  await work.runBoard(again, config, undefined, (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'assess'));
+  await work.runBoard(again, config, {
+    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'assess'),
+  });
   assert.equal(calls.calls, 1, 'nothing moved, nothing spent');
 
   // But turning tools off makes it a different question, drawn from different evidence.
@@ -529,7 +536,7 @@ test('one job is never paid for twice in a run, whatever the board says', async 
   // A board that wrongly keeps offering a finished job. The dispatcher must not buy it
   // again: the derivation is the thing most likely to be wrong, and calls cost money.
   const specs = board.deriveBoard(snap, settings());
-  const result = await work.runBoard(snap, settings(), undefined, () => specs);
+  const result = await work.runBoard(snap, settings(), { derive: () => specs });
 
   assert.equal(result.done, specs.length, 'every job ran');
   assert.equal(calls.calls, specs.length, 'and none of them ran twice');
@@ -556,9 +563,9 @@ test('the budget counts provider calls, not jobs — lookups come out of it too'
   const snap = snapshot(['a', 'b', 'c', 'd'].map((n) => branch(n)));
   enrich.applyCached(snap, config);
   assist.applyAssist(snap, config);
-  const result = await work.runBoard(snap, config, undefined, (s, c) =>
-    board.deriveBoard(s, c).filter((j) => j.kind === 'assess'),
-  );
+  const result = await work.runBoard(snap, config, {
+    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'assess'),
+  });
 
   assert.ok(calls <= 8, `a budget of 4 calls should not have bought ${calls}`);
   assert.ok(result.done >= 2 && result.done < 4, `two jobs at two calls each: got ${result.done}`);
@@ -580,9 +587,9 @@ test('two workers really do work at once', async () => {
 
   const snap = snapshot([branch('a'), branch('b'), branch('c'), branch('d')]);
   enrich.applyCached(snap, config);
-  await work.runBoard(snap, config, undefined, (s, c) =>
-    board.deriveBoard(s, c).filter((j) => j.kind === 'summarise'),
-  );
+  await work.runBoard(snap, config, {
+    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'summarise'),
+  });
 
   assert.equal(peak, 2, `settings say 2 at once; saw ${peak}`);
 });

@@ -64,7 +64,7 @@ async function brief(noLlm: boolean): Promise<number> {
 
   if (!noLlm && llmReady(settings)) {
     process.stderr.write(dim(`working the board with ${settings.llmModel}…\n`));
-    const result = await runBoard(snapshot, settings, () => {});
+    const result = await runBoard(snapshot, settings);
     process.stderr.write(dim(`${result.done} job(s) done\n`));
     if (result.failed > 0) {
       process.stderr.write(red(`\n${result.failed} failure(s):\n`));

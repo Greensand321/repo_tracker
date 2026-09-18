@@ -449,6 +449,46 @@ price for the privilege, and then answer *without* the evidence it asked for whi
 exactly as confident as it would with it. The job fails instead and the next read tries
 again — which is what parking and retrying are for.
 
+### D81 — Work you ask for is decided by freshness, not by what is missing
+
+The routine board derives from what is *absent*: no summary at this head, no vision, no
+assessment. That can never produce "read this again" — the summary is right there, the
+branch has not moved, and the predicate is already satisfied. Which is exactly the state
+you are in when the answer is wrong: nothing will ever regenerate it on its own.
+
+So a dispatched job carries the time it was asked for, and is done when the answer on disk
+is **newer than the question**. Same run function, same evidence, same stations — one
+different predicate. That is the whole of it, which is why a second opinion costs a line
+rather than a second pipeline.
+
+Asking twice for the same thing is one job, not two: the second ask refreshes the clock
+rather than queueing behind the first. And asking **supersedes** the routine job for the
+same subject (Q72) — otherwise both run, both write, and the one that happens to finish
+second silently wins, having paid for both.
+
+### D82 — The two lanes run side by side, and neither may claim the other's job
+
+`workers` runs the board; `dispatchWorkers` runs what the owner asked for, in its own pool
+with its own purse. Its own purse because a read that has just spent forty calls on
+summaries would otherwise have nothing left for the one thing actually asked for — and the
+whole point of asking was to stop watching.
+
+Running side by side means a job at the back of one lane's list can be claimed by the other
+while the first is still working through the front of it. Both would run it and both would
+pay, so the claim is re-checked at the moment of claiming rather than only when the list
+was drawn up. A test fails without that line.
+
+The same rule in the other direction: a lane decides what gets *claimed*, never what gets
+*shown*. Publishing only its own slice had the dispatched run wipe every routine job off
+the floor for as long as it took, and put them back when it finished.
+
+### D83 — Resuming is a startup event, not a settings-save event
+
+`startPolling` also runs on every settings save, and it is where dispatched work is picked
+back up. Counting a reboot each time would have parked everything the owner asked for after
+three visits to the settings screen — a restart is what a reboot means, so it happens once
+per process.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

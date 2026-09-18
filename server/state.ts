@@ -9,7 +9,9 @@
 import { refKey, type Snapshot, type SnapshotResponse } from '../shared/types.ts';
 import { applyAssist } from './advise/assist.ts';
 import { applyCached, llmReady } from './advise/enrich.ts';
-import { applyWork, runBoard, unpark } from './work/run.ts';
+import { applyWork, resumeDispatched, runBoard, unpark } from './work/run.ts';
+import { dispatch } from './work/dispatched.ts';
+import type { JobKind, JobSubject } from '../shared/types.ts';
 import { collect } from './collect.ts';
 import { applyGoals, pruneGoals } from './goals.ts';
 import { recordHistory } from './history.ts';
@@ -141,7 +143,7 @@ async function workInBackground(target: Snapshot): Promise<void> {
       if (snapshot === target) announceSnapshot();
     };
 
-    const result = await runBoard(target, loadSettings(), announceIfCurrent);
+    const result = await runBoard(target, loadSettings(), { onProgress: announceIfCurrent });
 
     if (result.failed > 0) {
       console.error(`the assistant: ${result.failed} failure(s)`, result.errors.join('; '));
@@ -198,6 +200,45 @@ export function reapplyVisions(): void {
 }
 
 /**
+ * Ask for something, and start on it now.
+ *
+ * Its own lane and its own guard, which is the whole point (D71): a routine pass over a
+ * hundred branches may well be running, and work the owner asked for and then stopped
+ * watching must not wait behind it. The two run side by side.
+ */
+export function dispatchWork(kind: JobKind, subject: JobSubject): void {
+  dispatch(kind, subject);
+  if (!snapshot) return;
+  applyWork(snapshot, loadSettings());
+  announce('snapshot');
+  if (llmReady(loadSettings())) void dispatchInBackground(snapshot);
+}
+
+let dispatching = false;
+
+async function dispatchInBackground(target: Snapshot): Promise<void> {
+  if (dispatching) return;
+  dispatching = true;
+  try {
+    const result = await runBoard(target, loadSettings(), {
+      lane: 'dispatched',
+      onProgress: () => {
+        if (snapshot === target) announceSnapshot();
+      },
+    });
+    if (result.failed > 0) {
+      console.error(`you asked for: ${result.failed} failure(s)`, result.errors.join('; '));
+      target.llm.errors = [...target.llm.errors, ...result.errors];
+    }
+  } catch (err) {
+    console.error('dispatched work failed:', message(err));
+  } finally {
+    dispatching = false;
+    if (snapshot === target) announce('snapshot');
+  }
+}
+
+/**
  * Take a parked job off the shelf and work it now, rather than at the next read.
  *
  * "Try again" that waits a minute to visibly do anything is indistinguishable from a
@@ -215,6 +256,10 @@ export function retryJob(id: string): boolean {
 /** Fresh on open, then keep going. `refreshSeconds: 0` turns polling off. */
 export function startPolling(): void {
   stopPolling();
+  // Anything asked for before the program last closed goes back on the board (D72).
+  const { resumed, gaveUp } = resumeDispatched();
+  if (resumed > 0) console.log(`picking up ${resumed} thing(s) you asked for last time`);
+  if (gaveUp > 0) console.log(`${gaveUp} thing(s) you asked for could not be finished`);
   const { refreshSeconds } = loadSettings();
   void refresh();
   if (refreshSeconds > 0) {

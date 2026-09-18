@@ -24,7 +24,8 @@ import { BudgetError } from '../advise/converse.ts';
 import { isFatal, llmReady } from '../advise/enrich.ts';
 import { insightKey, pruneInsights } from '../advise/store.ts';
 import { pruneVisions } from '../vision.ts';
-import { deriveBoard, toJob, type JobSpec } from './board.ts';
+import { deriveBoard, deriveDispatched, toJob, type JobSpec } from './board.ts';
+import { clearDispatched, listDispatched, rebootDispatched, subjectKey } from './dispatched.ts';
 
 /**
  * Up to this many rounds of derive-and-run per read. Four covers the longest real chain
@@ -59,6 +60,26 @@ const parked = new Map<string, Job>();
 const working = new Map<string, Job>();
 
 /**
+ * Dispatched work that has just landed, newest first.
+ *
+ * You are told when the thing you asked for finishes, because the point of asking was to
+ * stop watching (Q71). It ages out rather than needing dismissal — quieter, and it matches
+ * everything else here.
+ */
+const finished: Job[] = [];
+const FINISHED_FOR_MS = 10 * 60 * 1000;
+const FINISHED_MAX = 5;
+
+function recentlyFinished(now = Date.now()): Job[] {
+  while (finished.length > 0) {
+    const oldest = finished[finished.length - 1]!;
+    if (now - Date.parse(oldest.finishedAt ?? '') > FINISHED_FOR_MS) finished.pop();
+    else break;
+  }
+  return finished.slice(0, FINISHED_MAX);
+}
+
+/**
  * Put a parked job back on the board.
  *
  * Parking is not a verdict on the work, only on two attempts at it, so "try again" has to
@@ -82,6 +103,45 @@ export function resetBoardState(): void {
   attempts.clear();
   parked.clear();
   working.clear();
+  finished.length = 0;
+}
+
+/** Tests only: a fresh process, so the startup resume happens again. */
+export function forgetResume(): void {
+  hasResumed = false;
+}
+
+/**
+ * Called once at startup: anything the owner asked for that never reported finishing is
+ * put back on the board (D72). Work that has used up its reboots is parked instead, where
+ * it is visible, rather than quietly re-running on every start for ever.
+ */
+let hasResumed = false;
+
+export function resumeDispatched(): { resumed: number; gaveUp: number } {
+  // Once per process. `startPolling` also runs on every settings save, and counting a
+  // reboot each time would park everything the owner asked for after three visits to the
+  // settings screen — a restart is what a reboot means.
+  if (hasResumed) return { resumed: 0, gaveUp: 0 };
+  hasResumed = true;
+
+  const { resumed, gaveUp } = rebootDispatched();
+  for (const job of gaveUp) {
+    parked.set(`asked:${job.id}`, {
+      id: `asked:${job.id}`,
+      kind: job.kind,
+      title: 'Something you asked for could not be finished',
+      subject: job.subject,
+      origin: 'dispatched',
+      state: 'parked',
+      startedAt: null,
+      attempts: 0,
+      toolCalls: 0,
+      doing: null,
+      error: 'it was still unfinished after two restarts',
+    });
+  }
+  return { resumed: resumed.length, gaveUp: gaveUp.length };
 }
 
 export type RunResult = {
@@ -100,26 +160,55 @@ export type RunResult = {
 
 /** The free pass: what is outstanding, before anything is spent. Beside applyCached. */
 export function applyWork(snapshot: Snapshot, settings: Settings): void {
-  const waiting = deriveBoard(snapshot, settings).filter(
+  const waiting = allSpecs(snapshot, settings).filter(
     (spec) => !parked.has(spec.id) && !working.has(spec.id),
   );
   snapshot.work = {
     jobs: [...working.values(), ...waiting.map(toJob), ...parked.values()],
     workers: Math.max(1, settings.workers),
+    finished: recentlyFinished(),
   };
 }
 
-export async function runBoard(
-  snapshot: Snapshot,
-  settings: Settings,
-  onProgress?: () => void,
+/**
+ * Both lanes, with the routine job for a subject dropped when the owner has asked for that
+ * same thing (Q72). Asking for a fresher answer should not also leave the stale request
+ * standing: they would both run, both write, and the second would silently win.
+ */
+function allSpecs(snapshot: Snapshot, settings: Settings): JobSpec[] {
+  const asked = deriveDispatched(snapshot, settings);
+  const superseded = new Set(asked.map((spec) => `${spec.kind}:${subjectKey(spec.subject)}`));
+  const routine = deriveBoard(snapshot, settings).filter(
+    (spec) => !superseded.has(`${spec.kind}:${subjectKey(spec.subject)}`),
+  );
+  return [...asked, ...routine];
+}
+
+export type RunOptions = {
+  onProgress?: () => void;
   /**
    * The board itself, injectable. Deriving it is the pure half of this file (rule 5), so a
    * test can hand in a job that lies about having finished and check that the predicate —
    * not the worker's word — is what decides.
    */
-  derive: (snapshot: Snapshot, settings: Settings) => JobSpec[] = deriveBoard,
+  derive?: (snapshot: Snapshot, settings: Settings) => JobSpec[];
+  /**
+   * `dispatched` runs only what the owner asked for, in its own pool, with its own purse.
+   * That is the whole of the second lane (D71): work you asked for and then stopped
+   * watching must not wait behind a hundred background summaries.
+   */
+  lane?: 'all' | 'dispatched';
+};
+
+export async function runBoard(
+  snapshot: Snapshot,
+  settings: Settings,
+  options: RunOptions = {},
 ): Promise<RunResult> {
+  const onProgress = options.onProgress;
+  const lane = options.lane ?? 'all';
+  const derive =
+    options.derive ?? (lane === 'dispatched' ? deriveDispatched : (s: Snapshot, c: Settings) => allSpecs(s, c));
   const result: RunResult = {
     done: 0, failed: 0, parked: 0, claimedButNotDone: 0, errors: [], budgetSpent: false, byKind: {},
   };
@@ -145,7 +234,10 @@ export async function runBoard(
   let budget = settings.llmMaxPerRun;
   /** One call, if there is one to be had. The only place money is committed. */
   const spend = (): boolean => (budget > 0 ? (budget--, true) : false);
-  const workers = Math.max(1, settings.workers);
+  // The dispatched lane has its own purse and its own workers. It cannot be a share of the
+  // routine budget: a read that has just spent forty calls on summaries would then have
+  // nothing left for the one thing the owner actually asked for.
+  const workers = Math.max(1, lane === 'dispatched' ? settings.dispatchWorkers : settings.workers);
   // Every job in a read shares an identical system prompt per station, so routing them
   // together is exactly what the session header is for. Reads stay distinct.
   const sessionId = randomUUID();
@@ -156,15 +248,19 @@ export async function runBoard(
    * holds — but "never spend twice for the same thing because a derivation was wrong" is
    * too cheap a guarantee to leave to correctness elsewhere.
    */
-  const finished = new Set<string>();
+  const done = new Set<string>();
 
   const publish = (): void => {
-    const waiting = derive(snapshot, settings).filter(
-      (spec) => !parked.has(spec.id) && !working.has(spec.id) && !finished.has(spec.id),
+    // The whole board, not this lane's slice of it. A lane decides what gets *claimed*;
+    // showing only its own would have the dispatched run wipe every routine job off the
+    // floor for as long as it ran, and put them back when it finished.
+    const waiting = allSpecs(snapshot, settings).filter(
+      (spec) => !parked.has(spec.id) && !working.has(spec.id) && !done.has(spec.id),
     );
     snapshot.work = {
       jobs: [...working.values(), ...waiting.map(toJob), ...parked.values()],
       workers,
+      finished: recentlyFinished(),
     };
     onProgress?.();
   };
@@ -177,7 +273,7 @@ export async function runBoard(
   try {
     for (let pass = 0; pass < MAX_PASSES && !fatal; pass++) {
       const outstanding = derive(snapshot, settings).filter(
-        (spec) => !parked.has(spec.id) && !finished.has(spec.id) && !working.has(spec.id),
+        (spec) => !parked.has(spec.id) && !done.has(spec.id) && !working.has(spec.id),
       );
       if (outstanding.length === 0) break;
 
@@ -210,6 +306,12 @@ export async function runBoard(
       const before = result.done;
       await pool(claimed, workers, async (spec) => {
         if (fatal) return;
+        // Checked again here, not only when the list was drawn up. The two lanes run side
+        // by side, and a job at the back of this lane's list can be claimed by the other
+        // one while this lane is still working through the front of it — at which point
+        // both would run it, and both would pay.
+        if (working.has(spec.id) || done.has(spec.id) || parked.has(spec.id)) return;
+
         const tried = (attempts.get(spec.id) ?? 0) + 1;
         attempts.set(spec.id, tried);
 
@@ -247,7 +349,8 @@ export async function runBoard(
             result.done++;
             result.byKind[spec.kind] = (result.byKind[spec.kind] ?? 0) + 1;
             attempts.delete(spec.id);
-            finished.add(spec.id);
+            done.add(spec.id);
+            if (spec.origin === 'dispatched') land(spec);
           } else {
             result.claimedButNotDone++;
             park(spec, tried, 'finished without producing anything', result);
@@ -298,6 +401,17 @@ export async function runBoard(
 
   publish();
   return result;
+}
+
+/**
+ * A dispatched job landed: clear it from disk, and put it where the owner will see that it
+ * did. Clearing is what stops it coming back on the next start (D72).
+ */
+function land(spec: JobSpec): void {
+  const id = spec.id.startsWith('asked:') ? spec.id.slice('asked:'.length) : spec.id;
+  clearDispatched(id);
+  finished.unshift({ ...toJob(spec), state: 'done', finishedAt: new Date().toISOString() });
+  if (finished.length > FINISHED_MAX) finished.length = FINISHED_MAX;
 }
 
 /**

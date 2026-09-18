@@ -39,7 +39,7 @@ function snapshotOf(...branchNames: string[]): Snapshot {
     rateLimit: null,
     goals: [],
     brief: null,
-    work: { jobs: [], workers: 2 },
+    work: { jobs: [], workers: 2, finished: [] },
     llm: { enabled: false, pending: 0, errors: [] },
     branches: branchNames.map((name) => ({
       repoKey: 'greensand321/repo_tracker',

@@ -66,10 +66,11 @@ decides, what it may never do, and which `PROMPT_VERSION` to bump when you edit 
 
 The four background ones are **derived onto a board and run by one dispatcher**
 (`server/work/`), which checks each job against the snapshot rather than believing the
-model, and parks anything that fails twice. Adding a station is adding a row in
-`board.ts`, not a stage in a pipeline. The plan, and what comes next (tools per station,
-then dispatch, then the advisor that can act), is
-[`docs/plans/workroom.md`](docs/plans/workroom.md).
+model, and parks anything that fails twice. Three of them can **look things up** before
+answering — a station's tool list is part of its cache key (D74). Work the owner asks for
+runs in its own lane and is the only kind written to disk (D72). Adding a station is adding
+a row in `board.ts`, not a stage in a pipeline. The plan, and what comes next (the advisor
+that can act), is [`docs/plans/workroom.md`](docs/plans/workroom.md).
 
 ## Before adding anything
 

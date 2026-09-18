@@ -66,7 +66,7 @@ function branch(name: string, over: Partial<Branch> = {}): Branch {
 
 const snapshot = (branches: Branch[]): Snapshot => ({
   generatedAt: '2026-09-17T12:00:00Z', repos: [], branches, warnings: [], rateLimit: null, goals: [],
-  brief: null, work: { jobs: [], workers: 2 }, llm: { enabled: true, pending: 0, errors: [] },
+  brief: null, work: { jobs: [], workers: 2, finished: [] }, llm: { enabled: true, pending: 0, errors: [] },
 });
 
 /** A GitHub reader that answers from a script and counts what it was asked. */
