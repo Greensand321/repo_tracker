@@ -16,20 +16,27 @@ import { createHash } from 'node:crypto';
 
 import type { JobKind, Settings } from '../../shared/types.ts';
 import { siblingBranches, whatChanged } from './free.ts';
+import { commitFiles, repoReadme } from './github.ts';
 import type { Tool } from './types.ts';
 
 /**
- * Only `assess` so far, and on purpose: it is the station whose verdicts are claims about
- * intent — *drifted*, and the fleet-level *overtaken* it feeds — which are exactly the
- * ones that should rest on evidence rather than on a reading of commit subjects.
+ * Each station gets what changes its answer, and nothing else. A longer menu is a longer
+ * deliberation, and every item on it is a thing that can be chosen wrongly.
  *
- * `summarise` and `draft-vision` want `repo_readme` and `commit_files`, which are GitHub
- * calls and new collection; they arrive with step 4.
+ *   summarise     what the commits actually touched. The messages are written by the same
+ *                 agent whose work is in question, so the files are the independent record.
+ *   draft-vision  everything: what the software IS (the README), what this branch did to
+ *                 it, and what the branches beside it are for. Purpose is the hardest of
+ *                 the four to infer and the one worth paying most for.
+ *   assess        the files, how things moved, and the siblings — because *drifted* and
+ *                 *overtaken* are claims that cannot be checked from one branch alone.
+ *   brief         nothing yet. It already reads every branch, every vision and every
+ *                 verdict; `pr_reviews` is the one addition worth making and it waits.
  */
 const BY_KIND: Record<JobKind, Tool[]> = {
-  summarise: [],
-  'draft-vision': [],
-  assess: [siblingBranches, whatChanged],
+  summarise: [commitFiles],
+  'draft-vision': [repoReadme, commitFiles, siblingBranches],
+  assess: [commitFiles, whatChanged, siblingBranches],
   brief: [],
 };
 

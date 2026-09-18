@@ -64,7 +64,7 @@ async function brief(noLlm: boolean): Promise<number> {
 
   if (!noLlm && llmReady(settings)) {
     process.stderr.write(dim(`working the board with ${settings.llmModel}…\n`));
-    const result = await runBoard(snapshot, settings, () => {});
+    const result = await runBoard(snapshot, settings);
     process.stderr.write(dim(`${result.done} job(s) done\n`));
     if (result.failed > 0) {
       process.stderr.write(red(`\n${result.failed} failure(s):\n`));
@@ -203,7 +203,7 @@ function config(): number {
   console.log(`  provider key       ${settings.llmApiKey ? green('set') : red('not set')}`);
   console.log(`  model              ${settings.llmModel || red('not chosen')}`);
   console.log(`  calls per read     ${settings.llmMaxPerRun}`);
-  console.log(`  jobs at once       ${settings.workers}`);
+  console.log(`  jobs at once       ${settings.workers} routine, ${settings.dispatchWorkers} you asked for`);
   console.log(
     `  lookups            ${settings.toolsEnabled ? `on, up to ${settings.toolCallsPerJob} a job` : 'off'}`,
   );

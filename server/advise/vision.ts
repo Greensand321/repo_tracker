@@ -75,14 +75,60 @@ or, if you cannot be specific:
 
 export type Draft = { text: string; from: string } | { text: null; why: string };
 
-export async function draftVision(branch: Branch, settings: Parameters<typeof complete>[0], sessionId?: string): Promise<Draft> {
-  const raw = await complete(settings, {
+/**
+ * The station worth paying most for.
+ *
+ * Purpose is the hardest of the four things the assistant writes to infer, and the only
+ * one nothing in git records. So this one gets everything: what the software *is* (the
+ * README), what this branch actually did to it (the files), and what the branches beside
+ * it are for. A vision drawn from a README and a file list is a different object from one
+ * drawn from commit subjects — and this is the station whose output everything downstream
+ * is measured against, so a vague one poisons the assessment, the verdict and the brief.
+ */
+export async function draftVision(
+  branch: Branch,
+  settings: Settings,
+  options: {
+    sessionId?: string;
+    ctx?: ToolContext;
+    onTool?: (name: string | null) => void;
+    spend?: () => boolean;
+  } = {},
+): Promise<Draft> {
+  const tools = options.ctx ? toolsFor('draft-vision', settings) : [];
+  const sessionId = options.sessionId ?? randomUUID();
+
+  if (tools.length === 0 || !options.ctx) {
+    const raw = await complete(settings, {
+      system: DRAFT_SYSTEM,
+      user: describeBranch(branch),
+      maxTokens: 300,
+      sessionId,
+    });
+    return parseDraft(raw);
+  }
+
+  const result = await converse(settings, {
     system: DRAFT_SYSTEM,
     user: describeBranch(branch),
+    tools,
+    ctx: options.ctx,
+    sessionId,
     maxTokens: 300,
-    ...(sessionId ? { sessionId } : {}),
+    ...(options.onTool ? { onTool: options.onTool } : {}),
+    ...(options.spend ? { spend: options.spend } : {}),
   });
-  return parseDraft(raw);
+  return parseDraft(result.text);
+}
+
+/**
+ * What a draft was made under, tools included (D74). Not a cache key — a vision has no
+ * version, because it is the owner's to keep once written — but a **decline** does need
+ * one: "I looked and could not be specific" is only true of the evidence that was
+ * available, and a station that has since been given the README should be asked again.
+ */
+export function draftVersion(settings: Settings): string {
+  return VISION_PROMPT_VERSION + toolSetTag(toolsFor('draft-vision', settings));
 }
 
 export function parseDraft(raw: string): Draft {

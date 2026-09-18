@@ -78,7 +78,7 @@ function snap(branches: Branch[], goals: Goal[] = [], over: Partial<Snapshot> = 
     warnings: [],
     rateLimit: null,
     brief: null,
-    work: { jobs: [], workers: 2 },
+    work: { jobs: [], workers: 2, finished: [] },
     llm: { enabled: false, pending: 0, errors: [] },
     ...over,
   };
@@ -283,6 +283,7 @@ const job = (over: Partial<Job> = {}): Job => ({
 test('the floor separates what is running from what is queued and what gave up', () => {
   const s = snap([branch('a')]);
   s.work = {
+    finished: [],
     workers: 2,
     jobs: [
       job({ id: '1', state: 'working', startedAt: '2026-09-17T13:42:00Z' }),
@@ -307,7 +308,7 @@ test('a job that gave up is something waiting on you, and it comes first', () =>
   // Everything else in that panel is the assistant asking for context. This is the
   // assistant saying it could not do its job, which outranks all of it.
   const s = snap([branch('a', { vision: { text: 'x', state: 'proposed', from: '', draftedAt: null, createdAt: '', updatedAt: '' } })]);
-  s.work = { workers: 2, jobs: [job({ state: 'parked', error: 'provider returned 400' })] };
+  s.work = { finished: [], workers: 2, jobs: [job({ state: 'parked', error: 'provider returned 400' })] };
 
   const list = questions(s, 3);
   assert.equal(list[0]?.kind, 'stuck');

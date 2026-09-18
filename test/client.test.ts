@@ -288,7 +288,7 @@ test('every branch in one run shares a session, and runs differ', async () => {
   const advise = await import('../server/advise/enrich.ts');
   const { runBoard, resetBoardState } = await import('../server/work/run.ts');
   const makeSnapshot = () => ({
-    generatedAt: '2026-09-16T12:00:00Z', repos: [], warnings: [], rateLimit: null, goals: [], brief: null, work: { jobs: [], workers: 2 },
+    generatedAt: '2026-09-16T12:00:00Z', repos: [], warnings: [], rateLimit: null, goals: [], brief: null, work: { jobs: [], workers: 2, finished: [] },
     llm: { enabled: false, pending: 0, errors: [] },
     branches: ['a', 'b'].map((name) => ({
       repoKey: 'o/r', name, headSha: `sha-${name}-${Math.random()}`, url: 'u',

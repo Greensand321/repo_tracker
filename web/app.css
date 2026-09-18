@@ -139,6 +139,7 @@ a:hover { color: var(--text-hi); }
 .dateline button:hover { color: var(--now); }
 .dateline .live { color: var(--now); }
 .dateline .bad { color: var(--bad); }
+.dateline .good { color: var(--good); }
 
 .cols { display: grid; grid-template-columns: minmax(0, 1fr) 320px; }
 .leader { padding: 26px 40px 0 0; border-right: 1px solid var(--line-2); min-width: 0; }
@@ -294,6 +295,8 @@ a:hover { color: var(--text-hi); }
 .jclock { flex: none; font-family: var(--mono); font-size: 10px; color: var(--muted); }
 .jrow.live .jclock { color: var(--now); }
 .jrow.bad .jclock { color: var(--bad); }
+.jrow.done .jglyph { color: var(--good); }
+.jrow.done .jtitle { color: var(--dim); }
 
 .weather { font-family: var(--mono); font-size: 11px; line-height: 1.95; color: var(--muted); }
 .weather b { color: var(--body); font-weight: 500; display: inline-block; min-width: 26px; }

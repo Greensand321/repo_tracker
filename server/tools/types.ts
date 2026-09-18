@@ -21,6 +21,7 @@
  */
 
 import type { Branch, SafeSettings, Snapshot } from '../../shared/types.ts';
+import type { GitHubReader } from './evidence.ts';
 
 /**
  * A failure the model is meant to see and recover from — "no such branch", "that is not a
@@ -50,6 +51,12 @@ export type ToolContext = {
   /** The branch this job is about, when it is about one. Null for fleet-level work. */
   branch: Branch | null;
   now: Date;
+  /**
+   * The only door to GitHub, and a narrow one: two reads, bound to the token on the
+   * server. Null when there is no token, which reads as "cannot reach GitHub" rather than
+   * as a crash. A tool is never handed the credential itself (D77).
+   */
+  github: GitHubReader | null;
 };
 
 export type ToolArg = {

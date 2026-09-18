@@ -14,6 +14,7 @@ import { loadSettings, saveSettings, toSafe } from './settings.ts';
 import { resetBoardState } from './work/run.ts';
 import {
   currentResponse,
+  dispatchWork,
   reapplyGoals,
   reapplyVisions,
   refresh,
@@ -78,6 +79,7 @@ api.put('/settings', async (c) => {
     'askBranchCap',
     'maxOpenQuestions',
     'workers',
+    'dispatchWorkers',
     'toolCallsPerJob',
     'toolSeconds',
   ] as const) {
@@ -244,6 +246,43 @@ api.post('/vision/distribute', async (c) => {
   } catch (err) {
     return c.json({ error: describe(err) }, 400);
   }
+});
+
+const JOB_KINDS = new Set(['summarise', 'draft-vision', 'assess', 'brief']);
+
+/**
+ * Ask for something to be done now.
+ *
+ * The one write that creates work rather than describing it. It queues; it does not do —
+ * the reply comes back the moment the job is on the board, and the floor shows the rest.
+ */
+api.post('/work/dispatch', async (c) => {
+  const snapshot = currentResponse().snapshot;
+  if (!snapshot) return c.json({ error: 'nothing has been read from GitHub yet' }, 400);
+
+  const body = (await c.req.json()) as { kind?: unknown; repoKey?: unknown; branch?: unknown };
+  const kind = String(body.kind ?? '');
+  if (!JOB_KINDS.has(kind)) return c.json({ error: `there is no "${kind}" to ask for` }, 400);
+
+  if (kind === 'brief') {
+    dispatchWork('brief', { kind: 'fleet' });
+    return c.json({ ok: true });
+  }
+
+  if (typeof body.repoKey !== 'string' || typeof body.branch !== 'string') {
+    return c.json({ error: 'repoKey and branch are required' }, 400);
+  }
+  // Only a branch this read is carrying: a request against something that does not exist
+  // would sit on the board for ever waiting for a subject that never arrives.
+  const known = snapshot.branches.some((b) => b.repoKey === body.repoKey && b.name === body.branch);
+  if (!known) return c.json({ error: 'no such branch in this read' }, 400);
+
+  dispatchWork(kind as 'summarise' | 'draft-vision' | 'assess', {
+    kind: 'branch',
+    repoKey: body.repoKey,
+    branch: body.branch,
+  });
+  return c.json({ ok: true });
 });
 
 /**

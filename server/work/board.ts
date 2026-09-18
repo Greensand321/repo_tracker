@@ -23,11 +23,15 @@ import type { Branch, Job, JobKind, Settings, Snapshot } from '../../shared/type
 import {
   draftFor,
   assessFor,
+  briefWrittenAt,
   isAssessed,
   isBriefed,
   isDescribed,
   writeTheBrief,
 } from '../advise/assist.ts';
+import { insightWrittenAt } from '../advise/store.ts';
+import { assessedAt, describedAt } from '../vision.ts';
+import { listDispatched, type Dispatched } from './dispatched.ts';
 import { briefKey, worthAVision } from '../advise/brief.ts';
 import { toolsFor } from '../tools/catalog.ts';
 import { isSummarised, llmReady, summariseBranch, worthSummarising } from '../advise/enrich.ts';
@@ -129,7 +133,7 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
           branch,
           `Reading what ${branch.name} is doing`,
           settings,
-          (handle) => summariseBranch(branch, settings, handle.sessionId),
+          (handle) => summariseBranch(branch, snapshot, settings, handle),
           () => isSummarised(branch, settings),
         ),
       );
@@ -138,15 +142,15 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
 
   if (settings.visionAutoDraft) {
     for (const branch of branches) {
-      if (worthAVision(branch) && branch.summary !== null && !isDescribed(branch)) {
+      if (worthAVision(branch) && branch.summary !== null && !isDescribed(branch, settings)) {
         jobs.push(
           forBranch(
             'draft-vision',
             branch,
             `Working out what ${branch.name} is for`,
             settings,
-            (handle) => draftFor(branch, settings, handle.sessionId),
-            () => isDescribed(branch),
+            (handle) => draftFor(branch, snapshot, settings, handle),
+            () => isDescribed(branch, settings),
           ),
         );
       }
@@ -201,3 +205,95 @@ export function toJob(spec: JobSpec): Job {
   const { run: _run, doneWhen: _doneWhen, ...job } = spec;
   return job;
 }
+
+// ---------------------------------------------------------------------------
+// Work the owner asked for
+// ---------------------------------------------------------------------------
+
+/**
+ * The same stations, asked again on purpose.
+ *
+ * The routine board derives from what is *missing*, so it can never produce "read this
+ * again": the summary is right there, the cache key has not moved, and the predicate is
+ * already satisfied. A dispatched job carries the time it was asked for instead, and is
+ * done when the answer on disk is newer than the question (D81).
+ *
+ * That is the whole difference. Same run function, same evidence, same everything else —
+ * which is why asking for a second opinion costs one line rather than a second pipeline.
+ */
+export function deriveDispatched(snapshot: Snapshot, settings: Settings): JobSpec[] {
+  if (!llmReady(settings)) return [];
+
+  const specs: JobSpec[] = [];
+  for (const asked of listDispatched()) {
+    const spec = toSpec(asked, snapshot, settings);
+    if (spec) specs.push(spec);
+  }
+  return specs;
+}
+
+function toSpec(asked: Dispatched, snapshot: Snapshot, settings: Settings): JobSpec | null {
+  const base = {
+    id: `asked:${asked.id}`,
+    kind: asked.kind,
+    subject: asked.subject,
+    origin: 'dispatched' as const,
+    state: 'waiting' as const,
+    startedAt: null,
+    attempts: 0,
+    toolCalls: 0,
+    doing: null,
+    error: null,
+    stage: 0,
+    reserve: toolsFor(asked.kind, settings).length > 0 ? 2 : 1,
+  };
+
+  if (asked.subject.kind === 'fleet') {
+    if (asked.kind !== 'brief') return null;
+    return {
+      ...base,
+      title: 'Writing the brief again',
+      run: (handle) => writeTheBrief(snapshot, settings, handle.sessionId),
+      doneWhen: () => isNewer(briefWrittenAt(), asked.since),
+    };
+  }
+
+  const ref = asked.subject;
+  const branch = snapshot.branches.find((b) => b.repoKey === ref.repoKey && b.name === ref.branch);
+  // The branch is gone, or this read did not carry it. The request is dropped rather than
+  // kept for ever against something that may never come back.
+  if (!branch) return null;
+
+  switch (asked.kind) {
+    case 'summarise':
+      return {
+        ...base,
+        title: `Reading ${branch.name} again`,
+        run: (handle) => summariseBranch(branch, snapshot, settings, handle),
+        doneWhen: () => isNewer(insightWrittenAt(branch.repoKey, branch.name, branch.headSha), asked.since),
+      };
+    case 'draft-vision':
+      return {
+        ...base,
+        title: `Having another go at what ${branch.name} is for`,
+        run: (handle) => draftFor(branch, snapshot, settings, handle),
+        doneWhen: () => isNewer(describedAt({ repoKey: branch.repoKey, branch: branch.name }), asked.since),
+      };
+    case 'assess':
+      // Nothing to compare against is not a failure; the request simply does not apply.
+      if (!branch.vision) return null;
+      return {
+        ...base,
+        title: `Checking ${branch.name} against what it is for, again`,
+        run: (handle) => assessFor(branch, snapshot, settings, handle),
+        doneWhen: () =>
+          isNewer(assessedAt({ repoKey: branch.repoKey, branch: branch.name }, branch.headSha), asked.since),
+      };
+    default:
+      return null;
+  }
+}
+
+/** Written at or after it was asked for. Equal counts: the clock has one-second corners. */
+const isNewer = (writtenAt: string | null, since: string): boolean =>
+  writtenAt !== null && writtenAt >= since;

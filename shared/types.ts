@@ -177,8 +177,11 @@ export type Brief = {
 
 export type JobKind = 'summarise' | 'draft-vision' | 'assess' | 'brief';
 
-/** `waiting` is on the board, `working` is claimed, `parked` failed twice and needs you. */
-export type JobState = 'waiting' | 'working' | 'parked';
+/**
+ * `waiting` is on the board, `working` is claimed, `parked` failed twice and needs you.
+ * `done` is kept only for work the owner asked for, and only briefly — see `WorkState`.
+ */
+export type JobState = 'waiting' | 'working' | 'parked' | 'done';
 
 /** Routine work is derived. Dispatched work exists only because the owner asked for it. */
 export type JobOrigin = 'routine' | 'dispatched';
@@ -211,12 +214,22 @@ export type Job = {
   doing: string | null;
   /** Set when parked: what it tried and what came back. */
   error: string | null;
+  /** Set when it finished. Only dispatched work keeps this; routine work just appears. */
+  finishedAt?: string;
 };
 
 export type WorkState = {
   jobs: Job[];
   /** How many routine jobs may run at once. From settings, so the floor can say so. */
   workers: number;
+  /**
+   * Work the owner asked for that has just finished, newest first and ageing out.
+   *
+   * Only dispatched work: you are told when the thing you asked for lands, because the
+   * point of asking was to stop watching. Routine work simply appears — forty notices
+   * about forty summaries is a reason to stop reading notices (Q71).
+   */
+  finished: Job[];
 };
 
 // ---------------------------------------------------------------------------
@@ -356,6 +369,13 @@ export type Settings = {
   /** And a clock, because a cheap tool can still be asked for forty times slowly. */
   toolSeconds: number;
   /**
+   * How many jobs the owner asked for may run at once, **on top of** the routine workers
+   * (D71). Its own lane, because work you asked for and then stopped watching must not
+   * queue behind a hundred background summaries. Capped, because "spin up another" without
+   * a ceiling is how forty concurrent calls happen.
+   */
+  dispatchWorkers: number;
+  /**
    * How many routine jobs run at once (D71). Small on purpose: the only real burst is the
    * first import, after which the fleet moves every few minutes and this has all night.
    * More workers make a runaway bill arrive faster, not later.
@@ -387,6 +407,7 @@ export const DEFAULT_SETTINGS: Settings = {
   toolCallsPerJob: 8,
   toolSeconds: 60,
   workers: 2,
+  dispatchWorkers: 2,
 };
 
 // ---------------------------------------------------------------------------

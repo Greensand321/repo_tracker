@@ -40,6 +40,8 @@ type Entry = {
    * Keyed on the SHA, so the branch moving is what makes the question worth asking again.
    */
   declinedAt?: string | null;
+  /** When that decline was made, so a re-ask can tell an old refusal from a new one. */
+  declinedWhen?: string | null;
 };
 type VisionFile = Record<string, Entry>;
 
@@ -130,16 +132,47 @@ export function clearVision(ref: BranchRef): void {
 // Declines — the assistant looked and could not be specific
 // ---------------------------------------------------------------------------
 
-/** True when the assistant already declined to describe this exact state of the branch. */
-export function wasDeclined(ref: BranchRef, headSha: string): boolean {
-  return entry(load(), refKey(ref.repoKey, ref.branch)).declinedAt === headSha;
+/**
+ * True when the assistant already declined to describe this exact state of the branch,
+ * with the evidence it has now.
+ *
+ * Both halves matter. The SHA, so a branch that moves is worth asking about again. The
+ * version, because "I could not be specific" was only ever true of what it could see —
+ * give the station the README and the question is a different question.
+ */
+export function wasDeclined(ref: BranchRef, headSha: string, version: string): boolean {
+  return entry(load(), refKey(ref.repoKey, ref.branch)).declinedAt === `${headSha}@${version}`;
 }
 
-export function recordDecline(ref: BranchRef, headSha: string): void {
+export function recordDecline(ref: BranchRef, headSha: string, version: string): void {
   const all = load();
   const key = refKey(ref.repoKey, ref.branch);
-  all[key] = { ...entry(all, key), declinedAt: headSha };
+  all[key] = {
+    ...entry(all, key),
+    declinedAt: `${headSha}@${version}`,
+    declinedWhen: new Date().toISOString(),
+  };
   persist(all);
+}
+
+/**
+ * When this branch last had its purpose settled either way — written, or declined.
+ *
+ * What a re-ask turns on: nothing about the branch has changed, so "is it described" is
+ * still true and only "was it looked at again since I asked" can decide (D81).
+ */
+export function describedAt(ref: BranchRef): string | null {
+  const stored = entry(load(), refKey(ref.repoKey, ref.branch));
+  const times = [stored.vision?.updatedAt, stored.declinedWhen].filter(
+    (value): value is string => typeof value === 'string' && value.length > 0,
+  );
+  return times.sort().pop() ?? null;
+}
+
+/** The stored assessment as it is, with no freshness check. See `describedAt`. */
+export function assessedAt(ref: BranchRef, headSha: string): string | null {
+  const stored = entry(load(), refKey(ref.repoKey, ref.branch)).assessment;
+  return stored && stored.headSha === headSha ? stored.generatedAt : null;
 }
 
 // ---------------------------------------------------------------------------

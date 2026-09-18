@@ -176,6 +176,8 @@ export type Floor = {
   working: Job[];
   waiting: Job[];
   parked: Job[];
+  /** Work the owner asked for that has just landed. Ages out on its own. */
+  finished: Job[];
   /** What is queued, by kind, so a long tail reads as one line rather than forty. */
   queued: { kind: JobKind; count: number }[];
 };
@@ -191,6 +193,7 @@ export function floor(snapshot: Snapshot): Floor {
     working: jobs.filter((j) => j.state === 'working'),
     waiting,
     parked: jobs.filter((j) => j.state === 'parked'),
+    finished: snapshot.work?.finished ?? [],
     queued: [...queued].map(([kind, count]) => ({ kind, count })),
   };
 }
@@ -205,6 +208,8 @@ export const toolLabel = (name: string): string =>
   ({
     sibling_branches: 'reading the branches next to it',
     what_changed: 'reading what changed lately',
+    repo_readme: 'reading what the repo is for',
+    commit_files: 'reading what a commit touched',
   })[name] ?? `using ${name}`;
 
 /**

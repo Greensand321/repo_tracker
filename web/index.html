@@ -170,6 +170,11 @@
         <div class="hint">How many the assistant works on in parallel. Watch it on The floor.</div>
       </div>
       <div>
+        <label for="dispatchWorkers">Jobs you asked for, at once</label>
+        <input id="dispatchWorkers" type="number" min="1" max="8">
+        <div class="hint">Its own lane: what you ask for never queues behind the background work.</div>
+      </div>
+      <div>
         <label for="toolCallsPerJob">Lookups per job</label>
         <input id="toolCallsPerJob" type="number" min="0" max="20">
         <div class="hint">A ceiling, not a target. 0 is the same as turning lookups off.</div>

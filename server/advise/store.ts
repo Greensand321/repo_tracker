@@ -59,6 +59,18 @@ export function getInsight(
   return stored;
 }
 
+/**
+ * The stored summary as it is, with no freshness check.
+ *
+ * `getInsight` answers "is there a usable one"; this answers "when was one last written",
+ * which is what a re-read the owner asked for turns on — the cache key has not moved, so
+ * the only honest predicate is that the answer is newer than the request (D81).
+ */
+export function insightWrittenAt(repoKey: string, branch: string, headSha: string): string | null {
+  const stored = load()[insightKey(repoKey, branch)];
+  return stored && stored.meta.headSha === headSha ? stored.meta.generatedAt : null;
+}
+
 export function putInsight(repoKey: string, branch: string, insight: StoredInsight): void {
   ensureDirs();
   const all = load();

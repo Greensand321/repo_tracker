@@ -7,7 +7,17 @@
  * than the convenience of a wrapper.
  */
 
-import type { GhBranch, GhCi, GhCombinedStatus, GhCompare, GhPull, GhRepo, GhWorkflowRuns } from './gh-types.ts';
+import type {
+  GhBranch,
+  GhCi,
+  GhCombinedStatus,
+  GhCommitDetail,
+  GhCompare,
+  GhPull,
+  GhReadme,
+  GhRepo,
+  GhWorkflowRuns,
+} from './gh-types.ts';
 import type { RateLimit } from '../shared/types.ts';
 
 const API = 'https://api.github.com';
@@ -212,6 +222,66 @@ export async function fetchCi(key: string, token: string, sha: string): Promise<
     { token, repo: key },
   );
   return { runs, status };
+}
+
+/**
+ * The repo's own description of itself.
+ *
+ * `/readme` rather than fetching `README.md` by name: GitHub resolves whichever file the
+ * repo actually uses — `README`, `README.rst`, `docs/README.md` — in one call, and a repo
+ * that names it unusually is exactly the repo where guessing would fail.
+ *
+ * Null when there is none, which is a normal state and not an error: plenty of repos that
+ * are entirely clear about themselves have no README at all.
+ */
+export async function fetchReadme(key: string, token: string): Promise<string | null> {
+  const { owner, name } = splitRepoKey(key);
+  const payload = await optional<GhReadme>(`/repos/${owner}/${name}/readme`, { token, repo: key });
+  if (!payload?.content) return null;
+  if (payload.encoding && payload.encoding !== 'base64') return null;
+  try {
+    return Buffer.from(payload.content, 'base64').toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One file from the repo, by path. Used only as a fallback when there is no README —
+ * a repo whose real description of itself lives somewhere else.
+ */
+export async function fetchTextFile(key: string, token: string, path: string): Promise<string | null> {
+  const { owner, name } = splitRepoKey(key);
+  const payload = await optional<GhReadme>(
+    `/repos/${owner}/${name}/contents/${path.split('/').map(encodeURIComponent).join('/')}`,
+    { token, repo: key },
+  );
+  if (!payload?.content || (payload.encoding && payload.encoding !== 'base64')) return null;
+  try {
+    return Buffer.from(payload.content, 'base64').toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The files one commit touched.
+ *
+ * Deliberately not collected with everything else (D31 collects state, not contents): at a
+ * hundred branches with fifty commits each this would be five thousand calls a read. It is
+ * fetched for the one commit a worker asks about and cached on the SHA, which makes it one
+ * call ever — a commit's file list cannot change.
+ */
+export async function fetchCommitFiles(
+  key: string,
+  token: string,
+  sha: string,
+): Promise<GhCommitDetail | null> {
+  const { owner, name } = splitRepoKey(key);
+  return optional<GhCommitDetail>(`/repos/${owner}/${name}/commits/${encodeURIComponent(sha)}`, {
+    token,
+    repo: key,
+  });
 }
 
 /**

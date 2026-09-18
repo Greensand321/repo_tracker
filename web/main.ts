@@ -211,6 +211,13 @@ function renderDateline(data: SnapshotResponse | null): void {
     } else if (board.waiting.length > 0) {
       bits.push(`<span>${board.waiting.length} waiting</span>`);
     }
+    // Work you asked for and stopped watching. Routine work is not announced — forty
+    // notices about forty summaries is a reason to stop reading notices (Q71).
+    if (board.finished.length > 0) {
+      bits.push(
+        `<span class="good">${board.finished.length === 1 ? 'what you asked for is done' : `${board.finished.length} things you asked for are done`}</span>`,
+      );
+    }
   }
 
   // The dateline is the only thing always in view, so a repeating provider failure
@@ -365,6 +372,29 @@ async function postVision(path: string, body: unknown, method = 'POST'): Promise
  * a panel would cost more than it is worth — pre-filled so you are correcting a draft
  * rather than composing from nothing.
  */
+/**
+ * Ask for something to be done now.
+ *
+ * It queues; it does not do. The reply comes back as soon as the job is on the board, and
+ * the floor shows the rest — which is the point: you asked so that you could stop
+ * watching, and you are told on the floor when it lands.
+ */
+async function askFor(kind: string, key: string): Promise<void> {
+  const ref = key ? parseBranchKey(key) : null;
+  if (kind !== 'brief' && !ref) return;
+  try {
+    const res = await fetch('/api/work/dispatch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(kind === 'brief' ? { kind } : { kind, ...ref }),
+    });
+    if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'could not ask for that');
+    await loadSnapshot();
+  } catch (err) {
+    showFailure('Could not ask for that:', err);
+  }
+}
+
 /**
  * Try a parked job again. The board is derived, so there is nothing to un-write — the
  * server only forgets that this job failed twice, and the next pass picks it up.
@@ -686,6 +716,7 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#askBranchCap').value = String(settings.askBranchCap);
     $<HTMLInputElement>('#maxOpenQuestions').value = String(settings.maxOpenQuestions);
     $<HTMLInputElement>('#workers').value = String(settings.workers);
+    $<HTMLInputElement>('#dispatchWorkers').value = String(settings.dispatchWorkers);
     $<HTMLInputElement>('#toolCallsPerJob').value = String(settings.toolCallsPerJob);
     $<HTMLInputElement>('#toolsEnabled').checked = settings.toolsEnabled;
     $<HTMLInputElement>('#visionAutoDraft').checked = settings.visionAutoDraft;
@@ -736,6 +767,7 @@ async function saveSettings(): Promise<void> {
       askBranchCap: Number($<HTMLInputElement>('#askBranchCap').value),
       maxOpenQuestions: Number($<HTMLInputElement>('#maxOpenQuestions').value),
       workers: Number($<HTMLInputElement>('#workers').value),
+      dispatchWorkers: Number($<HTMLInputElement>('#dispatchWorkers').value),
       toolCallsPerJob: Number($<HTMLInputElement>('#toolCallsPerJob').value),
       toolsEnabled: $<HTMLInputElement>('#toolsEnabled').checked,
       visionAutoDraft: $<HTMLInputElement>('#visionAutoDraft').checked,
@@ -792,6 +824,12 @@ async function loadModels(): Promise<void> {
 function wire(): void {
   document.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
+
+    const ask = target.closest<HTMLElement>('[data-ask]');
+    if (ask) {
+      void askFor(ask.dataset['ask'] ?? '', ask.dataset['on'] ?? '');
+      return;
+    }
 
     const retry = target.closest<HTMLElement>('[data-retry]');
     if (retry) { void retryJob(retry.dataset['retry'] ?? ''); return; }

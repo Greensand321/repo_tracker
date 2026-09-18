@@ -158,11 +158,17 @@ export async function converse(settings: Settings, request: ConverseRequest): Pr
         result = cut(String(await tool.run(wanted.args, request.ctx)));
         seen.set(key, result);
       } catch (err) {
+        request.onTool?.(null);
+        // A ToolError is something the worker can fix — a bad argument, a SHA that is not
+        // on this branch — so it goes back as the result and the conversation continues.
+        //
+        // Anything else is not: a rate limit, an outage, a rejected token. Handing that
+        // back would have every job in the read discover it separately, at full price, and
+        // answer without the evidence it asked for while looking as confident as ever. The
+        // job fails instead, and the next read tries again.
+        if (!(err instanceof ToolError)) throw err;
         failed = true;
-        result =
-          err instanceof ToolError
-            ? `That call failed: ${err.message}`
-            : `That call failed: ${err instanceof Error ? err.message : String(err)}`;
+        result = `That call failed: ${err.message}`;
       } finally {
         request.onTool?.(null);
       }

@@ -19,22 +19,30 @@ import { DEFAULT_SETTINGS } from '../shared/types.ts';
 const TEMP = mkdtempSync(join(tmpdir(), 'bearing-tools-'));
 process.env['BEARING_DATA_DIR'] = TEMP;
 
+import type { GitHubReader } from '../server/tools/evidence.ts';
+
 let converse: typeof import('../server/advise/converse.ts');
 let free: typeof import('../server/tools/free.ts');
 let catalog: typeof import('../server/tools/catalog.ts');
 let toolTypes: typeof import('../server/tools/types.ts');
+let ghTools: typeof import('../server/tools/github.ts');
+let evidence: typeof import('../server/tools/evidence.ts');
 
 before(async () => {
   converse = await import('../server/advise/converse.ts');
   free = await import('../server/tools/free.ts');
   catalog = await import('../server/tools/catalog.ts');
   toolTypes = await import('../server/tools/types.ts');
+  ghTools = await import('../server/tools/github.ts');
+  evidence = await import('../server/tools/evidence.ts');
 });
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = realFetch;
   rmSync(join(TEMP, 'history'), { recursive: true, force: true });
+  rmSync(join(TEMP, 'evidence.json'), { force: true });
+  evidence?.resetEvidenceCache();
 });
 
 const settings = (over: Partial<Settings> = {}): Settings => ({
@@ -58,10 +66,33 @@ function branch(name: string, over: Partial<Branch> = {}): Branch {
 
 const snapshot = (branches: Branch[]): Snapshot => ({
   generatedAt: '2026-09-17T12:00:00Z', repos: [], branches, warnings: [], rateLimit: null, goals: [],
-  brief: null, work: { jobs: [], workers: 2 }, llm: { enabled: true, pending: 0, errors: [] },
+  brief: null, work: { jobs: [], workers: 2, finished: [] }, llm: { enabled: true, pending: 0, errors: [] },
 });
 
-const ctx = (branches: Branch[], subject: Branch | null, over: Partial<Settings> = {}) => {
+/** A GitHub reader that answers from a script and counts what it was asked. */
+function reader(over: Partial<GitHubReader> = {}): GitHubReader & { asks: string[] } {
+  const asks: string[] = [];
+  return {
+    asks,
+    async readme(repoKey: string) {
+      asks.push(`readme:${repoKey}`);
+      return over.readme ? over.readme(repoKey) : '# The thing\n\nIt does the thing.';
+    },
+    async commitFiles(repoKey: string, sha: string) {
+      asks.push(`files:${repoKey}@${sha}`);
+      return over.commitFiles
+        ? over.commitFiles(repoKey, sha)
+        : { sha, files: [{ path: 'src/a.ts', status: 'modified', added: 4, removed: 1 }], truncated: false };
+    },
+  };
+}
+
+const ctx = (
+  branches: Branch[],
+  subject: Branch | null,
+  over: Partial<Settings> = {},
+  github: GitHubReader | null = reader(),
+) => {
   // A tool is handed SafeSettings, never Settings: it cannot leak a token it never had.
   const { token: _t, llmApiKey: _k, ...safe } = settings(over);
   return {
@@ -69,6 +100,7 @@ const ctx = (branches: Branch[], subject: Branch | null, over: Partial<Settings>
     settings: { ...safe, hasToken: true, hasLlmKey: true },
     branch: subject,
     now: new Date('2026-09-17T12:00:00Z'),
+    github,
   };
 };
 
@@ -323,10 +355,17 @@ test('a tool is never handed a secret', async () => {
   assert.equal('token' in seen.settings, false);
   assert.equal('llmApiKey' in seen.settings, false);
 
+  // Two files are the boundary itself and are allowed to know about the token: the one
+  // that builds a context, and the one that binds a reader to it. No tool may.
+  const boundary = new Set(['context.ts', 'evidence.ts', 'types.ts']);
   const fs = await import('node:fs');
-  for (const file of fs.readdirSync(new URL('../server/tools/', import.meta.url))) {
-    const src = fs.readFileSync(new URL(file, new URL('../server/tools/', import.meta.url)), 'utf8');
-    assert.doesNotMatch(src, /settings\.token|llmApiKey/, `${file} must not reach for a credential`);
+  const dir = new URL('../server/tools/', import.meta.url);
+  for (const file of fs.readdirSync(dir)) {
+    if (boundary.has(file)) continue;
+    const src = fs.readFileSync(new URL(file, dir), 'utf8');
+    // Code, not prose: a file may explain why it has no credential.
+    assert.doesNotMatch(src, /settings\s*\.\s*token|llmApiKey/, `${file} must not reach for a credential`);
+    assert.doesNotMatch(src, /\bfetch\(/, `${file} must go through the reader, not make its own calls`);
     assert.doesNotMatch(src, /writeFileSync|appendFileSync|execSync|spawn/, `${file} must not write anything`);
   }
 });
@@ -366,4 +405,200 @@ test('it says so when it was pushed to answer, and the answer still counts', asy
   assert.equal(result.text, FINAL);
   assert.equal(result.hitBudget, true);
   assert.equal(result.uses.length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// The two that cost a GitHub call — and cost it once, ever
+// ---------------------------------------------------------------------------
+
+test('repo_readme reads what the repo says it is', async () => {
+  const gh = reader();
+  const subject = branch('a');
+  const out = (await ghTools.repoReadme.run({}, ctx([subject], subject, {}, gh))) as string;
+
+  assert.match(out, /It does the thing/);
+  assert.deepEqual(gh.asks, ['readme:o/r']);
+});
+
+test('a repo with no README says so rather than returning nothing', async () => {
+  const gh = reader({ readme: async () => null });
+  const subject = branch('a');
+  const out = (await ghTools.repoReadme.run({}, ctx([subject], subject, {}, gh))) as string;
+  assert.match(out, /no README/);
+});
+
+test('a job with no branch, or no GitHub, gets a reason rather than a crash', async () => {
+  const subject = branch('a');
+  await assert.rejects(
+    () => Promise.resolve(ghTools.repoReadme.run({}, ctx([subject], null, {}, reader()))),
+    /not about one branch/,
+  );
+  await assert.rejects(
+    () => Promise.resolve(ghTools.repoReadme.run({}, ctx([subject], subject, {}, null))),
+    /cannot reach GitHub/,
+  );
+});
+
+test('commit_files refuses a SHA that is not on this branch', async () => {
+  // The same guard the summary evidence has (D40). An invented SHA must not become a
+  // GitHub call: it would either 404, or succeed against some unrelated commit in the repo
+  // and be reported as this branch's work.
+  const gh = reader();
+  const subject = branch('a');
+  await assert.rejects(
+    () => Promise.resolve(ghTools.commitFiles.run({ sha: 'deadbee' }, ctx([subject], subject, {}, gh))),
+    /is not a commit on this branch/,
+  );
+  assert.deepEqual(gh.asks, [], 'and it never reached GitHub to find that out');
+});
+
+test('commit_files accepts the short SHA the model was shown', async () => {
+  const gh = reader();
+  const subject = branch('a'); // its one commit is abc1234def
+  const out = (await ghTools.commitFiles.run({ sha: 'abc1234' }, ctx([subject], subject, {}, gh))) as string;
+
+  assert.match(out, /src\/a\.ts/);
+  assert.match(out, /\+4\/-1/);
+  assert.deepEqual(gh.asks, ['files:o/r@abc1234def'], 'resolved to the full SHA before asking');
+});
+
+test('a huge commit is cut, and says GitHub may have cut it first', async () => {
+  const many = Array.from({ length: 320 }, (_, i) => ({
+    path: `src/f${i}.ts`, status: 'modified', added: 1, removed: 0,
+  }));
+  const gh = reader({ commitFiles: async (_r, sha) => ({ sha, files: many, truncated: true }) });
+  const subject = branch('a');
+  const out = (await ghTools.commitFiles.run({ sha: 'abc1234' }, ctx([subject], subject, {}, gh))) as string;
+
+  assert.ok(out.split('\n').length < 50, 'not three hundred lines into the prompt');
+  assert.match(out, /and 280 more/);
+  assert.match(out, /caps this list at 300/);
+});
+
+test('the evidence store asks GitHub once and never again', async () => {
+  // "One call ever" is the whole economic argument for these two. A commit's file list
+  // cannot change, and a README changes rarely enough that a re-read is not worth a call
+  // on every branch of every repo on every read.
+  const calls: string[] = [];
+  globalThis.fetch = (async (url: string) => {
+    calls.push(new URL(String(url)).pathname);
+    const body = String(url).includes('/readme')
+      ? { content: Buffer.from('# Bearing\n\nA dashboard.').toString('base64'), encoding: 'base64' }
+      : { sha: 'abc1234def', files: [{ filename: 'a.ts', status: 'modified', additions: 2, deletions: 0 }] };
+    return new Response(JSON.stringify(body), { status: 200 });
+  }) as typeof fetch;
+
+  const gh = evidence.readerFor('gh-token');
+  assert.match((await gh.readme('o/r'))!, /A dashboard/);
+  assert.match((await gh.readme('o/r'))!, /A dashboard/);
+  assert.equal((await gh.commitFiles('o/r', 'abc1234def'))!.files.length, 1);
+  assert.equal((await gh.commitFiles('o/r', 'abc1234def'))!.files.length, 1);
+
+  assert.equal(calls.length, 2, `asked GitHub ${calls.length} times for two facts`);
+});
+
+test('a repo with no README falls back to the file that actually describes it', async () => {
+  const paths: string[] = [];
+  globalThis.fetch = (async (url: string) => {
+    const path = new URL(String(url)).pathname;
+    paths.push(path);
+    if (path.endsWith('/readme')) return new Response('{}', { status: 404 });
+    return new Response(
+      JSON.stringify({ content: Buffer.from('# Working in this repo').toString('base64'), encoding: 'base64' }),
+      { status: 200 },
+    );
+  }) as typeof fetch;
+
+  evidence.resetEvidenceCache();
+  const text = await evidence.readerFor('gh-token').readme('o/r2');
+  assert.match(text!, /Working in this repo/);
+  assert.ok(paths.some((p) => p.endsWith('CLAUDE.md')), paths.join(' '));
+});
+
+test('having asked and found nothing is itself remembered', async () => {
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return new Response('{}', { status: 404 });
+  }) as typeof fetch;
+
+  evidence.resetEvidenceCache();
+  const gh = evidence.readerFor('gh-token');
+  assert.equal(await gh.readme('o/empty'), null);
+  const afterFirst = calls;
+  assert.equal(await gh.readme('o/empty'), null);
+  assert.equal(calls, afterFirst, 'a repo with nothing to read is not asked twice');
+});
+
+// ---------------------------------------------------------------------------
+// D74 again, now that three stations have tools
+// ---------------------------------------------------------------------------
+
+test('every station with tools carries them in its version', async () => {
+  const { assessVersion, draftVersion } = await import('../server/advise/vision.ts');
+  const { summariseVersion } = await import('../server/advise/enrich.ts');
+
+  for (const version of [summariseVersion, assessVersion, draftVersion]) {
+    const on = version(settings({ toolsEnabled: true }));
+    const off = version(settings({ toolsEnabled: false }));
+    assert.notEqual(on, off);
+    assert.match(off, /^v1$/, 'no tools means the version it always had');
+  }
+
+  // And the three do not collide: they have different tools, so different tags.
+  const withTools = settings({ toolsEnabled: true });
+  const tags = new Set([
+    summariseVersion(withTools),
+    assessVersion(withTools),
+    draftVersion(withTools),
+  ]);
+  assert.equal(tags.size, 3, 'different evidence, different key');
+});
+
+test('two workers wanting the same README make one call, not two', async () => {
+  // They miss the cache in the same millisecond, because it only closes after the first
+  // write. Measured on a two-branch fleet this doubled every GitHub call.
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return new Response(
+      JSON.stringify({ content: Buffer.from('# Same repo').toString('base64'), encoding: 'base64' }),
+      { status: 200 },
+    );
+  }) as typeof fetch;
+
+  evidence.resetEvidenceCache();
+  const gh = evidence.readerFor('gh-token');
+  const [one, two] = await Promise.all([gh.readme('o/same'), gh.readme('o/same')]);
+
+  assert.equal(calls, 1);
+  assert.equal(one, two);
+});
+
+test('a SHA prefix too short to be unique is refused', async () => {
+  const gh = reader();
+  const subject = branch('a');
+  await assert.rejects(
+    () => Promise.resolve(ghTools.commitFiles.run({ sha: 'abc' }, ctx([subject], subject, {}, gh))),
+    /is not a commit on this branch/,
+  );
+  assert.deepEqual(gh.asks, []);
+});
+
+test('a GitHub outage fails the job instead of becoming evidence', async () => {
+  // Fed back as a tool result, every job in the read would discover the outage separately,
+  // at full price, and answer without the evidence it asked for — looking just as sure.
+  const angry = {
+    name: 'angry', description: 'reaches GitHub', cost: 'github' as const, args: [],
+    run: () => { throw new Error('GitHub rate limit reached — resets at 14:02'); },
+  };
+  scripted(['{"tool":"angry","args":{}}', FINAL]);
+
+  await assert.rejects(
+    () => converse.converse(settings(), {
+      system: 'sys', user: 'usr', tools: [angry], ctx: ctx([branch('a')], branch('a')), sessionId: 's',
+    }),
+    /rate limit/,
+  );
 });

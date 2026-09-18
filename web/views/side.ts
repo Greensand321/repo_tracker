@@ -121,7 +121,12 @@ const MAX_PARKED_ROWS = 6;
 export function renderFloor(snapshot: Snapshot, now = new Date()): string {
   const board = floor(snapshot);
 
-  if (board.working.length === 0 && board.waiting.length === 0 && board.parked.length === 0) {
+  if (
+    board.working.length === 0 &&
+    board.waiting.length === 0 &&
+    board.parked.length === 0 &&
+    board.finished.length === 0
+  ) {
     return `<div class="quietnote">${
       snapshot.llm.enabled
         ? 'Nothing to do — everything on screen is up to date.'
@@ -160,6 +165,19 @@ export function renderFloor(snapshot: Snapshot, now = new Date()): string {
         <span class="jtitle dim">${plural(board.waiting.length, 'job')} waiting</span>
         <span class="jmeta">${detail}</span>
       </span>
+    </div>`);
+  }
+
+  // What you asked for, now done. You are told because the point of asking was to stop
+  // watching; it ages out rather than needing dismissal (Q71).
+  for (const job of board.finished) {
+    rows.push(`<div class="jrow done">
+      <span class="jglyph">&#10003;</span>
+      <span class="jbody">
+        <span class="jtitle">${esc(job.title)}</span>
+        <span class="jmeta">you asked for this &middot; done</span>
+      </span>
+      <span class="jclock">${esc(relativeTime(job.finishedAt ?? null, now))}</span>
     </div>`);
   }
 

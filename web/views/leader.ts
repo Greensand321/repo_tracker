@@ -48,7 +48,8 @@ export function renderBrief(snapshot: Snapshot): string {
   return `
     <div class="eyebrow">The brief</div>
     <div class="brief-text">${esc(snapshot.brief.text)}</div>
-    <div class="brief-prov">${esc(snapshot.brief.model)} · ${relativeTime(snapshot.brief.generatedAt)}</div>`;
+    <div class="brief-prov">${esc(snapshot.brief.model)} · ${relativeTime(snapshot.brief.generatedAt)}
+      <button class="link" data-ask="brief">write it again</button></div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +97,9 @@ export function forNow(branch: Branch): string {
         (vision.proposed ? ' <span class="proposed">my guess — not confirmed</span>' : '') +
         `</span></div>`
       : `<div class="fn"><span class="k">For</span><span class="v unsaid">${esc(vision.text)}
-          <button class="link" data-say="${esc(branchKey(branch))}">say what it is for</button></span></div>`,
+          <button class="link" data-say="${esc(branchKey(branch))}">say what it is for</button>
+          <button class="link" data-ask="draft-vision" data-on="${esc(branchKey(branch))}"
+            title="Have the assistant look at the repo and the commits and propose one">have a go</button></span></div>`,
   );
 
   // What it checked before deciding, when it checked anything. A verdict drawn from the
@@ -110,7 +113,14 @@ export function forNow(branch: Branch): string {
     : branch.summary
       ? esc(branch.summary)
       : '';
-  if (now) out.push(`<div class="fn"><span class="k">Now</span><span class="v">${now}</span></div>`);
+  if (now) {
+    // Asking again is the only thing you can do about an answer you disagree with: the
+    // branch has not moved, so nothing on its own will ever regenerate this (D81).
+    const again = branch.assessment
+      ? `<button class="link" data-ask="assess" data-on="${esc(branchKey(branch))}">check it again</button>`
+      : `<button class="link" data-ask="summarise" data-on="${esc(branchKey(branch))}">read it again</button>`;
+    out.push(`<div class="fn"><span class="k">Now</span><span class="v">${now} ${again}</span></div>`);
+  }
 
   return `<div class="fornow">${out.join('')}</div>`;
 }

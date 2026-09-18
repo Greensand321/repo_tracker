@@ -73,7 +73,7 @@ export function buildSnapshot(
     // (free, Plane B), the rest by the advisor (advise/enrich.ts).
     goals: [],
     brief: null,
-    work: { jobs: [], workers: 0 },
+    work: { jobs: [], workers: 0, finished: [] },
     llm: { enabled: false, pending: 0, errors: [] },
   };
 }

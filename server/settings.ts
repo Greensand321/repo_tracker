@@ -50,6 +50,7 @@ function sanitise(settings: Settings): Settings {
     toolSeconds: clamp(settings.toolSeconds, 5, 300, DEFAULT_SETTINGS.toolSeconds),
     // Capped low on purpose: more workers make a runaway bill arrive faster, not later.
     workers: clamp(settings.workers, 1, 8, DEFAULT_SETTINGS.workers),
+    dispatchWorkers: clamp(settings.dispatchWorkers, 1, 8, DEFAULT_SETTINGS.dispatchWorkers),
   };
 }
 

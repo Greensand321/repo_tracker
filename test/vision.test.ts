@@ -70,7 +70,7 @@ function snap(branches: Branch[], goals: Goal[] = []): Snapshot {
   return {
     generatedAt: '2026-09-17T13:42:08Z',
     repos: [{ key: 'greensand321/repo_tracker', owner: 'greensand321', name: 'repo_tracker', defaultBranch: 'main', branchCount: 9, url: '' }],
-    branches, goals, brief: null, work: { jobs: [], workers: 2 }, warnings: [], rateLimit: null,
+    branches, goals, brief: null, work: { jobs: [], workers: 2, finished: [] }, warnings: [], rateLimit: null,
     llm: { enabled: true, pending: 0, errors: [] },
   };
 }
