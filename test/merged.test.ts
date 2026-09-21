@@ -84,3 +84,18 @@ test('the pull request is read once per head, like everything else', async () =>
   assert.equal(calls['/repos/o/r/pulls/7/commits'], 1, 'served from the cache the second time');
   assert.equal(again.branches.find((b) => b.name === 'merged-feature')!.commits.length, 2);
 });
+
+test('a cache from before the fix is asked once, even though the branch has not moved', async () => {
+  const { calls } = github();
+  await collect.collect(settings);
+  // Forget that the pull request was ever consulted, the way an older cache file looks.
+  const { readCache, writeCache } = await import('../server/cache.ts');
+  const cache = readCache('o/r');
+  const entry = cache.details['merged-feature']!;
+  cache.details['merged-feature'] = { sha: entry.sha, compare: { ...entry.compare, commits: [] }, ci: entry.ci };
+  writeCache(cache);
+
+  const snapshot = await collect.collect(settings);
+  assert.equal(calls['/repos/o/r/pulls/7/commits'], 2, 'asked again, once');
+  assert.equal(snapshot.branches.find((b) => b.name === 'merged-feature')!.commits.length, 2);
+});

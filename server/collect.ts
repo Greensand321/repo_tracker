@@ -135,7 +135,11 @@ async function detailFor(
   let compare = moved ? await fetchCompare(key, token, base, branchName) : cached.compare;
   let viaPull: number | null = moved ? null : (cached.viaPull ?? null);
 
-  if (moved && compare.commits.length === 0) {
+  // Once per head — but a cache written before this existed holds an empty compare with
+  // no record of the pull request ever being asked, and a branch that never moves again
+  // would have stayed "nothing of its own" for ever. `undefined` means never asked.
+  const neverAsked = !moved && cached.viaPull === undefined;
+  if ((moved || neverAsked) && compare.commits.length === 0) {
     // Nothing ahead of the base is what a merged branch looks like — and "nothing of its
     // own" was the verdict on exactly the branches whose history is worth having. The pull
     // request kept it.
