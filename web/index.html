@@ -46,6 +46,7 @@
           <textarea id="askBox" placeholder="What moved while I was away?" rows="2"></textarea>
           <div class="row">
             <span class="hint" id="askHint"></span>
+            <button class="thread hidden" id="newThread" title="Forget what was said and start a fresh conversation. Nothing else changes.">new thread</button>
             <button class="go" id="askGo">Ask ⏎</button>
           </div>
         </div>
@@ -196,9 +197,15 @@
           </div>
         </div>
 
-        <div class="field nums four">
+        <div class="field nums five">
           <div>
-            <label for="briefEveryMinutes">Brief (min)
+            <label for="advisorMemoryMinutes">Memory
+              <span class="info" tabindex="0" role="img" aria-label="about the advisor's memory" data-tip="Minutes of quiet before the advisor forgets the conversation, so a follow-up like “and that one?” still means something. Nothing is held open between questions — this only decides how much of what was said is sent again, a few hundred tokens a turn. 0 starts every question clean.">i</span>
+            </label>
+            <input id="advisorMemoryMinutes" type="number" min="0" max="1440">
+          </div>
+          <div>
+            <label for="briefEveryMinutes">Brief
               <span class="info" tabindex="0" role="img" aria-label="about the brief" data-tip="Minutes between routine rewrites of the brief — it reads every branch, so it is the dearest call. The last one stays up, dated, until then. “Write it again” never waits. 0 rewrites every read.">i</span>
             </label>
             <input id="briefEveryMinutes" type="number" min="0" max="1440">
@@ -210,7 +217,7 @@
             <input id="workers" type="number" min="1" max="8">
           </div>
           <div>
-            <label for="dispatchWorkers">Asked for
+            <label for="dispatchWorkers">Asked
               <span class="info" tabindex="0" role="img" aria-label="about the dispatched lane" data-tip="How many jobs you asked for run at once — its own lane, so what you ask for never queues behind background work.">i</span>
             </label>
             <input id="dispatchWorkers" type="number" min="1" max="8">

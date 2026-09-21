@@ -424,6 +424,15 @@ export type Settings = {
   /** How many questions may be waiting at once. A wall of them is a chore list, not help. */
   maxOpenQuestions: number;
   /**
+   * Minutes of quiet before the advisor forgets the conversation (D92).
+   *
+   * There is no process being held open — every question is one stateless request — so this
+   * costs nothing while idle. What it buys is follow-ups that mean something ("and that
+   * one?"), and what it costs is a few hundred tokens of transcript on each turn. 0 turns
+   * it off: every question starts clean, as it did before.
+   */
+  advisorMemoryMinutes: number;
+  /**
    * How long a routine rewrite of the brief waits after the last one, in minutes.
    *
    * The brief reads the whole fleet and its key moves whenever any branch does. With agents
@@ -481,6 +490,7 @@ export const DEFAULT_SETTINGS: Settings = {
   askBranchCap: 60,
   visionAutoDraft: true,
   maxOpenQuestions: 3,
+  advisorMemoryMinutes: 30,
   briefEveryMinutes: 15,
   toolsEnabled: true,
   toolCallsPerJob: 8,

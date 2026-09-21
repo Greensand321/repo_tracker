@@ -11,7 +11,7 @@ import type { Answer } from '../server/advise/ask.ts';
 import type { BranchRef, Goal, SafeSettings, SnapshotResponse } from '../shared/types.ts';
 import { createPicker, type Picker } from './components/picker.ts';
 import { floor, tallies, threads, toolLabel } from './derive.ts';
-import { clockTime, countdown, esc, exactTime, relativeTime } from './format.ts';
+import { clockTime, countdown, esc, exactTime, plural, relativeTime } from './format.ts';
 import { branchKey, parseBranchKey, renderBrief, renderLeaderList, renderNow, type Grouping } from './views/leader.ts';
 import { renderConditions, renderFloor, renderNotices, renderQuestions, renderRegister } from './views/side.ts';
 
@@ -197,6 +197,8 @@ function draw(): void {
   renderAnswers();
   renderFiling();
   renderProposals();
+  // Only offered once there is a thread to end.
+  $('#newThread').classList.toggle('hidden', state.asked.length === 0);
 }
 
 function renderDateline(data: SnapshotResponse | null): void {
@@ -372,8 +374,27 @@ function renderStarted(answer: Answer): string {
 
 function renderProv(answer: Answer): string {
   const looked = answer.looked.length > 0 ? ` · after ${[...new Set(answer.looked)].map(toolLabel).join(' and ')}` : '';
+  // Whether it had the earlier turns in front of it. Worth showing: an answer that
+  // followed on from what you said is a different thing from one that started cold (D92).
+  const thread = answer.inThread > 0 ? ` · following on from ${plural(answer.inThread, 'question')}` : '';
   return `<div class="prov">${esc(answer.model)} · saw ${answer.sawBranches} branches,
-    ${answer.sawGoals} goals${esc(looked)} · ${(answer.ms / 1000).toFixed(1)}s</div>`;
+    ${answer.sawGoals} goals${esc(looked)}${esc(thread)} · ${(answer.ms / 1000).toFixed(1)}s</div>`;
+}
+
+/**
+ * Start again. The advisor's memory is only what was said; the register, the goals and
+ * everything on disk are untouched, so this is safe to press whenever a thread has wandered.
+ */
+async function newThread(): Promise<void> {
+  try {
+    await fetch('/api/ask', { method: 'DELETE' });
+  } catch {
+    // Nothing to report: the thread expires on its own, and a failed clear costs nothing.
+  }
+  state.asked = [];
+  renderAnswers();
+  $('#newThread').classList.add('hidden');
+  $<HTMLTextAreaElement>('#askBox').focus();
 }
 
 /** Accepting a proposed regrouping. One click, one write, then the page re-reads. */
@@ -408,6 +429,7 @@ async function askAdvisor(): Promise<void> {
   box.value = '';
   $<HTMLButtonElement>('#askGo').disabled = true;
   renderAnswers();
+  $('#newThread').classList.remove('hidden');
 
   try {
     const res = await fetch('/api/ask', {
@@ -802,6 +824,7 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#askBranchCap').value = String(settings.askBranchCap);
     $<HTMLInputElement>('#maxOpenQuestions').value = String(settings.maxOpenQuestions);
     $<HTMLInputElement>('#briefEveryMinutes').value = String(settings.briefEveryMinutes);
+    $<HTMLInputElement>('#advisorMemoryMinutes').value = String(settings.advisorMemoryMinutes);
     $<HTMLInputElement>('#workers').value = String(settings.workers);
     $<HTMLInputElement>('#dispatchWorkers').value = String(settings.dispatchWorkers);
     $<HTMLInputElement>('#toolCallsPerJob').value = String(settings.toolCallsPerJob);
@@ -855,6 +878,7 @@ async function saveSettings(): Promise<void> {
       askBranchCap: Number($<HTMLInputElement>('#askBranchCap').value),
       maxOpenQuestions: Number($<HTMLInputElement>('#maxOpenQuestions').value),
       briefEveryMinutes: Number($<HTMLInputElement>('#briefEveryMinutes').value),
+      advisorMemoryMinutes: Number($<HTMLInputElement>('#advisorMemoryMinutes').value),
       workers: Number($<HTMLInputElement>('#workers').value),
       dispatchWorkers: Number($<HTMLInputElement>('#dispatchWorkers').value),
       toolCallsPerJob: Number($<HTMLInputElement>('#toolCallsPerJob').value),
@@ -1056,6 +1080,7 @@ function wire(): void {
   });
 
   on('#askGo', 'click', () => void askAdvisor());
+  on('#newThread', 'click', () => void newThread());
   on('#refreshNow', 'click', () => void fetch('/api/refresh', { method: 'POST' }));
   on('#openSettings', 'click', () => void openSettings());
   on('#closeSettings', 'click', () => $('#settingsSheet').classList.add('hidden'));

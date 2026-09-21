@@ -5,6 +5,7 @@ import { streamSSE } from 'hono/streaming';
 
 import { refKey, type JobKind, type Settings } from '../shared/types.ts';
 import { ask } from './advise/ask.ts';
+import { forget } from './advise/conversation.ts';
 import { cannotAsk } from './work/asks.ts';
 import { distributeVisions } from './advise/vision.ts';
 import { LlmError, fetchModelsRaw, listModels } from './advise/client.ts';
@@ -82,6 +83,7 @@ api.put('/settings', async (c) => {
     'askBranchCap',
     'maxOpenQuestions',
     'briefEveryMinutes',
+    'advisorMemoryMinutes',
     'workers',
     'dispatchWorkers',
     'toolCallsPerJob',
@@ -321,6 +323,15 @@ api.post('/ask', async (c) => {
   } catch (err) {
     return c.json({ error: describe(err) }, 400);
   }
+});
+
+/**
+ * Start a new conversation. The advisor's memory is what was *said* — the state and Plane B
+ * are untouched by this, and nothing on the page changes (D92).
+ */
+api.delete('/ask', (c) => {
+  forget();
+  return c.json({ ok: true });
 });
 
 /**

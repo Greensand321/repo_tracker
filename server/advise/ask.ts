@@ -22,12 +22,11 @@
  * and an invented one is dropped, not shown.
  */
 
-import { randomUUID } from 'node:crypto';
-
 import { refKey, type Branch, type BranchRef, type Goal, type JobKind, type JobSubject, type Settings, type Snapshot } from '../../shared/types.ts';
 import { deskTools } from '../tools/catalog.ts';
 import { contextFor } from '../tools/context.ts';
 import { LlmError } from './client.ts';
+import { recall, remember, threadId, transcript } from './conversation.ts';
 import { converse } from './converse.ts';
 import { NOTHING_OPEN, extractJson } from './prompt.ts';
 
@@ -45,6 +44,8 @@ export type Answer = {
   started: string[];
   /** What it looked up before answering, by tool name. */
   looked: string[];
+  /** How many earlier exchanges it had in front of it. 0 means this began a new thread. */
+  inThread: number;
   askedAt: string;
   /** What the model was actually shown, so a wrong answer is debuggable. */
   sawBranches: number;
@@ -61,6 +62,12 @@ evidence that exists.
 You will be given the current state of every branch: what it is FOR (where anyone has
 said), what it DID, how the two COMPARE, and the goals the owner filed them under. Answer
 the question from that state and nothing else.
+
+You may also be given what was said earlier in this conversation. Use it to understand what
+the owner means — "that one", "the other two", "do it then" — and nothing more. The state
+below it is the current one; anything said earlier describes how things were then, and
+where the two disagree the state is right. Answer the LATEST question only; do not answer
+an earlier one again.
 
 Rules:
 - Answer in plain English, in at most four sentences. No headings, no markdown.
@@ -105,8 +112,29 @@ export function buildAskPrompt(snapshot: Snapshot, question: string, cap: number
     `BRANCHES (${threads.length} shown${omitted > 0 ? `, ${omitted} older ones omitted` : ''}):`,
     ...lines,
     '',
-    `QUESTION: ${question}`,
+    ...inFlight(snapshot),
+    `LATEST QUESTION: ${question}`,
   ].join('\n');
+}
+
+/**
+ * What the owner asked for that is still running, or has just landed.
+ *
+ * Without it, "did that finish?" one turn after the advisor dispatched something is
+ * unanswerable — it cannot see its own work, and the transcript only says it started
+ * something. Two lines, from the board that is already on the snapshot.
+ */
+function inFlight(snapshot: Snapshot): string[] {
+  const jobs = snapshot.work?.jobs ?? [];
+  const mine = jobs.filter((job) => job.origin === 'dispatched' && job.state !== 'parked');
+  const landed = snapshot.work?.finished ?? [];
+  if (mine.length === 0 && landed.length === 0) return [];
+  return [
+    '',
+    'WORK THE OWNER ASKED FOR:',
+    ...mine.map((job) => `  still running: ${job.title}`),
+    ...landed.map((job) => `  just finished: ${job.title}`),
+  ];
 }
 
 function describeGoal(goal: Goal): string {
@@ -171,22 +199,34 @@ export async function ask(
   const threads = snapshot.branches.filter((b) => !b.isBase);
   const started = Date.now();
 
+  // What was said, if the thread is still warm (D92). The state is re-read fresh below it
+  // either way — the transcript carries the conversation, never the facts.
+  const earlier = recall(settings.advisorMemoryMinutes);
+  const preamble = transcript(earlier);
+
   const result = await converse(settings, {
     system: SYSTEM,
-    user: buildAskPrompt(snapshot, text, settings.askBranchCap),
+    user: preamble
+      ? `${preamble}\n\n---\n\n${buildAskPrompt(snapshot, text, settings.askBranchCap)}`
+      : buildAskPrompt(snapshot, text, settings.askBranchCap),
     tools: deskTools(settings),
     ctx: { ...contextFor(snapshot, settings, null), dispatch: doors.dispatch ?? null },
-    // One question is one session. Nothing is carried between them, by design: a fresh
-    // context per question is cheaper and cannot drift (agent-plan.md).
-    sessionId: randomUUID(),
+    // One id for the whole conversation, first turn included: every turn shares the
+    // register as its prefix, and routing them together is what keeps it cached (D66).
+    // A fresh thread — asked for, or gone cold — has a fresh id by then.
+    sessionId: threadId(),
   });
 
   const parsed = parseAnswer(result.text, snapshot);
+  // Remembered only when it answered. A failed turn leaves no trace to be confused by.
+  remember(text, parsed.text);
+
   return {
     question: text,
     ...parsed,
     started: result.uses.filter((use) => use.name === 'dispatch' && !use.failed).map((use) => use.result),
     looked: result.uses.filter((use) => use.name !== 'dispatch').map((use) => use.name),
+    inThread: earlier.length,
     askedAt: new Date().toISOString(),
     sawBranches: Math.min(threads.length, settings.askBranchCap),
     sawGoals: snapshot.goals.length,

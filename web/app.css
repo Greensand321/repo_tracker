@@ -243,6 +243,8 @@ a:hover { color: var(--text-hi); }
 }
 .ask textarea::placeholder { color: var(--muted); font-style: italic; }
 .ask .row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.ask .thread { font-family: var(--mono); font-size: 9.5px; color: var(--faint); border: 1px solid var(--line-2); border-radius: 5px; padding: 2px 7px; }
+.ask .thread:hover { color: var(--now); border-color: #62c9c055; }
 .ask .hint { font-family: var(--mono); font-size: 9.5px; color: var(--faint);
              min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ask .go { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--now); border: 1px solid #62c9c044; border-radius: 6px; padding: 3px 10px; }
@@ -372,13 +374,17 @@ a:hover { color: var(--text-hi); }
 .field.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .field.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .field.nums > div, .field.two > div { min-width: 0; }
+/* These columns are narrow and their labels are not. Tighter tracking keeps each label
+   inside its own cell — they were running into the one beside them. */
+.field.nums label { font-size: 9px; letter-spacing: .07em; gap: 4px; }
 .field.nums.four { grid-template-columns: repeat(4, 1fr); }
+.field.nums.five { grid-template-columns: repeat(5, 1fr); }
 .model-row { display: flex; gap: 8px; align-items: center; }
 .model-row .picker { flex: 1; min-width: 0; }
 .check { display: flex; align-items: center; gap: 8px; margin-top: 11px; }
 .check input { width: auto; accent-color: var(--now); }
 .check label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 12.5px; color: var(--body); font-weight: 400; white-space: normal; }
-@media (max-width: 760px) { .settings-grid { grid-template-columns: 1fr; } .field.nums.four { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 760px) { .settings-grid { grid-template-columns: 1fr; } .field.nums.four, .field.nums.five { grid-template-columns: repeat(2, 1fr); } }
 
 /* The "i": a small ring that opens its note on hover or focus. Pure CSS; no JS, no clicks. */
 .info { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none;

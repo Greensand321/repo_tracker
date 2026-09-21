@@ -16,12 +16,14 @@ const TEMP = mkdtempSync(join(tmpdir(), 'bearing-desk-'));
 process.env['BEARING_DATA_DIR'] = TEMP;
 
 let desk: typeof import('../server/advise/ask.ts');
+let thread: typeof import('../server/advise/conversation.ts');
 let tool: typeof import('../server/tools/desk.ts');
 let goals: typeof import('../server/goals.ts');
 let types: typeof import('../server/tools/types.ts');
 
 before(async () => {
   desk = await import('../server/advise/ask.ts');
+  thread = await import('../server/advise/conversation.ts');
   tool = await import('../server/tools/desk.ts');
   goals = await import('../server/goals.ts');
   types = await import('../server/tools/types.ts');
@@ -32,6 +34,8 @@ afterEach(() => {
   globalThis.fetch = realFetch;
   for (const file of readdirSync(TEMP)) rmSync(join(TEMP, file), { recursive: true, force: true });
   goals.resetGoalCache();
+  // The advisor now remembers between questions (D92); each test starts a fresh thread.
+  thread.forget();
 });
 
 const settings = (over: Partial<Settings> = {}): Settings => ({

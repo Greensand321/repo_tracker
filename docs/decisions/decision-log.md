@@ -622,6 +622,34 @@ A proposed vision drafted at an older head is a stale guess: it is redrafted fir
 judged only then, and if the redraft declines, the old guess is withdrawn rather than left
 standing. The owner's own words are never touched by any of this.
 
+### D92 — The advisor remembers what was said, briefly, and the state is never remembered
+
+Every question was a fresh context, which made "and that one?" unanswerable. Worth
+correcting first: **there is no advisor process to keep alive.** Each question is one
+stateless HTTPS request; nothing exists between them to hold open, and a chatbot is simply
+a transcript resent each turn. So "keep it warm for thirty seconds" and "let it read the
+past conversation" are the same mechanism, and the timer belongs on *what is remembered*.
+
+Recent turns are kept in memory and sent again ahead of the state, bounded three ways,
+and the middle one is why this is safe:
+
+- **Bounded in size.** Six exchanges, each answer trimmed. The whole register already goes
+  into every prompt, and an unbounded transcript grows the bill every turn and eventually
+  crowds out the state it is about.
+- **Never the source of truth.** The snapshot is re-read fresh every turn and the
+  transcript holds only what was *said*; the prompt says outright that the state below it
+  is current and wins where they disagree. Anything that matters belongs in Plane B — a
+  goal, a vision, a note — because a conversation is the worst database there is
+  (`design/agent-shapes.html` ⑤).
+- **It ends.** After `advisorMemoryMinutes` of quiet (default 30, 0 turns it off) the
+  thread is dropped, which is what stops an old tangent steering a new answer. In memory
+  only: closing the program ends the conversation.
+
+One conversation is one provider session, which keeps the shared register prefix cached
+(D66). "New thread" forgets what was said and nothing else. The board that the advisor can
+write to is in the prompt too, so "did that finish?" is answerable from the state rather
+than from memory. This supersedes the no-memory half of D60.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

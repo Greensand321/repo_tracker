@@ -43,6 +43,7 @@ function sanitise(settings: Settings): Settings {
     visionAutoDraft: settings.visionAutoDraft !== false,
     maxOpenQuestions: clamp(settings.maxOpenQuestions, 0, 40, DEFAULT_SETTINGS.maxOpenQuestions),
     briefEveryMinutes: clamp(settings.briefEveryMinutes, 0, 1440, DEFAULT_SETTINGS.briefEveryMinutes),
+    advisorMemoryMinutes: clamp(settings.advisorMemoryMinutes, 0, 1440, DEFAULT_SETTINGS.advisorMemoryMinutes),
     toolsEnabled: settings.toolsEnabled !== false,
     // The worst case for a read is llmMaxPerRun jobs times this plus one, so it is capped
     // well below anything that could run away quietly.
