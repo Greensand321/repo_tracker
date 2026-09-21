@@ -109,6 +109,14 @@ const BRIEF_OK = {
   choices: [{ message: { content: JSON.stringify({ brief: 'All quiet.', goals: [], overtaken: [] }) } }],
 };
 
+/** Already summarised at its head, so a combined job has only the later steps left to do. */
+function summarised(name: string, config: Settings): void {
+  store.putInsight('o/r', name, {
+    title: 'T', summary: 'S', recap: { last: 'S', done: '', open: 'Nothing looks unfinished.' }, progress: 'progressing',
+    meta: { evidence: [], model: config.llmModel, promptVersion: enrich.summariseVersion(config), generatedAt: '2026-09-16T00:00:00Z', headSha: `sha-${name}` },
+  });
+}
+
 const insight = (over: Record<string, unknown> = {}) => ({
   choices: [{ message: { content: JSON.stringify({
     title: 'A real title', summary: 'It does a thing.', progress: 'progressing', evidence: ['abc1234'], ...over,
@@ -127,7 +135,7 @@ test('summaries land on the branches and are cached for next time', async () => 
   assert.equal(snap.llm.pending, 2);
 
   const result = await work.runBoard(snap, settings());
-  assert.equal(result.byKind.summarise, 2);
+  assert.equal(result.byKind.branch, 2);
   assert.equal(calls.summarised(), 2);
   assert.equal(snap.branches[0]!.title, 'A real title');
   assert.equal(snap.branches[0]!.progress, 'progressing');
@@ -138,7 +146,7 @@ test('summaries land on the branches and are cached for next time', async () => 
   assert.equal(again.llm.pending, 0, 'cached summaries should apply for free');
   assert.equal(again.branches[0]!.summary, 'It does a thing.');
   const after = await work.runBoard(again, settings());
-  assert.equal(after.byKind.summarise, undefined, 'nothing to summarise');
+  assert.equal(after.byKind.branch, undefined, 'nothing to summarise');
   assert.equal(calls.summarised(), 2, 'no further summarise calls');
 });
 
@@ -319,7 +327,7 @@ test('a declined vision is recorded, so the question is not asked again every re
   enrich.applyCached(again, config);
   assist.applyAssist(again, config);
   assert.equal(
-    board.deriveBoard(again, config).filter((j) => j.kind === 'draft-vision').length,
+    Number(board.outstandingFor(again.branches[0]!, config).includes('draft-vision')),
     0,
     'no vision job is derived for a branch already declined at this head',
   );
@@ -330,7 +338,7 @@ test('a declined vision is recorded, so the question is not asked again every re
   assist.applyAssist(moved, config);
   moved.branches[0]!.summary = 'It does a thing.';
   assert.equal(
-    board.deriveBoard(moved, config).filter((j) => j.kind === 'draft-vision').length,
+    Number(board.outstandingFor(moved.branches[0]!, config).includes('draft-vision')),
     1,
     'a moved branch is worth asking about again',
   );
@@ -362,12 +370,12 @@ test('jobs say in plain English what they are doing, and the page never sees a c
   enrich.applyCached(snap, config);
 
   const spec = board.deriveBoard(snap, config)[0]!;
-  assert.match(spec.title, /^Reading what claude\/kind-meitner is doing$/);
+  assert.match(spec.title, /^Reading claude\/kind-meitner$/);
 
   const job = board.toJob(spec) as Record<string, unknown>;
   assert.equal(job['run'], undefined);
   assert.equal(job['doneWhen'], undefined);
-  assert.equal(job['kind'], 'summarise');
+  assert.equal(job['kind'], 'branch');
 });
 
 test('the free pass fills the board before anything is spent', () => {
@@ -395,6 +403,8 @@ test('an assessment can look things up, and the floor sees it happen', async () 
 
   // The owner said what it is for, so the assess job is derivable.
   vision.setVision({ repoKey: 'o/r', branch: 'a' }, 'Replace the picker with a searchable one', 'yours');
+  summarised('a', config);
+  summarised('b', config);
 
   const bodies: string[] = [];
   let turn = 0;
@@ -412,7 +422,7 @@ test('an assessment can look things up, and the floor sees it happen', async () 
 
   // Only the assess job: summaries are off and the brief is not what is being tested.
   const onlyAssess = (s: Snapshot, c: Settings) =>
-    board.deriveBoard(s, c).filter((j) => j.kind === 'assess');
+    board.deriveBoard(s, c).filter((j) => j.kind === 'branch');
   assert.equal(onlyAssess(snap, config).length, 1, 'one branch with a vision and no assessment');
 
   const seen: { doing: string | null; toolCalls: number }[] = [];
@@ -438,6 +448,7 @@ test('the same assessment is not re-paid when tools are left alone', async () =>
   const config = settings({ visionAutoDraft: false, toolsEnabled: true });
   const subject = branch('a');
   vision.setVision({ repoKey: 'o/r', branch: 'a' }, 'Replace the picker', 'yours');
+  summarised('a', config);
 
   const calls = stubProvider({ choices: [{ message: { content: '{"verdict":"on-track","because":"yes","evidence":[]}' } }] });
 
@@ -445,7 +456,7 @@ test('the same assessment is not re-paid when tools are left alone', async () =>
   enrich.applyCached(first, config);
   assist.applyAssist(first, config);
   await work.runBoard(first, config, {
-    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'assess'),
+    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'branch'),
   });
   assert.equal(calls.calls, 1);
 
@@ -454,7 +465,7 @@ test('the same assessment is not re-paid when tools are left alone', async () =>
   assist.applyAssist(again, config);
   assert.equal(again.branches[0]!.assessment?.verdict, 'on-track', 'served from disk, free');
   await work.runBoard(again, config, {
-    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'assess'),
+    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'branch'),
   });
   assert.equal(calls.calls, 1, 'nothing moved, nothing spent');
 
@@ -490,7 +501,7 @@ test('a bad API key does not park the fleet, and fixing it resumes the work', as
   enrich.applyCached(snap, settings());
   const result = await work.runBoard(snap, settings());
 
-  assert.equal(result.byKind.summarise, 3, 'all three resume by themselves');
+  assert.equal(result.byKind.branch, 3, 'all three resume by themselves');
   assert.equal(snap.work.jobs.filter((j) => j.state === 'parked').length, 0);
   assert.equal(calls.summarised(), 3);
 });
@@ -534,7 +545,7 @@ test('nothing is left marked in flight once a run is over', async () => {
   assert.equal(after.work.jobs.filter((j) => j.state === 'working').length, 0);
   assert.deepEqual(
     after.work.jobs.map((j) => j.kind).sort(),
-    ['brief', 'summarise'],
+    ['branch', 'brief'],
     'the new branch, and the brief the fleet moving made stale',
   );
 });
@@ -559,6 +570,7 @@ test('the budget counts provider calls, not jobs — lookups come out of it too'
   const config = settings({ visionAutoDraft: false, toolsEnabled: true, llmMaxPerRun: 4 });
   for (const name of ['a', 'b', 'c', 'd']) {
     vision.setVision({ repoKey: 'o/r', branch: name }, `Do the ${name} thing`, 'yours');
+    summarised(name, config);
   }
 
   let calls = 0;
@@ -575,7 +587,7 @@ test('the budget counts provider calls, not jobs — lookups come out of it too'
   enrich.applyCached(snap, config);
   assist.applyAssist(snap, config);
   const result = await work.runBoard(snap, config, {
-    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'assess'),
+    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'branch'),
   });
 
   assert.ok(calls <= 8, `a budget of 4 calls should not have bought ${calls}`);
@@ -599,8 +611,89 @@ test('two workers really do work at once', async () => {
   const snap = snapshot([branch('a'), branch('b'), branch('c'), branch('d')]);
   enrich.applyCached(snap, config);
   await work.runBoard(snap, config, {
-    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'summarise'),
+    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'branch'),
   });
 
   assert.equal(peak, 2, `settings say 2 at once; saw ${peak}`);
+});
+
+// ---------------------------------------------------------------------------
+// One job per branch (D91)
+// ---------------------------------------------------------------------------
+
+/** A stub that speaks every station: summary, draft, verdict — by the prompt it is sent. */
+function stations(draft: unknown): { calls: string[] } {
+  const calls: string[] = [];
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    const body = String(init?.body ?? '');
+    const kind = body.includes('propose what it is FOR') ? 'draft' : body.includes('It is FOR:') ? 'assess' : 'summarise';
+    calls.push(kind);
+    const content =
+      kind === 'draft' ? JSON.stringify(draft)
+      : kind === 'assess' ? '{"verdict":"on-track","because":"matches","evidence":[]}'
+      : JSON.stringify({ title: 'T', last: 'L', done: 'D', open: 'Nothing looks unfinished.', progress: 'progressing', evidence: [] });
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
+  }) as typeof fetch;
+  return { calls };
+}
+
+test('one job reads a branch, says what it is for, and judges it — in that order, before the card changes', async () => {
+  const config = settings({ visionAutoDraft: true, toolsEnabled: false, briefEveryMinutes: 0 });
+  const { calls } = stations({ vision: 'Ship the thing', from: 'its commits' });
+  const snap = snapshot([branch('a')]);
+  enrich.applyCached(snap, config);
+  assist.applyAssist(snap, config);
+
+  const only = (s: Snapshot, c: Settings) => board.deriveBoard(s, c).filter((j) => j.kind === 'branch');
+  assert.equal(only(snap, config).length, 1, 'one job, not three');
+  assert.deepEqual(board.outstandingFor(snap.branches[0]!, config), ['summarise', 'draft-vision']);
+
+  const result = await work.runBoard(snap, config, { derive: only });
+  assert.equal(result.done, 1);
+  assert.deepEqual(calls, ['summarise', 'draft', 'assess']);
+  const b = snap.branches[0]!;
+  assert.equal(b.title, 'T');
+  assert.equal(b.vision?.text, 'Ship the thing');
+  assert.equal(b.assessment?.verdict, 'on-track');
+  assert.deepEqual(board.outstandingFor(b, config), [], 'nothing left');
+});
+
+test('a guess made at an older head is redrafted, not judged against', async () => {
+  const config = settings({ visionAutoDraft: true, toolsEnabled: false });
+  summarised('a', config);
+  vision.setVision({ repoKey: 'o/r', branch: 'a' }, 'An old guess', 'proposed', { draftedAt: 'sha-old' });
+  const { calls } = stations({ vision: 'A fresh guess', from: 'its commits' });
+
+  const snap = snapshot([branch('a')]);
+  enrich.applyCached(snap, config);
+  assist.applyAssist(snap, config);
+  assert.deepEqual(board.outstandingFor(snap.branches[0]!, config), ['draft-vision'], 'redraft first; no verdict on the stale guess');
+
+  await work.runBoard(snap, config, { derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'branch') });
+  assert.deepEqual(calls, ['draft', 'assess']);
+  assert.equal(snap.branches[0]!.vision?.text, 'A fresh guess');
+  assert.equal(snap.branches[0]!.vision?.draftedAt, 'sha-a');
+  assert.equal(snap.branches[0]!.assessment?.verdict, 'on-track', 'judged against the fresh one');
+});
+
+test('a stale guess it can no longer stand behind is withdrawn, and the owner\'s own words never are', async () => {
+  const config = settings({ visionAutoDraft: true, toolsEnabled: false });
+  summarised('a', config);
+  vision.setVision({ repoKey: 'o/r', branch: 'a' }, 'An old guess', 'proposed', { draftedAt: 'sha-old' });
+  const { calls } = stations({ vision: null, why: 'too thin now' });
+
+  const snap = snapshot([branch('a')]);
+  enrich.applyCached(snap, config);
+  assist.applyAssist(snap, config);
+  await work.runBoard(snap, config, { derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'branch') });
+  assert.deepEqual(calls, ['draft'], 'declined, so nothing to judge against');
+  assert.equal(snap.branches[0]!.vision, null, 'the old guess is gone');
+  assert.deepEqual(board.outstandingFor(snap.branches[0]!, config), [], 'and the question is settled at this head');
+
+  // The owner's words are not a guess: they stand, whatever head the branch is at.
+  vision.setVision({ repoKey: 'o/r', branch: 'a' }, 'My words', 'yours');
+  const mine = snapshot([branch('a')]);
+  enrich.applyCached(mine, config);
+  assist.applyAssist(mine, config);
+  assert.deepEqual(board.outstandingFor(mine.branches[0]!, config), ['assess']);
 });

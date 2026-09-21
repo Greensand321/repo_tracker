@@ -222,6 +222,7 @@ export const toolLabel = (name: string): string =>
  */
 export const jobKindLabel = (kind: JobKind): string =>
   ({
+    branch: 'the whole branch',
     summarise: 'summary',
     'draft-vision': 'what it is for',
     assess: 'against its vision',

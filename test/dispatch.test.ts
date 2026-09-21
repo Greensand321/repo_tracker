@@ -104,7 +104,7 @@ test('you can ask for a second opinion on something already answered', async () 
   const first = snapshot([branch('a')]);
   enrich.applyCached(first, config);
   await work.runBoard(first, config, {
-    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'summarise'),
+    derive: (s, c) => board.deriveBoard(s, c).filter((j) => j.kind === 'branch'),
   });
   assert.equal(calls.calls, 1);
   assert.equal(first.branches[0]!.summary, 'First answer.');
@@ -112,7 +112,7 @@ test('you can ask for a second opinion on something already answered', async () 
   // Nothing has changed, so the routine board has nothing to say about this branch.
   const again = snapshot([branch('a')]);
   enrich.applyCached(again, config);
-  assert.equal(board.deriveBoard(again, config).filter((j) => j.kind === 'summarise').length, 0);
+  assert.equal(board.deriveBoard(again, config).filter((j) => j.kind === 'branch').length, 0);
 
   // But asked for, it runs — and the answer is replaced.
   queue.dispatch('summarise', ref);
@@ -190,12 +190,12 @@ test('asking for something supersedes the routine job for the same thing', async
   const snap = snapshot([branch('a')]);
   enrich.applyCached(snap, config);
   work.applyWork(snap, config);
-  assert.equal(snap.work.jobs.filter((j) => j.kind === 'summarise').length, 1);
+  assert.equal(snap.work.jobs.filter((j) => j.kind === 'branch').length, 1);
 
   queue.dispatch('summarise', ref);
   work.applyWork(snap, config);
 
-  const summarising = snap.work.jobs.filter((j) => j.kind === 'summarise');
+  const summarising = snap.work.jobs.filter((j) => j.subject.kind === 'branch' && j.subject.branch === 'a');
   assert.equal(summarising.length, 1, 'one, not two');
   assert.equal(summarising[0]!.origin, 'dispatched', 'and it is the one you asked for');
 });

@@ -39,6 +39,8 @@ const BY_KIND: Record<JobKind, Tool[]> = {
   'draft-vision': [repoReadme, commitFiles, siblingBranches],
   assess: [commitFiles, whatChanged, siblingBranches],
   brief: [],
+  // The combined per-branch job: each step inside asks for its own station's tools.
+  branch: [],
 };
 
 export function toolsFor(kind: JobKind, settings: Settings): Tool[] {

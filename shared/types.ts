@@ -221,7 +221,8 @@ export type Brief = {
 // The board — what the assistant is working on. See docs/plans/workroom.md.
 // ---------------------------------------------------------------------------
 
-export type JobKind = 'summarise' | 'draft-vision' | 'assess' | 'brief';
+/** `branch` is the routine job: all three per-branch stations in one pair of hands (D91). The three by name are what can be asked for on their own. */
+export type JobKind = 'branch' | 'summarise' | 'draft-vision' | 'assess' | 'brief';
 
 /**
  * `waiting` is on the board, `working` is claimed, `parked` failed twice and needs you.

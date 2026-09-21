@@ -127,54 +127,34 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings, now = new Da
     (a, b) => Date.parse(b.lastActivity ?? '0') - Date.parse(a.lastActivity ?? '0'),
   );
 
+  // One job per branch, one worker, one session (D91): read it, say what it is for, judge
+  // it, in that order, and write all three before the card changes. Three separate jobs
+  // used to fill the card in pieces across passes — and judged a branch against a guess
+  // drafted at an older head. The steps inside are the same stations as before; only
+  // who runs them changed. A step that is already done is skipped, so a job that ran out
+  // of budget half-way carries on from where it got to on the next read.
   for (const branch of branches) {
-    if (worthSummarising(branch) && !isSummarised(branch, settings)) {
-      jobs.push(
-        forBranch(
-          'summarise',
-          branch,
-          `Reading what ${branch.name} is doing`,
-          settings,
-          (handle) => summariseBranch(branch, snapshot, settings, handle),
-          () => isSummarised(branch, settings),
-        ),
-      );
-    }
-  }
+    if (branch.isBase || branch.commits.length === 0) continue;
+    const todo = outstandingFor(branch, settings);
+    if (todo.length === 0) continue;
 
-  if (settings.visionAutoDraft) {
-    for (const branch of branches) {
-      if (worthAVision(branch) && branch.summary !== null && !isDescribed(branch, settings)) {
-        jobs.push(
-          forBranch(
-            'draft-vision',
-            branch,
-            `Working out what ${branch.name} is for`,
-            settings,
-            (handle) => draftFor(branch, snapshot, settings, handle),
-            () => isDescribed(branch, settings),
-          ),
-        );
-      }
-    }
-  }
-
-  for (const branch of branches) {
-    // A vision and nothing to compare it against is not a job: the verdict on a branch with
-    // no commits is a guess dressed as a finding, and "drifted" on a merged, empty compare
-    // was exactly that.
-    if (!branch.isBase && branch.vision !== null && branch.commits.length > 0 && !isAssessed(branch, settings)) {
-      jobs.push(
-        forBranch(
-          'assess',
-          branch,
-          `Checking ${branch.name} against what it is for`,
-          settings,
-          (handle) => assessFor(branch, snapshot, settings, handle),
-          () => isAssessed(branch, settings),
-        ),
-      );
-    }
+    jobs.push({
+      stage: 0,
+      reserve: reserveFor(branch, settings),
+      id: jobId('branch', branch),
+      kind: 'branch',
+      title: `Reading ${branch.name}`,
+      subject: { kind: 'branch', repoKey: branch.repoKey, branch: branch.name },
+      origin: 'routine',
+      state: 'waiting',
+      startedAt: null,
+      attempts: 0,
+      toolCalls: 0,
+      doing: null,
+      error: null,
+      run: (handle) => readBranch(branch, snapshot, settings, handle),
+      doneWhen: () => outstandingFor(branch, settings).length === 0,
+    });
   }
 
   // The brief reads every branch, every vision and every verdict, so it is worth nothing
@@ -204,6 +184,40 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings, now = new Da
   }
 
   return jobs;
+}
+
+type Step = 'summarise' | 'draft-vision' | 'assess';
+
+/** The assistant's own guess, made at a head the branch has since left. Withdrawn, not judged against. */
+function staleGuess(branch: Branch): boolean {
+  return branch.vision?.state === 'proposed' && branch.vision.draftedAt !== null && branch.vision.draftedAt !== branch.headSha;
+}
+
+/** Which of the three steps this branch still needs, in the order they run. */
+export function outstandingFor(branch: Branch, settings: Settings): Step[] {
+  const steps: Step[] = [];
+  if (worthSummarising(branch) && !isSummarised(branch, settings)) steps.push('summarise');
+  const wantsDraft =
+    settings.visionAutoDraft && worthAVision(branch) && (staleGuess(branch) || !isDescribed(branch, settings));
+  if (wantsDraft) steps.push('draft-vision');
+  // Judged only against a vision that stands at this head: the owner's words, or a guess
+  // made here. A stale guess is redrafted first, above, and then judged.
+  if (branch.vision !== null && !staleGuess(branch) && !isAssessed(branch, settings)) steps.push('assess');
+  return steps;
+}
+
+function reserveFor(branch: Branch, settings: Settings): number {
+  return outstandingFor(branch, settings).reduce(
+    (n, step) => n + (toolsFor(step, settings).length > 0 ? 2 : 1),
+    0,
+  );
+}
+
+/** The three stations in one pair of hands. Each step re-checks, because the last one changed the branch. */
+async function readBranch(branch: Branch, snapshot: Snapshot, settings: Settings, handle: RunHandle): Promise<void> {
+  if (outstandingFor(branch, settings).includes('summarise')) await summariseBranch(branch, snapshot, settings, handle);
+  if (outstandingFor(branch, settings).includes('draft-vision')) await draftFor(branch, snapshot, settings, handle);
+  if (outstandingFor(branch, settings).includes('assess')) await assessFor(branch, snapshot, settings, handle);
 }
 
 /** What reaches the page: the job without the two server-only closures. */

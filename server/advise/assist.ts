@@ -18,6 +18,7 @@ import { DATA_DIR } from '../paths.ts';
 import { contextFor } from '../tools/context.ts';
 import {
   applyVisions,
+  clearVision,
   getAssessment,
   putAssessment,
   recordDecline,
@@ -145,6 +146,14 @@ export async function draftFor(
     // specific" was true of the commit messages alone, and a station since given the
     // README deserves to be asked again.
     recordDecline(ref, branch.headSha, draftVersion(settings));
+    // Its own earlier guess, made at a head the branch has left, is withdrawn rather than
+    // left standing to be judged against. The owner's words are never touched here.
+    if (branch.vision?.state === 'proposed') {
+      clearVision(ref);
+      recordDecline(ref, branch.headSha, draftVersion(settings));
+      branch.vision = null;
+      branch.assessment = null;
+    }
     return;
   }
 

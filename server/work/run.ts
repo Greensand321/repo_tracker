@@ -176,10 +176,11 @@ export function applyWork(snapshot: Snapshot, settings: Settings): void {
  */
 function allSpecs(snapshot: Snapshot, settings: Settings): JobSpec[] {
   const asked = deriveDispatched(snapshot, settings);
-  const superseded = new Set(asked.map((spec) => `${spec.kind}:${subjectKey(spec.subject)}`));
-  const routine = deriveBoard(snapshot, settings).filter(
-    (spec) => !superseded.has(`${spec.kind}:${subjectKey(spec.subject)}`),
-  );
+  // By subject, not by kind: the routine job reads a whole branch (D91), and asking for
+  // one step of it must not leave the whole running beside it, both writing the same
+  // summary. When the ask lands the routine job is derived again with that step done.
+  const superseded = new Set(asked.map((spec) => subjectKey(spec.subject)));
+  const routine = deriveBoard(snapshot, settings).filter((spec) => !superseded.has(subjectKey(spec.subject)));
   return [...asked, ...routine];
 }
 

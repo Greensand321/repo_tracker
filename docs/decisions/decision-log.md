@@ -604,6 +604,24 @@ goal" — and never which branch; the branches each part rests on come back sepa
 sit under it as chips, where one click puts the name in the search box. Rule 6 holds: the
 literal name is always shown, beside the prose rather than inside it.
 
+### D91 — One job per branch, and a stale guess is redrafted before it is judged
+
+The three per-branch stations were three jobs, queued behind one another across passes,
+so a branch's card filled in pieces: title, then purpose a minute later, then verdict. And
+the assessment step took whatever vision was there — including the assistant's own guess
+drafted at a head the branch had since left, which is how a branch got "drifted" against a
+purpose that described a different piece of work.
+
+So the routine job is the branch: one worker, one session, read it, say what it is for,
+judge it, in that order, writing all three before the card changes. The stations inside
+are unchanged and still askable on their own. Each step re-checks before it runs, so a job
+that ran out of budget half-way carries on from where it got to. A dispatched ask
+supersedes the routine job by subject, not by step.
+
+A proposed vision drafted at an older head is a stale guess: it is redrafted first and
+judged only then, and if the redraft declines, the old guess is withdrawn rather than left
+standing. The owner's own words are never touched by any of this.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

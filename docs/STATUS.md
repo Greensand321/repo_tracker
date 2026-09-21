@@ -169,7 +169,7 @@ recommendation there was D6; the owner chose D4 and the reasons are in D57.
 | **Stage 1** | Built. Every branch across your repos, with its real commit history, PR and CI state. ETag change detection; a repo that has not moved costs nothing. |
 | **Stage 2 engine** | Built. Per-branch plain-English title, summary, and progress judgement, cached so an idle branch is never re-summarised. |
 | **Stage 2 surfaces** | Deliberately not built — the comment tool, the chat panel, and "what changed since I last looked" all wait for the real design. |
-| Tests | 282, no network. Recorded GitHub fixtures and a stubbed provider. |
+| Tests | 287, no network. Recorded GitHub fixtures and a stubbed provider. |
 
 ## Try it without the GUI
 
@@ -292,6 +292,7 @@ Then, in whatever order they earn it:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 21 Sep 2026 | **One job per branch**: read, describe, judge in one pair of hands, so the card fills in at once; a guess drafted at an older head is redrafted before it is judged. D91 |
 | 21 Sep 2026 | **The brief has no branch names in it**: the branches a part rests on sit under it as chips; a click finds the task. D90 |
 | 21 Sep 2026 | **Merged branches had no history** — an empty compare read as "nothing of its own", and was judged anyway. The PR's commits are read instead. The summary became a recap (last / done / open) and the brief three parts (done / next / now); every prompt at v2. D89 |
 | 21 Sep 2026 | **First real run** parked every assessment and the brief on "the model returned an empty reply": a reasoning model exhausting per-station caps of 350 and 1200 tokens. One reply allowance in settings, a cut-off reply retried once with double the room, and the error names the cause. D88 |
