@@ -271,6 +271,7 @@ Then, in whatever order they earn it:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 21 Sep 2026 | **Settings rebuilt**: two columns, GitHub and the advisor, fitting a laptop screen without scrolling; every explanation moved behind an ⓘ that opens on hover or focus |
 | 21 Sep 2026 | **The workroom, step 6 — the desk**, a review of the room, and the persistence bugs that were re-paying for summaries: pruning against a failed read, torn files treated as empty, the brief rewritten every read. D84–D87 |
 | 18 Sep 2026 | **The workroom, step 5**: you can ask for a second opinion, in its own lane, surviving a restart. Work asked for is decided by freshness rather than by what is missing. D81–D83 |
 | 18 Sep 2026 | **The workroom, step 4**: `repo_readme` and `commit_files` — fetched on demand, cached for ever, and wired into summarise, draft-vision and assess. A tool gets a reader, never the token. D79, D80 |

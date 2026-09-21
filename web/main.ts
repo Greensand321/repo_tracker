@@ -780,12 +780,13 @@ function ensureModelPicker(): Picker {
 function applyProviderChoice(): void {
   const provider = $<HTMLSelectElement>('#llmProvider');
   const custom = provider.value === 'custom';
-  $('#llmBaseUrl').classList.toggle('hidden', !custom);
+  $('#endpointField').classList.toggle('hidden', !custom);
   if (!custom) $<HTMLInputElement>('#llmBaseUrl').value = provider.value;
-  $('#providerHint').textContent = custom
-    ? 'Any endpoint that speaks the OpenAI, Anthropic or Responses API.'
+  // The note behind the provider's "i" says what the choice means; the field itself stays quiet.
+  $('#providerHint').dataset['tip'] = custom
+    ? 'Any endpoint that speaks the OpenAI, Anthropic or Responses API. Paste its base URL below.'
     : provider.value.includes('/go/')
-      ? 'The subscription plan. A different base URL from pay-as-you-go — using the wrong one reports an empty balance.'
+      ? 'The $10/month subscription. A different base URL from pay-as-you-go — the wrong one reports an empty balance.'
       : 'Pay as you go. Needs a balance on your Zen account.';
 }
 
