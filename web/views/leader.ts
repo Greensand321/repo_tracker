@@ -51,12 +51,20 @@ export function renderBrief(snapshot: Snapshot): string {
   const stale = snapshot.brief.stale ? ' · the fleet has moved since' : '';
   // Three parts when it was written in three (D89): done, next, now. The three questions
   // the brief exists to answer, each findable without reading the others.
+  // The sentences carry no branch names (D90). The branches a part rests on sit under it
+  // as chips — identifiers beside the prose, not inside it — and a click finds the task.
   const parts = snapshot.brief.parts;
+  const refs = (list: BranchRef[] | undefined): string =>
+    list && list.length > 0
+      ? `<span class="refs">${list.map((r) => `<button class="ref" data-find="${esc(r.branch)}" title="${esc(r.repoKey)} — find it in the list">${esc(r.branch)}</button>`).join('')}</span>`
+      : '';
+  const part = (k: string, text: string, list: BranchRef[] | undefined): string =>
+    text ? `<div class="fn"><span class="k">${k}</span><span class="v">${esc(text)}${refs(list)}</span></div>` : '';
   const body = parts
     ? `<div class="brief-parts">
-        ${parts.done ? `<div class="fn"><span class="k">Done</span><span class="v">${esc(parts.done)}</span></div>` : ''}
-        ${parts.next ? `<div class="fn"><span class="k">Next</span><span class="v">${esc(parts.next)}</span></div>` : ''}
-        ${parts.now ? `<div class="fn"><span class="k">Now</span><span class="v">${esc(parts.now)}</span></div>` : ''}
+        ${part('Done', parts.done, parts.refs?.done)}
+        ${part('Next', parts.next, parts.refs?.next)}
+        ${part('Now', parts.now, parts.refs?.now)}
       </div>`
     : `<div class="brief-text">${esc(snapshot.brief.text)}</div>`;
   return `

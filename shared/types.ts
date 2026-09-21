@@ -171,12 +171,17 @@ export type Assessment = {
 // ---------------------------------------------------------------------------
 
 export type BriefParts = {
-  /** What has landed or looks finished: which goals, which branches. */
+  /** What has landed or looks finished. Prose, with no branch names in it. */
   done: string;
   /** What still needs doing, leading with the thing most in the way. */
   next: string;
-  /** What is actually going on: what moved most recently and what each is mid-way through. */
+  /** What is actually going on: what moved most recently and what it is mid-way through. */
   now: string;
+  /**
+   * The branches each part rests on, kept out of the sentences (D90). Branch names are
+   * identifiers, not prose; they sit beside the text as chips, where one click finds the task.
+   */
+  refs: { done: BranchRef[]; next: BranchRef[]; now: BranchRef[] };
 };
 
 export type GoalState = 'progressing' | 'at-risk' | 'stalled' | 'looks-done' | 'needs-you';

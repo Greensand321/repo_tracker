@@ -465,6 +465,9 @@ a:hover { color: var(--text-hi); }
 .mrow .tt.open { font-family: var(--sans); font-size: 12px; color: #d8a54a; opacity: .85; margin-top: 3px; }
 .brief-parts { margin-top: 6px; max-width: 80ch; }
 .brief-parts .fn .v { font-family: var(--serif); font-size: 15px; line-height: 1.55; color: var(--text-hi); }
+.brief-parts .refs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.brief-parts .ref { font-family: var(--mono); font-size: 9.5px; color: var(--muted); border: 1px solid var(--line-2); border-radius: 5px; padding: 1px 6px; }
+.brief-parts .ref:hover { color: var(--now); border-color: #62c9c055; }
 .proposed {
   font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em; color: var(--faint);
   border: 1px solid var(--line-2); border-radius: 5px; padding: 1px 6px; white-space: nowrap;

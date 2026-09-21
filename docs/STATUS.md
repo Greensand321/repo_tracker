@@ -292,6 +292,7 @@ Then, in whatever order they earn it:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 21 Sep 2026 | **The brief has no branch names in it**: the branches a part rests on sit under it as chips; a click finds the task. D90 |
 | 21 Sep 2026 | **Merged branches had no history** — an empty compare read as "nothing of its own", and was judged anyway. The PR's commits are read instead. The summary became a recap (last / done / open) and the brief three parts (done / next / now); every prompt at v2. D89 |
 | 21 Sep 2026 | **First real run** parked every assessment and the brief on "the model returned an empty reply": a reasoning model exhausting per-station caps of 350 and 1200 tokens. One reply allowance in settings, a cut-off reply retried once with double the room, and the error names the cause. D88 |
 | 21 Sep 2026 | **Settings rebuilt**: two columns, GitHub and the advisor, fitting a laptop screen without scrolling; every explanation moved behind an ⓘ that opens on hover or focus |

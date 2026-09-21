@@ -920,6 +920,17 @@ function wire(): void {
       return;
     }
 
+    // A branch chip beside the brief: put the name in the search box, which is what "find
+    // the task" means on this page.
+    const find = target.closest<HTMLElement>('[data-find]');
+    if (find) {
+      state.search = find.dataset['find'] ?? '';
+      render();
+      const box = document.querySelector<HTMLInputElement>('#search');
+      if (box) { box.value = state.search; box.focus(); }
+      return;
+    }
+
     const retry = target.closest<HTMLElement>('[data-retry]');
     if (retry) { void retryJob(retry.dataset['retry'] ?? ''); return; }
 
