@@ -54,7 +54,7 @@ function branch(name: string, over: Partial<Branch> = {}): Branch {
     title: null,
     summary: null,
     progress: null,
-    insight: null,
+    insight: null, recap: null, commitsFrom: 'ahead',
     ...over,
   };
 }
@@ -412,4 +412,20 @@ test('the brief key knows which branches are under a goal, not only how many', (
   const before = briefKey({ ...snap([branch('a'), branch('b')]), goals: [goal('g1', ['a']), goal('g2', ['b'])] }, settings);
   const after = briefKey({ ...snap([branch('a'), branch('b')]), goals: [goal('g1', ['b']), goal('g2', ['a'])] }, settings);
   assert.notEqual(before, after);
+});
+
+test('the brief comes back in three parts, and as one text for anything that reads it whole', () => {
+  const r = parseBrief(
+    JSON.stringify({ done: 'Webhooks landed.', next: 'Fix the red CI on a.', now: 'b is mid-refactor.', goals: [], overtaken: [] }),
+    snap([branch('a'), branch('b')]),
+    settings,
+  );
+  assert.deepEqual(r.parts, { done: 'Webhooks landed.', next: 'Fix the red CI on a.', now: 'b is mid-refactor.' });
+  assert.equal(r.brief, 'Webhooks landed. Fix the red CI on a. b is mid-refactor.');
+});
+
+test('a brief in the old single-paragraph shape still reads', () => {
+  const r = parseBrief(JSON.stringify({ brief: 'All quiet.', goals: [], overtaken: [] }), snap([branch('a')]), settings);
+  assert.equal(r.brief, 'All quiet.');
+  assert.equal(r.parts, null);
 });

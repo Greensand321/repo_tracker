@@ -9,13 +9,15 @@
 
 import { join } from 'node:path';
 
-import { repoOfKey, type InsightMeta, type Progress } from '../../shared/types.ts';
+import { repoOfKey, type InsightMeta, type Progress, type Recap } from '../../shared/types.ts';
 import { readJson, writeJson } from '../jsonfile.ts';
 import { DATA_DIR } from '../paths.ts';
 
 export type StoredInsight = {
   title: string;
   summary: string;
+  /** Absent only in a file written before v2, which the version check retires anyway. */
+  recap?: Recap;
   progress: Progress;
   meta: InsightMeta;
 };

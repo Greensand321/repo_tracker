@@ -12,7 +12,7 @@
 
 import { join } from 'node:path';
 
-import { type Assessment, type Branch, type BranchRef, type Settings, type Snapshot } from '../../shared/types.ts';
+import { type Assessment, type Branch, type BranchRef, type BriefParts, type Settings, type Snapshot } from '../../shared/types.ts';
 import { readJson, writeJson } from '../jsonfile.ts';
 import { DATA_DIR } from '../paths.ts';
 import { contextFor } from '../tools/context.ts';
@@ -35,6 +35,8 @@ import { VISION_PROMPT_VERSION, assessBranch, assessVersion, draftVersion, draft
 type Stored = {
   key: string;
   brief: string;
+  /** The three parts (D89). Absent in a file written before v2. */
+  parts?: BriefParts | null;
   generatedAt: string;
   model: string;
   judgements: Record<string, BriefResult['judgements'] extends Map<string, infer V> ? V : never>;
@@ -93,6 +95,7 @@ export function applyAssist(snapshot: Snapshot, settings: Settings): void {
 
   snapshot.brief = {
     text: stored.brief,
+    parts: stored.parts ?? null,
     generatedAt: stored.generatedAt,
     model: stored.model,
     promptVersion: BRIEF_PROMPT_VERSION,
@@ -231,6 +234,7 @@ export async function writeTheBrief(
   saveStored({
     key,
     brief: written.brief,
+    parts: written.parts,
     generatedAt: new Date().toISOString(),
     model: settings.llmModel,
     judgements: Object.fromEntries(written.judgements),

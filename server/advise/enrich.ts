@@ -90,6 +90,7 @@ export async function summariseBranch(
   const stored: StoredInsight = {
     title: insight.title,
     summary: insight.summary,
+    recap: insight.recap,
     progress: insight.progress,
     meta: {
       evidence: insight.evidence,
@@ -123,6 +124,7 @@ export function worthSummarising(branch: Branch): boolean {
 function assign(branch: Branch, stored: StoredInsight): void {
   branch.title = stored.title;
   branch.summary = stored.summary;
+  branch.recap = stored.recap ?? null;
   branch.progress = stored.progress;
   branch.insight = stored.meta;
 }

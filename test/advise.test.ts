@@ -51,7 +51,7 @@ function branch(overrides: Partial<Branch> = {}): Branch {
     title: null,
     summary: null,
     progress: null,
-    insight: null,
+    insight: null, recap: null, commitsFrom: 'ahead',
     ...overrides,
   };
 }
@@ -181,4 +181,45 @@ test('extractJson finds the outermost object', () => {
   assert.equal(extractJson('junk {"a": {"b": 1}} junk'), '{"a": {"b": 1}}');
   assert.equal(extractJson('no braces here'), null);
   assert.equal(extractJson('} backwards {'), null);
+});
+
+// --- v2: the recap — last / done / open -------------------------------------
+
+test('the recap carries what it did last, what landed, and what is open', () => {
+  const insight = parseInsight(
+    JSON.stringify({
+      title: 'Stopping duplicate webhook charges',
+      last: 'Wiring the dedupe table into the handler.',
+      done: 'Signature verification is merged and green.',
+      open: 'The idempotency test exists with no implementation behind it yet.',
+      progress: 'progressing',
+      evidence: ['abc1234'],
+    }),
+    branch(),
+  );
+  assert.equal(insight.recap.last, 'Wiring the dedupe table into the handler.');
+  assert.equal(insight.recap.done, 'Signature verification is merged and green.');
+  assert.match(insight.recap.open, /no implementation/);
+  assert.equal(insight.summary, `${insight.recap.last} ${insight.recap.open}`, 'the gist is last plus what is open');
+});
+
+test('when nothing is open the gist is just what it did last', () => {
+  const insight = parseInsight(
+    JSON.stringify({ title: 'T', last: 'Shipped it.', done: 'All of it.', open: 'Nothing looks unfinished.', progress: 'done', evidence: [] }),
+    branch(),
+  );
+  assert.equal(insight.summary, 'Shipped it.');
+  assert.equal(insight.recap.open, 'Nothing looks unfinished.');
+});
+
+test('the old one-paragraph shape is still read, as the last line', () => {
+  const insight = parseInsight(reply(), branch());
+  assert.equal(insight.recap.last, insight.summary);
+  assert.equal(insight.recap.done, '');
+});
+
+test('a merged branch is told its commits are its own, so 0 ahead is not a contradiction', () => {
+  const prompt = buildUserPrompt(branch({ commitsFrom: 'pull', ahead: 0 }), NOW);
+  assert.match(prompt, /recorded on its pull request/);
+  assert.doesNotMatch(buildUserPrompt(branch(), NOW), /recorded on its pull request/);
 });

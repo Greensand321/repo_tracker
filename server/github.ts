@@ -11,6 +11,7 @@ import type {
   GhBranch,
   GhCi,
   GhCombinedStatus,
+  GhCommit,
   GhCommitDetail,
   GhCompare,
   GhPull,
@@ -194,6 +195,19 @@ export async function fetchCompare(
     { token, repo: key },
   );
   return (await res.json()) as GhCompare;
+}
+
+/**
+ * A pull request's own commits, oldest first, the same shape the compare returns.
+ *
+ * Once a branch has been merged with a merge commit, the base contains every one of its
+ * commits and the compare against it comes back empty — for exactly the branches whose
+ * history is most worth having (D89). The pull request remembers what the branch did.
+ * GitHub caps this at 250 commits; `getAll` walks the pages.
+ */
+export async function fetchPullCommits(key: string, token: string, number: number): Promise<GhCommit[]> {
+  const { owner, name } = splitRepoKey(key);
+  return getAll<GhCommit>(`/repos/${owner}/${name}/pulls/${number}/commits`, { token, repo: key });
 }
 
 /**

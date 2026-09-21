@@ -69,7 +69,7 @@ function branch(name: string, over: Partial<Branch> = {}): Branch {
     ahead: 2, behind: 0, lastActivity: '2026-09-15T00:00:00Z',
     diff: { files: 1, additions: 1, deletions: 0 }, activity: ['2026-09-15'],
     pr: null, ci: { state: 'none', url: null }, relevance: 'active', isBase: false, goalId: null,
-    vision: null, assessment: null, title: null, summary: null, progress: null, insight: null, ...over,
+    vision: null, assessment: null, title: null, summary: null, progress: null, insight: null, recap: null, commitsFrom: 'ahead', ...over,
   };
 }
 
@@ -421,4 +421,15 @@ test('the door refuses what the board would only drop', () => {
   assert.equal(board.cannotAsk('draft-vision', branch('a', { vision: { ...mine, state: 'proposed' } })), null);
   assert.equal(board.cannotAsk('assess', branch('a', { vision: mine })), null);
   assert.equal(board.cannotAsk('brief', base), null);
+});
+
+test('a branch with nothing to compare is never assessed, routine or asked for', () => {
+  // "drifted" on a merged branch with an empty compare was a guess dressed as a finding.
+  const mine = { text: 'Ship X', state: 'yours' as const, from: '', draftedAt: null, createdAt: 'x', updatedAt: 'x' };
+  const empty = branch('a', { commits: [], vision: mine });
+  assert.equal(board.deriveBoard(snapshot([empty]), settings()).filter((j) => j.kind === 'assess').length, 0);
+  queue.dispatch('assess', ref);
+  assert.deepEqual(board.deriveDispatched(snapshot([empty]), settings()), []);
+  assert.deepEqual(queue.listDispatched(), [], 'and the request is cleared');
+  assert.match(board.cannotAsk('assess', empty) ?? '', /no commits/);
 });

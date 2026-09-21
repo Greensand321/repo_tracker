@@ -140,6 +140,7 @@ export function matches(branch: Branch, needle: string): boolean {
     branch.repoKey.toLowerCase().includes(q) ||
     (branch.title ?? '').toLowerCase().includes(q) ||
     (branch.summary ?? '').toLowerCase().includes(q) ||
+    (branch.recap?.done ?? '').toLowerCase().includes(q) ||
     (branch.pr?.title ?? '').toLowerCase().includes(q) ||
     branch.commits.some((c) => c.message.toLowerCase().includes(q))
   );

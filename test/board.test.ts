@@ -70,7 +70,7 @@ function branch(name: string, over: Partial<Branch> = {}): Branch {
     ahead: 3, behind: 0, lastActivity: '2026-09-15T00:00:00Z',
     diff: { files: 1, additions: 1, deletions: 0 }, activity: ['2026-09-15'],
     pr: null, ci: { state: 'none', url: null }, relevance: 'active', isBase: false, goalId: null, vision: null, assessment: null,
-    title: null, summary: null, progress: null, insight: null, ...over,
+    title: null, summary: null, progress: null, insight: null, recap: null, commitsFrom: 'ahead', ...over,
   };
 }
 

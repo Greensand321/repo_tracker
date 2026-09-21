@@ -9,6 +9,7 @@
  */
 
 import { refKey, type Branch, type BranchRef, type Goal, type Snapshot } from '../../shared/types.ts';
+import { NOTHING_OPEN } from '../../server/advise/prompt.ts';
 import { esc, relativeTime } from '../format.ts';
 import { byRecency, glyph, groupByGoal, headline, matches, nowThread, threads, toolLabel, verdictChip, verdictLabel, visionLine } from '../derive.ts';
 
@@ -37,7 +38,7 @@ export const shortRepo = (key: string): string => key.split('/')[1] ?? key;
 // ---------------------------------------------------------------------------
 
 export function renderBrief(snapshot: Snapshot): string {
-  if (!snapshot.brief || !snapshot.brief.text) {
+  if (!snapshot.brief || (!snapshot.brief.text && !snapshot.brief.parts)) {
     // Said plainly rather than shown as an empty space. Nothing here is faked while the
     // assistant is still reading, or while it is switched off.
     const why = snapshot.llm.enabled
@@ -48,9 +49,19 @@ export function renderBrief(snapshot: Snapshot): string {
   // Dated, and honest when the fleet has moved since: the routine rewrite waits its
   // interval, and a brief from ten minutes ago beats a blank space for those ten minutes.
   const stale = snapshot.brief.stale ? ' · the fleet has moved since' : '';
+  // Three parts when it was written in three (D89): done, next, now. The three questions
+  // the brief exists to answer, each findable without reading the others.
+  const parts = snapshot.brief.parts;
+  const body = parts
+    ? `<div class="brief-parts">
+        ${parts.done ? `<div class="fn"><span class="k">Done</span><span class="v">${esc(parts.done)}</span></div>` : ''}
+        ${parts.next ? `<div class="fn"><span class="k">Next</span><span class="v">${esc(parts.next)}</span></div>` : ''}
+        ${parts.now ? `<div class="fn"><span class="k">Now</span><span class="v">${esc(parts.now)}</span></div>` : ''}
+      </div>`
+    : `<div class="brief-text">${esc(snapshot.brief.text)}</div>`;
   return `
     <div class="eyebrow">The brief</div>
-    <div class="brief-text">${esc(snapshot.brief.text)}</div>
+    ${body}
     <div class="brief-prov">${esc(snapshot.brief.model)} · ${relativeTime(snapshot.brief.generatedAt)}${stale}
       <button class="link" data-ask="brief">write it again</button></div>`;
 }
@@ -105,24 +116,35 @@ export function forNow(branch: Branch): string {
             title="Have the assistant look at the repo and the commits and propose one">have a go</button></span></div>`,
   );
 
+  // Asking again is the only thing you can do about an answer you disagree with: the
+  // branch has not moved, so nothing on its own will ever regenerate this (D81).
+  const readAgain = `<button class="link" data-ask="summarise" data-on="${esc(branchKey(branch))}">read it again</button>`;
+
+  // The note you pick the work back up from (D89): what it did last, what landed, and
+  // what looks half-finished — the last of those in amber, because it is the line that
+  // decides what you do next.
+  if (branch.recap) {
+    const nothing = NOTHING_OPEN.test(branch.recap.open);
+    out.push(`<div class="fn"><span class="k">Last</span><span class="v">${esc(branch.recap.last)}</span></div>`);
+    if (branch.recap.done) out.push(`<div class="fn"><span class="k">Done</span><span class="v">${esc(branch.recap.done)}</span></div>`);
+    if (branch.recap.open) {
+      out.push(`<div class="fn"><span class="k">Open</span><span class="v ${nothing ? 'unsaid' : 'open'}">${esc(branch.recap.open)} ${readAgain}</span></div>`);
+    }
+  } else if (branch.summary && !branch.assessment) {
+    out.push(`<div class="fn"><span class="k">Now</span><span class="v">${esc(branch.summary)} ${readAgain}</span></div>`);
+  }
+
   // What it checked before deciding, when it checked anything. A verdict drawn from the
   // branches next to this one is worth more than one drawn from commit subjects, and that
   // difference should be visible rather than inferred.
-  const looked = branch.assessment?.looked?.length
-    ? ` <span class="looked">${esc(lookedWords(branch.assessment.looked))}</span>`
-    : '';
-  const now = branch.assessment
-    ? `<span class="verdict v-${branch.assessment.verdict}">${verdictLabel(branch.assessment.verdict)}</span> ${esc(branch.assessment.because)}${looked}`
-    : branch.summary
-      ? esc(branch.summary)
+  if (branch.assessment) {
+    const looked = branch.assessment.looked?.length
+      ? ` <span class="looked">${esc(lookedWords(branch.assessment.looked))}</span>`
       : '';
-  if (now) {
-    // Asking again is the only thing you can do about an answer you disagree with: the
-    // branch has not moved, so nothing on its own will ever regenerate this (D81).
-    const again = branch.assessment
-      ? `<button class="link" data-ask="assess" data-on="${esc(branchKey(branch))}">check it again</button>`
-      : `<button class="link" data-ask="summarise" data-on="${esc(branchKey(branch))}">read it again</button>`;
-    out.push(`<div class="fn"><span class="k">Now</span><span class="v">${now} ${again}</span></div>`);
+    const again = `<button class="link" data-ask="assess" data-on="${esc(branchKey(branch))}">check it again</button>`;
+    out.push(
+      `<div class="fn"><span class="k">Now</span><span class="v"><span class="verdict v-${branch.assessment.verdict}">${verdictLabel(branch.assessment.verdict)}</span> ${esc(branch.assessment.because)}${looked} ${again}</span></div>`,
+    );
   }
 
   return `<div class="fornow">${out.join('')}</div>`;
@@ -237,11 +259,15 @@ function unfiledItem(branches: Branch[]): string {
 
 function memberRow(branch: Branch): string {
   const head = headline(branch);
+  // The one line from the recap that changes what you do: what is still open. Shown here,
+  // in the compact view, only when something is.
+  const open = branch.recap?.open && !NOTHING_OPEN.test(branch.recap.open) ? branch.recap.open : '';
   return `<div class="mrow">
     <span class="g">${glyph(branch)}</span>
     <span style="min-width:0">
       <span class="nm"><span class="repo">${esc(shortRepo(branch.repoKey))} /</span> ${esc(branch.name)}</span>
       <span class="tt">${esc(head.text)}</span>
+      ${open ? `<span class="tt open">${esc(open)}</span>` : ''}
     </span>
     <span class="num"><span class="up">&#8593;${branch.ahead}</span> <span class="down">&#8595;${branch.behind}</span></span>
     <span class="chips">${chips(branch)}</span>
