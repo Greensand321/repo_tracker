@@ -98,6 +98,40 @@ button{font:inherit;background:none;border:0;color:inherit;cursor:pointer}
 .verdict.v-drifted{color:var(--warn)}.verdict.v-unclear{color:var(--muted)}
 .looked{font-family:var(--mono);font-size:9.5px;color:var(--faint)}
 
+/* N6 — the line. The headline above already says what the work is, so the band only
+   says where it stands, in the fewest words that are true. */
+.rev{padding:26px 0 8px;border-bottom:1px solid var(--line)}
+.rev .lede{max-width:74ch;font-size:14px;color:var(--body);line-height:1.7;margin:10px 0 4px}
+.rev .lede b{color:var(--text-hi);font-weight:500}
+.rev .lede em{font-family:var(--serif);color:var(--note);font-style:italic}
+.cases{margin-top:22px}
+.case{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:26px;align-items:start;
+  padding:15px 0;border-top:1px solid var(--line)}
+.case .mini{border-left:2px solid var(--now);padding-left:16px}
+.case .mini.off{border-left-color:var(--line-3)}
+.case .ttl{font-family:var(--serif);font-size:16px;color:var(--text-hi);line-height:1.3;font-weight:600}
+.case .ttl .raw{font-family:var(--mono);font-size:13px;color:var(--text)}
+.case .line{font-family:var(--serif);font-size:19px;line-height:1.45;color:var(--text-hi);margin-top:7px}
+.case .line .w{font-weight:600}
+.case .line .w.done{color:var(--done)}
+.case .line .w.left{color:#e8c98a}
+.case .line .w.no{color:var(--warn)}
+.case .line .w.quiet{color:var(--muted)}
+.case .line .w.going{color:var(--good)}
+.case .line .tail{color:#e8c98a}
+.case .line .soft{color:var(--dim)}
+.case .why{font-size:11.5px;color:var(--muted);line-height:1.65;padding-top:22px}
+.case .why b{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:4px;font-weight:700}
+.case .why .n{font-family:var(--mono);font-size:10px;color:var(--faint);display:block;margin-top:6px}
+@media (max-width:980px){.case{grid-template-columns:minmax(0,1fr)}.case .why{padding-top:2px}}
+.gram{margin:26px 0 0;border-top:1px solid var(--line-2);padding-top:18px}
+.gram table{border-collapse:collapse;font-size:12.5px;width:100%;max-width:74ch}
+.gram td{padding:5px 14px 5px 0;vertical-align:top;color:var(--body);border-bottom:1px solid var(--line)}
+.gram td:first-child{font-family:var(--mono);font-size:11px;color:var(--dim);white-space:nowrap;width:1%}
+.gram .never{margin-top:16px;font-size:12.5px;color:var(--muted);line-height:1.8;max-width:74ch}
+.gram .never b{color:var(--bad);font-weight:500;font-family:var(--mono);font-size:11px}
+
 /* N1 — the paragraph */
 .para{font-family:var(--serif);font-size:17px;line-height:1.55;color:var(--text-hi);
   max-width:60ch;margin-top:13px}
@@ -195,6 +229,8 @@ button{font:inherit;background:none;border:0;color:inherit;cursor:pointer}
     that names are identifiers, not words. A number you never act on belongs in a chip, not a
     sentence.</li>
 </ul>
+
+<div id="line"></div>
 
 <div class="states" id="states"></div>
 <div id="out"></div>
@@ -417,6 +453,95 @@ function n5(b) {
     ${chips(b, { noVerdict: true })}`;
 }
 
+/* --- N6: the line, after the owner's call ------------------------------
+   "Done" alone when it is done. Anything else said in the fewest words that are true.
+   The h1 above already says WHAT the work is — so the band only says where it stands,
+   and the body clause N1 carried turns out to be the headline said twice. */
+
+const CASES = [
+  ['Financials chapter row shows only project name', true,
+   `<span class="w done">Done.</span>`,
+   'The whole case. Nothing follows it, because nothing is true that is worth a word.',
+   'state: done, next: null, no open siblings', 1],
+
+  ['Financials chapter row shows only project name', true,
+   `<span class="w done">Done.</span> <span class="soft">3 left in Financials panel cleanup.</span>`,
+   'One piece of a multi-part job. The count is <b style="display:inline;font-family:inherit;font-size:inherit;letter-spacing:0;text-transform:none;color:var(--dim)">counted, not written</b> — branches under the same goal that are not done. A number nobody can hallucinate.',
+   'the goal, already in Plane B', 7],
+
+  ['Financials chapter row shows only project name', true,
+   `<span class="w done">Done,</span> except <span class="tail">the tooltip still shows the raw number</span>.`,
+   'Merged, and the model still found a loose end. "Done" keeps its meaning by naming the exception in the same breath.',
+   'state: done + next', 9],
+
+  ['Retry queue for dropped webhook deliveries', true,
+   `<span class="w left">Left:</span> <span class="tail">the drain worker never re-sends</span>.`,
+   'Leads with what is left. "Still going" is not said — if it is not done, of course it is going.',
+   'next, as a fragment, never a sentence', 6],
+
+  ['Retry queue for dropped webhook deliveries', true,
+   `<span class="w going">Going.</span>`,
+   'Moving, nothing identifiably open. One word, because the headline already said what it is.',
+   'state: going, next: null', 1],
+
+  ['Invoice export rewritten around a new PDF renderer', true,
+   `<span class="w no">Not what it was for:</span> <span class="tail">the wrapping bug is untouched</span>.`,
+   'The one state that earns more words. Drift is only legible against the intent, so the intent is the sentence.',
+   'state: drifted + next', 9],
+
+  ['claude/curious-bohr-2p91zz', false,
+   `<span class="w quiet">Quiet 6 days.</span> <span class="soft">Nobody has said what it is for.</span>
+    <button class="link">say</button>`,
+   'Nothing to report and nothing to measure it against — so it says exactly that, and offers the only thing that would help.',
+   'age + no vision. Both already in the Snapshot', 9],
+];
+
+function drawLine() {
+  document.getElementById('line').innerHTML = `
+    <section class="rev">
+      <div class="no" style="font-family:var(--mono);font-size:10.5px;color:var(--muted)">N6 &middot; the shape, revised</div>
+      <h2 style="font-family:var(--serif);font-size:23px;font-weight:600;margin:5px 0 4px;color:var(--text-hi)">The line</h2>
+      <div class="lede"><b>Done means done, and says one word.</b> Where something is left, or where
+      the branch is one piece of a larger job, that is said too — in the fewest words that are
+      true and not one more. <em>The headline above already says what the work is; the band only
+      says where it stands.</em> That is N4's state-switching with N1's discipline, and it retires
+      N1's body clause, which turns out to be the headline said a second time.</div>
+      <div class="cases">
+        ${CASES.map(([ttl, generated, line, why, from, n]) => `
+          <div class="case">
+            <div class="mini ${/Quiet/.test(line) ? 'off' : ''}">
+              <div class="eyebrow ${/Quiet/.test(line) ? '' : 'now'}">Happening now</div>
+              <div class="ttl" style="margin-top:6px">${generated && !/^claude\//.test(ttl) ? esc(ttl) : `<span class="raw">${esc(ttl)}</span>`}</div>
+              <div class="line">${line}</div>
+            </div>
+            <div class="why">${why}<span class="n">${esc(from)} &middot; ${n} word${n === 1 ? '' : 's'}</span></div>
+          </div>`).join('')}
+      </div>
+      <div class="gram">
+        <table>
+          <tr><td>done</td><td><b>Done.</b></td></tr>
+          <tr><td>done, of many</td><td><b>Done.</b> <i>n</i> left in <i>&lt;goal&gt;</i>.</td></tr>
+          <tr><td>done, loose end</td><td><b>Done,</b> except <i>&lt;next&gt;</i>.</td></tr>
+          <tr><td>working</td><td><b>Left:</b> <i>&lt;next&gt;</i>. &nbsp;&mdash;&nbsp; or <b>Going.</b> when nothing is open</td></tr>
+          <tr><td>drifted</td><td><b>Not what it was for:</b> <i>&lt;next&gt;</i>.</td></tr>
+          <tr><td>quiet</td><td><b>Quiet <i>n</i> days.</b> <i>+ the ask, when nobody has said what it is for</i></td></tr>
+        </table>
+        <div class="never">
+          The station is held to it rather than trusted with it:
+          <b>next</b> is a fragment, never a sentence &mdash; "the drain worker never re-sends", not
+          "The drain worker is a stub: it reads the queue and logs, but never re-sends, and CI has
+          been red since that commit."<br>
+          <b>12</b> words is the cap on the whole line, and it is a setting (rule 7), not a number in the code.<br>
+          <b>never</b> a word about a non-event, a branch name, a PR number or a SHA &mdash; those are
+          chips, and the chips are unchanged.<br>
+          <b>counted</b> beats written: the "3 left" comes from the goal, so it cannot be invented.<br>
+          <b>CI</b> is a chip, and becomes words only when it is the thing standing between you and
+          done &mdash; "Left: CI red since Tuesday." Never both.
+        </div>
+      </div>
+    </section>`;
+}
+
 /* --- the page ----------------------------------------------------------- */
 
 const DESIGNS = [
@@ -497,6 +622,7 @@ document.getElementById('states').addEventListener('click', (e) => {
   window.scrollTo({ top: 0, behavior: 'instant' });
 });
 
+drawLine();
 draw();
 </script>
 </body></html>

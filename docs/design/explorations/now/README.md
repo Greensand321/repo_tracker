@@ -1,6 +1,34 @@
 # The "happening now" band — five ways to say the same thing
 
-**Status:** proposals, 21 Sep 2026. Nothing here is built. Open
+> **Chosen: N6, "The line"** (21 Sep 2026). The owner's call, after reading the five:
+> *"just 'Done' is the best to say when it's actually done. However if there is more to be
+> done, or if the implementation is only one part of a multipart implementation, then that
+> should be said — but also in fewest words possible."*
+>
+> N6 is at the top of [`index.html`](index.html): N4's state-switching with N1's
+> discipline, cut to **one line**. It retires N1's body clause, which turned out to be the
+> headline said a second time. The five below are the exploration that led to it, kept as
+> reasoning.
+>
+> **The grammar**
+>
+> | state | the line |
+> |---|---|
+> | done | **Done.** |
+> | done, one of many | **Done.** *n* left in *&lt;goal&gt;*. |
+> | done, loose end | **Done,** except *&lt;next&gt;*. |
+> | working | **Left:** *&lt;next&gt;*. — or **Going.** when nothing is open |
+> | drifted | **Not what it was for:** *&lt;next&gt;*. |
+> | quiet | **Quiet *n* days.** *+ the ask, when nobody has said what it is for* |
+>
+> And the bans, which are what keep it short: `next` is a **fragment, never a sentence**;
+> twelve words is the cap on the whole line and it is a **setting**, not a number in the
+> code (rule 7); never a word about a non-event, a branch name, a PR number or a SHA;
+> the "*n* left" is **counted from the goal**, never written by the model, so it cannot be
+> invented; CI is a chip, and becomes words only when it is the one thing between you and
+> done.
+
+**Status:** N6 chosen, not yet built. Open
 [`index.html`](index.html) — it runs from disk, no server and no build, and the four
 buttons at the top switch the branch state every design is drawn against.
 
