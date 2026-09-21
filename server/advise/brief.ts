@@ -26,8 +26,8 @@ import {
 import { complete } from './client.ts';
 import { NOTHING_OPEN, extractJson } from './prompt.ts';
 
-/** v2: the brief is three parts — done, next, now — rather than a paragraph (D89). */
-export const BRIEF_PROMPT_VERSION = 'v2';
+/** v2: three parts — done, next, now (D89). v4: no branch names in the prose; they sit beside it (D90). */
+export const BRIEF_PROMPT_VERSION = 'v4';
 
 const GOAL_STATES: GoalState[] = ['progressing', 'at-risk', 'stalled', 'looks-done', 'needs-you'];
 
@@ -37,11 +37,12 @@ You are given every branch: what it is FOR (its vision, where one has been state
 
 Produce three things.
 
-1. THE BRIEF, in three parts. Each is one or two sentences of plain English — no lists, no headings, no markdown — naming branches by their literal git name. Write like a colleague, not a status report.
-     done   what has landed or looks finished: which goals, which branches, what they delivered.
-     next   what still needs doing, leading with the thing most in their way — red CI, a branch that has drifted, half-finished work, a decision only the owner can make.
-     now    what is actually going on: which branches moved most recently and what each is mid-way through.
-   If something has no vision and you cannot tell what it is for, say so plainly rather than filling the gap.
+1. THE BRIEF, in three parts. Each is ONE sentence, at most 35 words, of plain English — no lists, no headings, no markdown. Write like a colleague leaning over, not a status report.
+     done   what has landed or looks finished, and what it delivered.
+     next   the one thing most in their way — red CI, work that has drifted, something half-finished, a decision only the owner can make — and what to do about it.
+     now    what is actually going on: what moved most recently and what it is mid-way through.
+   NEVER write a branch name inside a sentence. Branch names are identifiers, not words; the owner reads the sentence and the names sit beside it. Say what the work is ("the assignee repaint", "the webhook retries", "five merged branches under the webhook goal"), never which branch. Then, for each part, list the literal git names of the branches that sentence rests on — at most four per part, the ones that matter most — in "branches".
+   If something has no vision and you cannot tell what it is for, say so in a few words rather than filling the gap.
 
 2. GOAL JUDGEMENTS — for each goal, one of:
      progressing   branches are moving toward it
@@ -62,6 +63,7 @@ Reply with ONLY a JSON object, no prose around it, no markdown fence:
   "done": "...",
   "next": "...",
   "now": "...",
+  "branches": {"done": ["branch-name", ...], "next": ["branch-name", ...], "now": ["branch-name", ...]},
   "goals": [{"id": "...", "state": "progressing|at-risk|stalled|looks-done|needs-you", "because": "...", "branches": ["branch-name", ...]}],
   "overtaken": [{"repo": "owner/name", "branch": "...", "byRepo": "owner/name", "byBranch": "...", "why": "..."}]
 }`;
@@ -163,7 +165,7 @@ export function parseBrief(raw: string, snapshot: Snapshot, settings: Settings):
   const json = extractJson(raw);
   if (!json) return empty;
 
-  let parsed: { brief?: unknown; done?: unknown; next?: unknown; now?: unknown; goals?: unknown; overtaken?: unknown };
+  let parsed: { brief?: unknown; done?: unknown; next?: unknown; now?: unknown; branches?: unknown; goals?: unknown; overtaken?: unknown };
   try {
     parsed = JSON.parse(json) as typeof parsed;
   } catch {
@@ -220,7 +222,24 @@ export function parseBrief(raw: string, snapshot: Snapshot, settings: Settings):
 
   // Three parts when the model wrote them; the old single paragraph when it did not.
   const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
-  const parts: BriefParts = { done: text(parsed.done), next: text(parsed.next), now: text(parsed.now) };
+  // The branches a part rests on: real ones only, by name, matched across the fleet.
+  const byName = new Map<string, BranchRef>();
+  for (const b of snapshot.branches) if (!b.isBase) byName.set(b.name, { repoKey: b.repoKey, branch: b.name });
+  const refsOf = (value: unknown): BranchRef[] => {
+    const seen = new Set<string>();
+    const out: BranchRef[] = [];
+    for (const name of Array.isArray(value) ? value : []) {
+      const ref = typeof name === 'string' ? byName.get(name.trim()) : undefined;
+      if (ref && !seen.has(ref.branch)) { seen.add(ref.branch); out.push(ref); }
+      if (out.length === 4) break;
+    }
+    return out;
+  };
+  const named = (parsed.branches ?? {}) as { done?: unknown; next?: unknown; now?: unknown };
+  const parts: BriefParts = {
+    done: text(parsed.done), next: text(parsed.next), now: text(parsed.now),
+    refs: { done: refsOf(named.done), next: refsOf(named.next), now: refsOf(named.now) },
+  };
   const hasParts = Boolean(parts.done || parts.next || parts.now);
   const brief = hasParts ? [parts.done, parts.next, parts.now].filter(Boolean).join(' ') : text(parsed.brief);
 

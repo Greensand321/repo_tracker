@@ -420,7 +420,9 @@ test('the brief comes back in three parts, and as one text for anything that rea
     snap([branch('a'), branch('b')]),
     settings,
   );
-  assert.deepEqual(r.parts, { done: 'Webhooks landed.', next: 'Fix the red CI on a.', now: 'b is mid-refactor.' });
+  assert.equal(r.parts?.done, 'Webhooks landed.');
+  assert.equal(r.parts?.now, 'b is mid-refactor.');
+  assert.deepEqual(r.parts?.refs, { done: [], next: [], now: [] });
   assert.equal(r.brief, 'Webhooks landed. Fix the red CI on a. b is mid-refactor.');
 });
 
@@ -428,4 +430,15 @@ test('a brief in the old single-paragraph shape still reads', () => {
   const r = parseBrief(JSON.stringify({ brief: 'All quiet.', goals: [], overtaken: [] }), snap([branch('a')]), settings);
   assert.equal(r.brief, 'All quiet.');
   assert.equal(r.parts, null);
+});
+
+test('the branches a part rests on come back beside it, real ones only, never in the prose', () => {
+  const r = parseBrief(
+    JSON.stringify({ done: 'The repaint landed.', next: '', now: '', branches: { done: ['a', 'ghost', 'a'], next: ['b'] }, goals: [], overtaken: [] }),
+    snap([branch('a'), branch('b')]),
+    settings,
+  );
+  assert.deepEqual(r.parts?.refs.done.map((x) => x.branch), ['a']);
+  assert.deepEqual(r.parts?.refs.next.map((x) => x.branch), ['b']);
+  assert.deepEqual(r.parts?.refs.now, []);
 });

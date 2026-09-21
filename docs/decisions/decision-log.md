@@ -594,6 +594,16 @@ without reading the others, and it is fed each branch's recap rather than its gi
 
 Every prompt version moved to v2, so nothing written on the old evidence survives.
 
+### D90 — Branch names are identifiers, and the brief's prose has none
+
+Told to name branches by their literal git name, the brief named all of them, and each
+part became a list of `claude/adjective-scientist-xxxxxx`. Those names are not words: they
+carry no meaning to read and are only ever needed to *find* something. So the sentences
+say what the work is — "the assignee repaint", "five merged branches under the webhook
+goal" — and never which branch; the branches each part rests on come back separately and
+sit under it as chips, where one click puts the name in the search box. Rule 6 holds: the
+literal name is always shown, beside the prose rather than inside it.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.
