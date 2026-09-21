@@ -26,8 +26,8 @@ import {
 import { complete } from './client.ts';
 import { NOTHING_OPEN, extractJson } from './prompt.ts';
 
-/** v2: the brief is three parts — done, next, now — rather than a paragraph (D89). */
-export const BRIEF_PROMPT_VERSION = 'v2';
+/** v2: three parts — done, next, now (D89). v3: one sentence each, two names each at most. */
+export const BRIEF_PROMPT_VERSION = 'v3';
 
 const GOAL_STATES: GoalState[] = ['progressing', 'at-risk', 'stalled', 'looks-done', 'needs-you'];
 
@@ -37,11 +37,12 @@ You are given every branch: what it is FOR (its vision, where one has been state
 
 Produce three things.
 
-1. THE BRIEF, in three parts. Each is one or two sentences of plain English — no lists, no headings, no markdown — naming branches by their literal git name. Write like a colleague, not a status report.
-     done   what has landed or looks finished: which goals, which branches, what they delivered.
-     next   what still needs doing, leading with the thing most in their way — red CI, a branch that has drifted, half-finished work, a decision only the owner can make.
-     now    what is actually going on: which branches moved most recently and what each is mid-way through.
-   If something has no vision and you cannot tell what it is for, say so plainly rather than filling the gap.
+1. THE BRIEF, in three parts. Each is ONE sentence, at most 35 words, of plain English — no lists, no headings, no markdown. Write like a colleague leaning over, not a status report.
+     done   what has landed or looks finished, and what it delivered.
+     next   the one thing most in their way — red CI, a branch that has drifted, half-finished work, a decision only the owner can make — and what to do about it.
+     now    what is actually going on: what moved most recently and what it is mid-way through.
+   The owner has the full register beside this. So: name at most TWO branches in each part, the ones that matter most, by their literal git name. Refer to the rest as a count or a group ("five more merged branches", "the webhook goal"). Never list branches. Never repeat a branch across parts unless it is the point. Say what happened, not which branch it happened on, wherever the branch is not the point.
+   If something has no vision and you cannot tell what it is for, say so in a few words rather than filling the gap.
 
 2. GOAL JUDGEMENTS — for each goal, one of:
      progressing   branches are moving toward it
