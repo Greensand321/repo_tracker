@@ -137,7 +137,6 @@ export async function writeBrief(
   const raw = await complete(settings, {
     system: SYSTEM,
     user: buildBriefPrompt(snapshot, settings.askBranchCap),
-    maxTokens: 1200,
     // The read's own session: every job in one read is one batch of work, which is what
     // keeps a shared prompt prefix warm on one provider. A caller with no read behind it
     // gets a fresh one rather than no header at all (D66).

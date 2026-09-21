@@ -359,6 +359,16 @@ export type Settings = {
   /** Ceiling on summaries per refresh, so a first run cannot surprise you with a bill. */
   llmMaxPerRun: number;
   /**
+   * How many tokens one reply may run to. A cap, not a target: a plain model uses a few
+   * hundred and the rest costs nothing. A reasoning model spends its thinking out of the
+   * same allowance and, capped low, returns nothing at all — every station's answer was an
+   * "empty reply" at 350. One number for every station, and a reply cut off by it is
+   * retried once with double the room before it is reported (D88).
+   */
+  llmReplyTokens: number;
+  /** How long to wait for one reply. Reasoning models on a big prompt take their time. */
+  llmTimeoutSeconds: number;
+  /**
    * How many branches a question may put in front of the model. The prompt grows with
    * this, and so does the cost of every question — at a hundred branches the whole
    * register does not need to be in the prompt to answer "what is red".
@@ -425,6 +435,8 @@ export const DEFAULT_SETTINGS: Settings = {
   llmModel: '',
   llmEnabled: true,
   llmMaxPerRun: 40,
+  llmReplyTokens: 2000,
+  llmTimeoutSeconds: 120,
   askBranchCap: 60,
   visionAutoDraft: true,
   maxOpenQuestions: 3,

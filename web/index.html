@@ -85,126 +85,156 @@
 
 <div class="sheet-modal hidden" id="settingsSheet">
   <div class="panel">
-    <h2>Settings</h2>
-    <p class="lede">Bearing reads your repos and never writes to them. Goals, notes and settings are its own — they never go near a repo.</p>
-
-    <label for="token">GitHub token</label>
-    <input id="token" type="password" placeholder="github_pat_… — leave blank to keep the current one" autocomplete="off" spellcheck="false">
-    <div class="hint">
-      A <b>fine-grained</b> token, <b>read-only</b>. Under <b>Repository permissions</b> set
-      <b>Metadata</b>, <b>Contents</b>, <b>Pull requests</b> and <b>Actions</b> to Read-only —
-      plus <b>Commit statuses</b> if your CI is not GitHub Actions. Nothing under <i>Account</i>.
-      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer noopener">Create one</a>.
-      <br>There is no <b>Checks</b> option — GitHub does not offer it to fine-grained tokens.
-      It is stored in <code>data/settings.json</code> on this machine and never sent anywhere but GitHub.
+    <div class="top">
+      <h2>Settings</h2>
+      <p class="lede">Reads your repos, never writes to them. Goals, notes and settings stay on this machine.</p>
     </div>
 
-    <label for="repos">Repositories — one <code>owner/name</code> per line</label>
-    <textarea id="repos" spellcheck="false" placeholder="greensand321/repo_tracker"></textarea>
+    <div class="settings-grid">
+      <div class="col">
+        <div class="eyebrow">GitHub</div>
 
-    <div class="row">
-      <div>
-        <label for="refreshSeconds">Read every (seconds)</label>
-        <input id="refreshSeconds" type="number" min="0" max="3600" step="10">
-        <div class="hint">0 turns background reading off.</div>
-      </div>
-      <div>
-        <label for="quietAfterDays">Quiet after (days)</label>
-        <input id="quietAfterDays" type="number" min="1" max="365">
-        <div class="hint">Older branches fold away. Never deleted.</div>
-      </div>
-      <div>
-        <label for="commitsPerBranch">Commits per branch</label>
-        <input id="commitsPerBranch" type="number" min="1" max="300">
-        <div class="hint">How much history to keep.</div>
-      </div>
-    </div>
+        <div class="field">
+          <label for="token">Token
+            <span class="info" tabindex="0" role="img" aria-label="about the token" data-tip="A fine-grained, read-only token. Under Repository permissions set Metadata, Contents, Pull requests and Actions to Read-only — plus Commit statuses if your CI is not GitHub Actions. Nothing under Account; there is no Checks option for these tokens. Kept in data/settings.json on this machine and sent nowhere but GitHub.">i</span>
+            <a class="beside" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer noopener">create one &#8599;</a>
+          </label>
+          <input id="token" type="password" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
+        </div>
 
-    <hr style="border:0;border-top:1px solid var(--line-2);margin:26px 0 4px">
-    <p class="lede" style="margin:16px 0 0">
-      <b>The advisor</b> — writes the plain-English headline on each branch, and answers
-      questions about what it can see. Optional: leave it blank and everything else still works.
-    </p>
+        <div class="field">
+          <label for="repos">Repositories
+            <span class="info" tabindex="0" role="img" aria-label="about repositories" data-tip="One owner/name per line. Every branch in each of them appears here.">i</span>
+          </label>
+          <textarea id="repos" spellcheck="false" placeholder="greensand321/repo_tracker" rows="6"></textarea>
+        </div>
 
-    <label for="llmApiKey">Provider API key</label>
-    <input id="llmApiKey" type="password" autocomplete="off" spellcheck="false">
-    <div class="hint">Stored on this machine only, next to the GitHub token.</div>
-
-    <label for="llmProvider">Provider</label>
-    <select id="llmProvider">
-      <option value="https://opencode.ai/zen/go/v1">OpenCode Go — $10/month subscription</option>
-      <option value="https://opencode.ai/zen/v1">OpenCode Zen — pay as you go</option>
-      <option value="custom">Other OpenAI-compatible endpoint…</option>
-    </select>
-    <div class="hint" id="providerHint"></div>
-    <input id="llmBaseUrl" type="text" spellcheck="false" placeholder="https://…/v1" class="hidden">
-
-    <div class="row" style="align-items:flex-end">
-      <div style="flex:2">
-        <label>Model</label>
-        <div id="modelPicker"></div>
-        <div class="hint">
-          <a href="#" id="loadModels">Load the list</a> once the key is saved.
-          A model your plan cannot reach will say so when it is first used.
+        <div class="field nums">
+          <div>
+            <label for="refreshSeconds">Read every (s)
+              <span class="info" tabindex="0" role="img" aria-label="about reading" data-tip="Seconds between background reads of GitHub. A repo that has not moved costs nothing. 0 turns background reading off.">i</span>
+            </label>
+            <input id="refreshSeconds" type="number" min="0" max="3600" step="10">
+          </div>
+          <div>
+            <label for="quietAfterDays">Quiet after (d)
+              <span class="info" tabindex="0" role="img" aria-label="about quiet branches" data-tip="Days without a commit before a branch folds away as quiet. It is never deleted.">i</span>
+            </label>
+            <input id="quietAfterDays" type="number" min="1" max="365">
+          </div>
+          <div>
+            <label for="commitsPerBranch">Commits kept
+              <span class="info" tabindex="0" role="img" aria-label="about commits" data-tip="How much history is kept per branch, and how much a summary may read.">i</span>
+            </label>
+            <input id="commitsPerBranch" type="number" min="1" max="300">
+          </div>
         </div>
       </div>
-      <div>
-        <label for="llmMaxPerRun">Provider calls per read</label>
-        <input id="llmMaxPerRun" type="number" min="0" max="500">
-        <div class="hint">The whole read, every job and every lookup. Work left over waits
-          for the next one.</div>
-      </div>
-      <div>
-        <label for="askBranchCap">Branches per question</label>
-        <input id="askBranchCap" type="number" min="1" max="400">
-        <div class="hint">How much of the register a question may show the model.</div>
-      </div>
-      <div>
-        <label for="maxOpenQuestions">Questions waiting at once</label>
-        <input id="maxOpenQuestions" type="number" min="0" max="40">
-        <div class="hint">A wall of them is a chore list. 0 switches them off.</div>
-      </div>
-      <div>
-        <label for="briefEveryMinutes">Minutes between briefs</label>
-        <input id="briefEveryMinutes" type="number" min="0" max="1440">
-        <div class="hint">The brief reads every branch, so it is the dearest call. Between
-          rewrites the last one stays up, dated. “Write it again” never waits.</div>
-      </div>
-      <div>
-        <label for="workers">Jobs at once</label>
-        <input id="workers" type="number" min="1" max="8">
-        <div class="hint">How many the assistant works on in parallel. Watch it on The floor.</div>
-      </div>
-      <div>
-        <label for="dispatchWorkers">Jobs you asked for, at once</label>
-        <input id="dispatchWorkers" type="number" min="1" max="8">
-        <div class="hint">Its own lane: what you ask for never queues behind the background work.</div>
-      </div>
-      <div>
-        <label for="toolCallsPerJob">Lookups per job</label>
-        <input id="toolCallsPerJob" type="number" min="0" max="20">
-        <div class="hint">A ceiling, not a target. 0 is the same as turning lookups off.</div>
+
+      <div class="col right">
+        <div class="eyebrow">The advisor
+          <span class="info" tabindex="0" role="img" aria-label="about the advisor" data-tip="Writes the plain-English headline on each branch, judges each against what it is for, writes the brief, and answers questions. Optional: leave the key blank and everything else still works.">i</span>
+        </div>
+
+        <div class="field two">
+          <div>
+            <label for="llmApiKey">API key
+              <span class="info" tabindex="0" role="img" aria-label="about the key" data-tip="Kept on this machine only, next to the GitHub token. Leave blank to keep the current one.">i</span>
+            </label>
+            <input id="llmApiKey" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false">
+          </div>
+          <div>
+            <label for="llmProvider">Provider
+              <span class="info" id="providerHint" tabindex="0" role="img" aria-label="about the provider" data-tip="">i</span>
+            </label>
+            <select id="llmProvider">
+              <option value="https://opencode.ai/zen/go/v1">OpenCode Go — subscription</option>
+              <option value="https://opencode.ai/zen/v1">OpenCode Zen — pay as you go</option>
+              <option value="custom">Other OpenAI-compatible…</option>
+            </select>
+          </div>
+        </div>
+        <div class="field hidden" id="endpointField">
+          <label for="llmBaseUrl">Endpoint</label>
+          <input id="llmBaseUrl" type="text" spellcheck="false" placeholder="https://…/v1">
+        </div>
+
+        <div class="field">
+          <label>Model
+            <span class="info" tabindex="0" role="img" aria-label="about the model" data-tip="Pick one from the provider's own list, loaded once the key is saved. A model your plan cannot reach says so the first time it is used.">i</span>
+          </label>
+          <div class="model-row">
+            <div id="modelPicker"></div>
+            <button class="btn small" id="loadModels" type="button">Load the list</button>
+          </div>
+        </div>
+
+        <div class="field nums four">
+          <div>
+            <label for="llmMaxPerRun">Calls per read
+              <span class="info" tabindex="0" role="img" aria-label="about the call budget" data-tip="The most provider calls one read may make — every job and every lookup. Work left over waits for the next read.">i</span>
+            </label>
+            <input id="llmMaxPerRun" type="number" min="0" max="500">
+          </div>
+          <div>
+            <label for="llmReplyTokens">Reply tokens
+              <span class="info" tabindex="0" role="img" aria-label="about reply room" data-tip="How long one reply may run. A cap, not a target: a plain model uses a few hundred and the rest costs nothing. A reasoning model thinks out of the same allowance and, capped too low, returns nothing — “the model returned an empty reply”. A reply that hits the cap is tried once more with double the room.">i</span>
+            </label>
+            <input id="llmReplyTokens" type="number" min="256" max="32000" step="100">
+          </div>
+          <div>
+            <label for="askBranchCap">Branches
+              <span class="info" tabindex="0" role="img" aria-label="about the question size" data-tip="How much of the register a question may put in front of the model. Every question grows with it.">i</span>
+            </label>
+            <input id="askBranchCap" type="number" min="1" max="400">
+          </div>
+          <div>
+            <label for="maxOpenQuestions">Questions
+              <span class="info" tabindex="0" role="img" aria-label="about questions" data-tip="How many may wait for you at once. A wall of them is a chore list. 0 switches them off.">i</span>
+            </label>
+            <input id="maxOpenQuestions" type="number" min="0" max="40">
+          </div>
+        </div>
+
+        <div class="field nums four">
+          <div>
+            <label for="briefEveryMinutes">Brief (min)
+              <span class="info" tabindex="0" role="img" aria-label="about the brief" data-tip="Minutes between routine rewrites of the brief — it reads every branch, so it is the dearest call. The last one stays up, dated, until then. “Write it again” never waits. 0 rewrites every read.">i</span>
+            </label>
+            <input id="briefEveryMinutes" type="number" min="0" max="1440">
+          </div>
+          <div>
+            <label for="workers">Jobs
+              <span class="info" tabindex="0" role="img" aria-label="about workers" data-tip="How many background jobs run at once. Watch them on The floor.">i</span>
+            </label>
+            <input id="workers" type="number" min="1" max="8">
+          </div>
+          <div>
+            <label for="dispatchWorkers">Asked for
+              <span class="info" tabindex="0" role="img" aria-label="about the dispatched lane" data-tip="How many jobs you asked for run at once — its own lane, so what you ask for never queues behind background work.">i</span>
+            </label>
+            <input id="dispatchWorkers" type="number" min="1" max="8">
+          </div>
+          <div>
+            <label for="toolCallsPerJob">Lookups
+              <span class="info" tabindex="0" role="img" aria-label="about lookups" data-tip="Lookups one job may make before answering. A ceiling, not a target. 0 is the same as turning lookups off.">i</span>
+            </label>
+            <input id="toolCallsPerJob" type="number" min="0" max="20">
+          </div>
+        </div>
+
+        <div class="check">
+          <input id="visionAutoDraft" type="checkbox">
+          <label for="visionAutoDraft">Propose what each branch is for</label>
+          <span class="info" tabindex="0" role="img" aria-label="about proposals" data-tip="Only where it can be specific — a purpose nothing could contradict is worthless as a yardstick, so it says nothing rather than padding. Proposals stay marked until you confirm them.">i</span>
+        </div>
+        <div class="check">
+          <input id="toolsEnabled" type="checkbox">
+          <label for="toolsEnabled">Look things up before answering</label>
+          <span class="info" tabindex="0" role="img" aria-label="about lookups" data-tip="A station may read the README, what a commit touched, the branches next to it and what moved this week, instead of inferring all of it from commit messages. A call or two more per branch. Also what lets the advisor start work. Switching it regenerates judgements, which were drawn from different evidence.">i</span>
+        </div>
       </div>
     </div>
-
-    <label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--body);font-weight:400">
-      <input id="visionAutoDraft" type="checkbox" style="width:auto">
-      Let the assistant propose what each branch is for
-    </label>
-    <div class="hint">It only proposes when it can be specific — a purpose nothing could
-      contradict is worthless as a yardstick, so it says nothing rather than padding.
-      Proposals are always marked until you confirm them.</div>
-
-    <label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--body);font-weight:400">
-      <input id="toolsEnabled" type="checkbox" style="width:auto">
-      Let it look things up before answering
-    </label>
-    <div class="hint">When it judges a branch against what the branch is for, it can read the
-      branches next to it and how things moved this week — instead of inferring both from
-      commit messages. It costs a call or two more per branch, and it is what turns
-      “drifted” and “already done elsewhere” from a hunch into a finding.
-      Switching this regenerates those judgements, because they were drawn from different
-      evidence.</div>
 
     <div class="err" id="settingsErr"></div>
     <div class="actions">

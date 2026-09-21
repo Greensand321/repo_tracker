@@ -102,7 +102,6 @@ export async function draftVision(
     const raw = await complete(settings, {
       system: DRAFT_SYSTEM,
       user: describeBranch(branch),
-      maxTokens: 300,
       sessionId,
     });
     return parseDraft(raw);
@@ -114,7 +113,6 @@ export async function draftVision(
     tools,
     ctx: options.ctx,
     sessionId,
-    maxTokens: 300,
     ...(options.onTool ? { onTool: options.onTool } : {}),
     ...(options.spend ? { spend: options.spend } : {}),
   });
@@ -206,7 +204,7 @@ export async function assessBranch(
   const sessionId = options.sessionId ?? randomUUID();
 
   if (tools.length === 0 || !options.ctx) {
-    const raw = await complete(settings, { system: ASSESS_SYSTEM, user, maxTokens: 350, sessionId });
+    const raw = await complete(settings, { system: ASSESS_SYSTEM, user, sessionId });
     return parseAssessment(raw, branch);
   }
 
@@ -216,7 +214,6 @@ export async function assessBranch(
     tools,
     ctx: options.ctx,
     sessionId,
-    maxTokens: 350,
     ...(options.onTool ? { onTool: options.onTool } : {}),
     ...(options.spend ? { spend: options.spend } : {}),
   });
@@ -294,7 +291,6 @@ export async function distributeVisions(
   const raw = await complete(settings, {
     system: DISTRIBUTE_SYSTEM,
     user: `Branches that exist:\n${list}\n\nWhat the owner said:\n${paragraph.trim()}`,
-    maxTokens: 700,
     sessionId: randomUUID(),
   });
   return parseDistribution(raw, branches);

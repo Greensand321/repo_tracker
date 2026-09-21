@@ -780,12 +780,13 @@ function ensureModelPicker(): Picker {
 function applyProviderChoice(): void {
   const provider = $<HTMLSelectElement>('#llmProvider');
   const custom = provider.value === 'custom';
-  $('#llmBaseUrl').classList.toggle('hidden', !custom);
+  $('#endpointField').classList.toggle('hidden', !custom);
   if (!custom) $<HTMLInputElement>('#llmBaseUrl').value = provider.value;
-  $('#providerHint').textContent = custom
-    ? 'Any endpoint that speaks the OpenAI, Anthropic or Responses API.'
+  // The note behind the provider's "i" says what the choice means; the field itself stays quiet.
+  $('#providerHint').dataset['tip'] = custom
+    ? 'Any endpoint that speaks the OpenAI, Anthropic or Responses API. Paste its base URL below.'
     : provider.value.includes('/go/')
-      ? 'The subscription plan. A different base URL from pay-as-you-go — using the wrong one reports an empty balance.'
+      ? 'The $10/month subscription. A different base URL from pay-as-you-go — the wrong one reports an empty balance.'
       : 'Pay as you go. Needs a balance on your Zen account.';
 }
 
@@ -797,6 +798,7 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#quietAfterDays').value = String(settings.quietAfterDays);
     $<HTMLInputElement>('#commitsPerBranch').value = String(settings.commitsPerBranch);
     $<HTMLInputElement>('#llmMaxPerRun').value = String(settings.llmMaxPerRun);
+    $<HTMLInputElement>('#llmReplyTokens').value = String(settings.llmReplyTokens);
     $<HTMLInputElement>('#askBranchCap').value = String(settings.askBranchCap);
     $<HTMLInputElement>('#maxOpenQuestions').value = String(settings.maxOpenQuestions);
     $<HTMLInputElement>('#briefEveryMinutes').value = String(settings.briefEveryMinutes);
@@ -849,6 +851,7 @@ async function saveSettings(): Promise<void> {
       quietAfterDays: Number($<HTMLInputElement>('#quietAfterDays').value),
       commitsPerBranch: Number($<HTMLInputElement>('#commitsPerBranch').value),
       llmMaxPerRun: Number($<HTMLInputElement>('#llmMaxPerRun').value),
+      llmReplyTokens: Number($<HTMLInputElement>('#llmReplyTokens').value),
       askBranchCap: Number($<HTMLInputElement>('#askBranchCap').value),
       maxOpenQuestions: Number($<HTMLInputElement>('#maxOpenQuestions').value),
       briefEveryMinutes: Number($<HTMLInputElement>('#briefEveryMinutes').value),
