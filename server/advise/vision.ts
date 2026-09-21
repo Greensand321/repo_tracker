@@ -354,7 +354,8 @@ export function describeBranch(branch: Branch): string {
     lines.push('The commits below are the branch\'s own work as recorded on its pull request; they are already merged into the base.');
   }
   if (branch.recap) {
-    lines.push('', `Last: ${branch.recap.last}`, `Done: ${branch.recap.done}`, `Open: ${branch.recap.open}`);
+    lines.push('', `Last: ${branch.recap.last}`, `Done: ${branch.recap.done}`);
+    if (branch.recap.next) lines.push(`Left: ${branch.recap.next}`);
   }
   lines.push('', 'Commits, newest first:');
 

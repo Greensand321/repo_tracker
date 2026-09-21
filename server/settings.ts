@@ -42,6 +42,9 @@ function sanitise(settings: Settings): Settings {
     askBranchCap: clamp(settings.askBranchCap, 1, 400, DEFAULT_SETTINGS.askBranchCap),
     visionAutoDraft: settings.visionAutoDraft !== false,
     maxOpenQuestions: clamp(settings.maxOpenQuestions, 0, 40, DEFAULT_SETTINGS.maxOpenQuestions),
+    // Four words is the longest lead the line can take ("Not what it was for:"), so below
+    // five there is nothing left to say after it; above twenty it is a sentence again.
+    nowLineWords: clamp(settings.nowLineWords, 5, 20, DEFAULT_SETTINGS.nowLineWords),
     briefEveryMinutes: clamp(settings.briefEveryMinutes, 0, 1440, DEFAULT_SETTINGS.briefEveryMinutes),
     toolsEnabled: settings.toolsEnabled !== false,
     // The worst case for a read is llmMaxPerRun jobs times this plus one, so it is capped

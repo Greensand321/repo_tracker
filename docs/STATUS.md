@@ -1,10 +1,37 @@
 # Status — where the project stands
 
-**Updated:** 21 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant · the workroom** · **Branch:** `claude/kind-meitner-cpis9v`
+**Updated:** 21 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant · the workroom** · **Branch:** `claude/funny-heisenberg-rrawhz`
 
 > Keep this short and current. It is the first thing to read after any time away.
 
 ---
+
+## "Happening now" is one line
+
+The band printed five labelled rows — for, last, done, open, now — and on a finished branch
+four of them said one sentence four times. It says one line now, and as few words as are
+true (D91):
+
+| | |
+|---|---|
+| done | **Done.** |
+| done, one of many | **Done.** 3 left in Financials panel cleanup. |
+| done, loose end | **Done,** except the tooltip still shows the raw number. |
+| working | **Left:** the drain worker never re-sends. — or **Going.** |
+| drifted | **Not what it was for:** the wrapping bug is untouched. |
+| quiet | **Quiet 6 days.** *+ the ask, when nobody has said what it is for* |
+
+The headline above already says what the work *is*, so the line only says where it stands.
+`Recap.open` became **`Recap.next`** — a fragment, or **null** when nothing is left, which
+draws nothing at all. The width is `nowLineWords` in settings (default 12): the model is
+told the number, and it is part of the summary prompt's cache key, so shortening the line
+rewrites the summaries to fit. The "3 left" is **counted** from the goal, never written by
+the model. Every prompt at **v3**.
+
+Nothing is said twice: the verdict and progress chips left the band, the goal leaves the
+byline when the line names it, and the pull request number left its chip for good — it is
+the link now, which is the only thing anyone does with it. Five shapes were drawn before
+this one was picked; they are kept in `docs/design/explorations/now/`.
 
 ## Merged branches have their history back, and a summary is now a recap
 
@@ -292,6 +319,7 @@ Then, in whatever order they earn it:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 21 Sep 2026 | **"Happening now" is one line.** Five labelled rows, four saying one fact, replaced by *Done.* — and, where something is left or the branch is one piece of a larger job, that in the fewest true words. `recap.open` became `recap.next` (a fragment or null), the width is a setting, the "n left" is counted from the goal, and the PR number left the band. Prompts at v3. D91 |
 | 21 Sep 2026 | **The brief has no branch names in it**: the branches a part rests on sit under it as chips; a click finds the task. D90 |
 | 21 Sep 2026 | **Merged branches had no history** — an empty compare read as "nothing of its own", and was judged anyway. The PR's commits are read instead. The summary became a recap (last / done / open) and the brief three parts (done / next / now); every prompt at v2. D89 |
 | 21 Sep 2026 | **First real run** parked every assessment and the brief on "the model returned an empty reply": a reasoning model exhausting per-station caps of 350 and 1200 tokens. One reply allowance in settings, a cut-off reply retried once with double the room, and the error names the cause. D88 |

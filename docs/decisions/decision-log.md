@@ -604,6 +604,57 @@ goal" — and never which branch; the branches each part rests on come back sepa
 sit under it as chips, where one click puts the name in the search box. Rule 6 holds: the
 literal name is always shown, beside the prose rather than inside it.
 
+### D91 — "Happening now" is one line, and "Done" means done
+
+The band printed five labelled rows — **for · last · done · open · now** — and on a branch
+that finished cleanly, four of them said one sentence four times: ninety words to say
+*finished, and it is what you wanted*. The owner's verdict was that it defeated the point
+of the program, and he is right. It repeated because four stations each write a full
+sentence about one branch and the page printed all four whether or not they differed; the
+labels made the reader assemble the sentence; the verdict that decides what you do sat
+last; and "Pull request #630 merged…" put an identifier inside prose, which D90 had
+already ruled against for the brief.
+
+Five shapes were drawn and rendered against four branch states
+(`docs/design/explorations/now/`). The owner chose the line:
+
+| state | the line |
+|---|---|
+| done | **Done.** |
+| done, one of many | **Done.** *n* left in *&lt;goal&gt;*. |
+| done, loose end | **Done,** except *&lt;next&gt;*. |
+| working | **Left:** *&lt;next&gt;*. — or **Going.** when nothing is open |
+| drifted | **Not what it was for:** *&lt;next&gt;*. |
+| quiet | **Quiet *n* days.** *+ the ask, when nobody has said what it is for* |
+
+**The headline already says what the work is, so the line only says where it stands.** That
+is what makes one word enough: a paragraph restating the h1 was the same mistake in nicer
+clothes.
+
+**What keeps it short is written down rather than trusted to the model.** `Recap.open` — a
+sentence, with "Nothing looks unfinished." as its good case — became `Recap.next`, a
+**fragment or null**. Null draws nothing, which retires a regex that matched prose to
+decide whether prose was worth showing. The line's whole width is `nowLineWords`, a
+setting (rule 7, default 12); the model is told the number and the tail is trimmed to it,
+so a model that ignores it costs a clipped tail rather than the band's point. The budget
+is in the summary prompt, so it is in that prompt's cache key too (D74's reasoning):
+shorten the line and the summaries are rewritten to fit rather than trimmed for ever.
+
+**"n left" is counted, never written.** It is the branches under the same goal that are
+still going — Plane B data the program already holds. A model asked "is this part of
+something bigger" will always find a way to say yes; a count cannot.
+
+**Nothing is said twice.** The verdict and progress chips leave the band, because the line
+says them in words; the goal leaves the byline when the line names it; the pull request
+number leaves its chip entirely and survives as the link, which is the only thing anyone
+does with it. The line itself is derived (`nowLine` in `derive.ts`) from the verdict, the
+recap, the branch's quietness and its goal — no view computes it, and no station is asked
+for the same fact twice.
+
+`PROMPT_VERSION` moved to v3. The four-sentence recap keeps `last` and `done` in the data,
+for search and for the prompts that read a branch in a line; it stops being what the page
+prints.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

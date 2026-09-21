@@ -35,6 +35,8 @@ const state = {
   asked: [] as Asked[],
   /** How many questions the assistant may have waiting. Read from settings. */
   maxQuestions: 3,
+  /** The word budget for the "happening now" line. Read from settings (D91). */
+  lineWords: 12,
   /** Proposals from a paragraph, awaiting confirmation. Nothing is written until then. */
   proposals: [] as { ref: BranchRef; vision: string; suggest: 'done' | 'close' | null }[],
   describing: false,
@@ -173,9 +175,9 @@ function draw(): void {
     .join('');
 
   $('#brief').innerHTML = renderBrief(snapshot);
-  $('#nowBand').innerHTML = renderNow(snapshot);
+  $('#nowBand').innerHTML = renderNow(snapshot, state.lineWords);
   renderLeaderHead(snapshot);
-  $('#leaderList').innerHTML = renderLeaderList(snapshot, state.grouping, state.search);
+  $('#leaderList').innerHTML = renderLeaderList(snapshot, state.grouping, state.search, state.lineWords);
 
   const board = floor(snapshot);
   $('#floor').innerHTML = renderFloor(snapshot);
@@ -801,6 +803,7 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#llmReplyTokens').value = String(settings.llmReplyTokens);
     $<HTMLInputElement>('#askBranchCap').value = String(settings.askBranchCap);
     $<HTMLInputElement>('#maxOpenQuestions').value = String(settings.maxOpenQuestions);
+    $<HTMLInputElement>('#nowLineWords').value = String(settings.nowLineWords);
     $<HTMLInputElement>('#briefEveryMinutes').value = String(settings.briefEveryMinutes);
     $<HTMLInputElement>('#workers').value = String(settings.workers);
     $<HTMLInputElement>('#dispatchWorkers').value = String(settings.dispatchWorkers);
@@ -808,6 +811,7 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#toolsEnabled').checked = settings.toolsEnabled;
     $<HTMLInputElement>('#visionAutoDraft').checked = settings.visionAutoDraft;
     state.maxQuestions = settings.maxOpenQuestions;
+    state.lineWords = settings.nowLineWords;
     $<HTMLInputElement>('#token').value = '';
     $<HTMLInputElement>('#token').placeholder = settings.hasToken
       ? 'a token is set — leave blank to keep it'
@@ -854,6 +858,7 @@ async function saveSettings(): Promise<void> {
       llmReplyTokens: Number($<HTMLInputElement>('#llmReplyTokens').value),
       askBranchCap: Number($<HTMLInputElement>('#askBranchCap').value),
       maxOpenQuestions: Number($<HTMLInputElement>('#maxOpenQuestions').value),
+      nowLineWords: Number($<HTMLInputElement>('#nowLineWords').value),
       briefEveryMinutes: Number($<HTMLInputElement>('#briefEveryMinutes').value),
       workers: Number($<HTMLInputElement>('#workers').value),
       dispatchWorkers: Number($<HTMLInputElement>('#dispatchWorkers').value),
@@ -1081,6 +1086,7 @@ void fetch('/api/settings')
   .then((res) => res.json())
   .then((settings: SafeSettings) => {
     state.maxQuestions = settings.maxOpenQuestions;
+    state.lineWords = settings.nowLineWords;
   })
   .catch(() => {
     /* the default stands; the snapshot load will report if the program is not running */
