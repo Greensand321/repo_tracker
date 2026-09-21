@@ -6,6 +6,7 @@ import {
   buildUserPrompt,
   extractJson,
   parseInsight,
+  systemPrompt,
   validEvidence,
 } from '../server/advise/prompt.ts';
 import type { Branch } from '../shared/types.ts';
@@ -183,15 +184,15 @@ test('extractJson finds the outermost object', () => {
   assert.equal(extractJson('} backwards {'), null);
 });
 
-// --- v2: the recap — last / done / open -------------------------------------
+// --- v3: the recap — last / done / next -------------------------------------
 
-test('the recap carries what it did last, what landed, and what is open', () => {
+test('the recap carries what it did last, what landed, and the one thing left', () => {
   const insight = parseInsight(
     JSON.stringify({
       title: 'Stopping duplicate webhook charges',
       last: 'Wiring the dedupe table into the handler.',
       done: 'Signature verification is merged and green.',
-      open: 'The idempotency test exists with no implementation behind it yet.',
+      next: 'the idempotency test has no implementation behind it',
       progress: 'progressing',
       evidence: ['abc1234'],
     }),
@@ -199,17 +200,31 @@ test('the recap carries what it did last, what landed, and what is open', () => 
   );
   assert.equal(insight.recap.last, 'Wiring the dedupe table into the handler.');
   assert.equal(insight.recap.done, 'Signature verification is merged and green.');
-  assert.match(insight.recap.open, /no implementation/);
-  assert.equal(insight.summary, `${insight.recap.last} ${insight.recap.open}`, 'the gist is last plus what is open');
+  assert.match(insight.recap.next ?? '', /no implementation/);
+  assert.equal(insight.summary, `${insight.recap.last} ${insight.recap.next}`, 'the gist is last plus what is left');
 });
 
-test('when nothing is open the gist is just what it did last', () => {
+test('nothing left is null, not a sentence saying so', () => {
   const insight = parseInsight(
-    JSON.stringify({ title: 'T', last: 'Shipped it.', done: 'All of it.', open: 'Nothing looks unfinished.', progress: 'done', evidence: [] }),
+    JSON.stringify({ title: 'T', last: 'Shipped it.', done: 'All of it.', next: null, progress: 'done', evidence: [] }),
     branch(),
   );
+  assert.equal(insight.recap.next, null);
   assert.equal(insight.summary, 'Shipped it.');
-  assert.equal(insight.recap.open, 'Nothing looks unfinished.');
+});
+
+test("a model still answering in v2's shape is understood, and its non-finding becomes null", () => {
+  const v2 = (open: string) =>
+    parseInsight(JSON.stringify({ title: 'T', last: 'L.', done: 'D.', open, progress: 'done', evidence: [] }), branch());
+  assert.equal(v2('Nothing looks unfinished.').recap.next, null, 'v2 phrase for "nothing"');
+  assert.equal(v2('none').recap.next, null, 'a model writing null as a word');
+  assert.equal(v2('four templates unported').recap.next, 'four templates unported', 'a real finding still lands');
+});
+
+test('the word budget reaches the model, and is the owner\'s number', () => {
+  assert.match(systemPrompt(12), /At most 7 words/);
+  assert.match(systemPrompt(20), /At most 15 words/);
+  assert.doesNotMatch(systemPrompt(12), /NEXT_WORDS/);
 });
 
 test('the old one-paragraph shape is still read, as the last line', () => {

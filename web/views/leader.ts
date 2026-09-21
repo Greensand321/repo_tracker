@@ -9,9 +9,8 @@
  */
 
 import { refKey, type Branch, type BranchRef, type Goal, type Snapshot } from '../../shared/types.ts';
-import { NOTHING_OPEN } from '../../server/advise/prompt.ts';
 import { esc, relativeTime } from '../format.ts';
-import { byRecency, glyph, groupByGoal, headline, matches, nowThread, threads, toolLabel, verdictChip, verdictLabel, visionLine } from '../derive.ts';
+import { byRecency, glyph, groupByGoal, headline, matches, nowLine, nowThread, threads, toolLabel, trimTo, verdictChip } from '../derive.ts';
 
 export type Grouping = 'goal' | 'branch';
 
@@ -78,7 +77,7 @@ export function renderBrief(snapshot: Snapshot): string {
 // Happening now
 // ---------------------------------------------------------------------------
 
-export function renderNow(snapshot: Snapshot): string {
+export function renderNow(snapshot: Snapshot, words: number): string {
   const branch = nowThread(snapshot);
   if (!branch) {
     return `<div class="eyebrow">Happening now</div>
@@ -88,74 +87,72 @@ export function renderNow(snapshot: Snapshot): string {
 
   const head = headline(branch);
   const goal = snapshot.goals.find((g) => g.id === branch.goalId) ?? null;
+  // The line names the goal when it counts what is left under it. Once is enough.
+  const towards = goal && !nowLine(snapshot, branch).namesGoal;
 
   return `
     <div class="eyebrow now">Happening now</div>
     <h1>${head.generated ? esc(head.text) : `<span class="raw">${esc(head.text)}</span>`}</h1>
     <div class="byline">
       <b>${esc(branch.repoKey)}</b> · ${esc(branch.name)} · ${statusWords(branch)}
-      ${goal ? ` · toward <b>${esc(goal.title)}</b>` : ''}
+      ${towards ? ` · toward <b>${esc(goal.title)}</b>` : ''}
     </div>
-    ${forNow(branch)}
+    ${theLine(snapshot, branch, words)}
+    ${provenance(branch)}
     <div class="acts">
-      ${chips(branch)}
+      ${chips(branch, { quiet: true })}
       <a class="act" href="${esc(branch.url)}" target="_blank" rel="noreferrer noopener">open on GitHub &#8599;</a>
-      ${branch.pr ? `<a class="act" href="${esc(branch.pr.url)}" target="_blank" rel="noreferrer noopener">PR #${branch.pr.number} &#8599;</a>` : ''}
+      ${branch.pr ? `<a class="act" href="${esc(branch.pr.url)}" target="_blank" rel="noreferrer noopener"
+        title="Pull request #${branch.pr.number}">pull request &#8599;</a>` : ''}
       <button class="act" data-file="${esc(branchKey(branch))}">${goal ? 'refile' : 'file under a goal'}</button>
     </div>`;
 }
 
 /**
- * The yardstick and the reality, on two lines. The comparison needs no explaining once
- * they sit next to each other — which is the whole argument for stating a vision at all.
+ * The line (D91). `Done.` when it is done; where something is left, or the branch is one
+ * piece of a larger job, that too — and never a word more.
+ *
+ * Every part of it is decided in `nowLine`; this only paints it. The word budget is the
+ * owner's (rule 7), and only the tail is ever cut — a line clipped to "Done," would be
+ * worse than one clipped to nothing.
  */
-export function forNow(branch: Branch): string {
-  const vision = visionLine(branch);
-  const out: string[] = [];
+export function theLine(snapshot: Snapshot, branch: Branch, words: number): string {
+  if (!branch.recap && !branch.assessment && branch.relevance !== 'quiet') {
+    // Nothing read it yet. Said plainly rather than guessed at, and never faked as "Going."
+    return `<div class="nowline"><span class="unread">not read yet</span></div>`;
+  }
 
-  out.push(
-    vision.known
-      ? `<div class="fn"><span class="k">For</span><span class="v reflect">${esc(vision.text)}` +
-        (vision.proposed ? ' <span class="proposed">my guess — not confirmed</span>' : '') +
-        `</span></div>`
-      : `<div class="fn"><span class="k">For</span><span class="v unsaid">${esc(vision.text)}
-          <button class="link" data-say="${esc(branchKey(branch))}">say what it is for</button>
-          <button class="link" data-ask="draft-vision" data-on="${esc(branchKey(branch))}"
-            title="Have the assistant look at the repo and the commits and propose one">have a go</button></span></div>`,
-  );
-
+  const line = nowLine(snapshot, branch);
+  const { rest, clipped } = trimTo(line, words);
   // Asking again is the only thing you can do about an answer you disagree with: the
   // branch has not moved, so nothing on its own will ever regenerate this (D81).
-  const readAgain = `<button class="link" data-ask="summarise" data-on="${esc(branchKey(branch))}">read it again</button>`;
+  const ask = line.ask
+    ? ` <span class="unsaid">Nobody has said what it is for.</span>
+        <button class="link" data-say="${esc(branchKey(branch))}">say</button>
+        <button class="link" data-ask="draft-vision" data-on="${esc(branchKey(branch))}"
+          title="Have the assistant look at the repo and the commits and propose one">or have a go</button>`
+    : '';
 
-  // The note you pick the work back up from (D89): what it did last, what landed, and
-  // what looks half-finished — the last of those in amber, because it is the line that
-  // decides what you do next.
-  if (branch.recap) {
-    const nothing = NOTHING_OPEN.test(branch.recap.open);
-    out.push(`<div class="fn"><span class="k">Last</span><span class="v">${esc(branch.recap.last)}</span></div>`);
-    if (branch.recap.done) out.push(`<div class="fn"><span class="k">Done</span><span class="v">${esc(branch.recap.done)}</span></div>`);
-    if (branch.recap.open) {
-      out.push(`<div class="fn"><span class="k">Open</span><span class="v ${nothing ? 'unsaid' : 'open'}">${esc(branch.recap.open)} ${readAgain}</span></div>`);
-    }
-  } else if (branch.summary && !branch.assessment) {
-    out.push(`<div class="fn"><span class="k">Now</span><span class="v">${esc(branch.summary)} ${readAgain}</span></div>`);
-  }
+  return `<div class="nowline"${clipped ? ` title="${esc(`${line.lead} ${line.rest}`)}"` : ''}>
+    <span class="lead t-${line.tone}">${esc(line.lead)}</span>${
+      rest ? ` <span class="rest${line.restIsOpen ? ' open' : ''}">${esc(rest)}</span>` : ''}${ask}</div>`;
+}
 
-  // What it checked before deciding, when it checked anything. A verdict drawn from the
-  // branches next to this one is worth more than one drawn from commit subjects, and that
-  // difference should be visible rather than inferred.
-  if (branch.assessment) {
-    const looked = branch.assessment.looked?.length
-      ? ` <span class="looked">${esc(lookedWords(branch.assessment.looked))}</span>`
-      : '';
-    const again = `<button class="link" data-ask="assess" data-on="${esc(branchKey(branch))}">check it again</button>`;
-    out.push(
-      `<div class="fn"><span class="k">Now</span><span class="v"><span class="verdict v-${branch.assessment.verdict}">${verdictLabel(branch.assessment.verdict)}</span> ${esc(branch.assessment.because)}${looked} ${again}</span></div>`,
-    );
-  }
-
-  return `<div class="fornow">${out.join('')}</div>`;
+/**
+ * Where the line came from, and how to disagree with it. Small, grey, and under the line
+ * rather than in it — the machinery is supporting metadata (rule 3).
+ */
+function provenance(branch: Branch): string {
+  const looked = branch.assessment?.looked?.length ? ` · ${esc(lookedWords(branch.assessment.looked))}` : '';
+  const why = branch.assessment?.because ? ` title="${esc(branch.assessment.because)}"` : '';
+  const again = [
+    `<button class="link" data-ask="summarise" data-on="${esc(branchKey(branch))}">read it again</button>`,
+    // Only offered where there is a yardstick to check it against; without a vision an
+    // assessment is a guess, and the band has already offered to get one.
+    branch.vision ? `<button class="link" data-ask="assess" data-on="${esc(branchKey(branch))}">check it again</button>` : '',
+  ].filter(Boolean);
+  return `<div class="prov"${why}>read ${esc(relativeTime(branch.insight?.generatedAt ?? branch.lastActivity))}${looked}
+    · ${again.join(' · ')}</div>`;
 }
 
 /** "after reading the branches next to it" — plain English, never a tool name (rule 3). */
@@ -173,19 +170,29 @@ function statusWords(branch: Branch): string {
   return bits.join(' · ');
 }
 
-function chips(branch: Branch): string {
+/**
+ * `quiet` drops the verdict and progress chips: beside the line they are the same fact a
+ * second time, and nothing is printed twice (D91). The register keeps them — there the
+ * chips ARE the reading.
+ *
+ * The pull request number is gone from the chip either way. It is an identifier nobody
+ * types (D90); it survives as the link, which is the only thing anyone does with it.
+ */
+function chips(branch: Branch, opts: { quiet?: boolean } = {}): string {
   const out: string[] = [];
-  if (branch.assessment) {
-    out.push(
-      `<span class="chip verd-${branch.assessment.verdict}" title="${esc(branch.assessment.because)}">${verdictChip(branch.assessment.verdict)}</span>`,
-    );
-  } else if (branch.progress) {
-    out.push(`<span class="chip prog-${branch.progress}">${branch.progress}</span>`);
+  if (!opts.quiet) {
+    if (branch.assessment) {
+      out.push(
+        `<span class="chip verd-${branch.assessment.verdict}" title="${esc(branch.assessment.because)}">${verdictChip(branch.assessment.verdict)}</span>`,
+      );
+    } else if (branch.progress) {
+      out.push(`<span class="chip prog-${branch.progress}">${branch.progress}</span>`);
+    }
   }
   if (branch.ci.state !== 'none') out.push(`<span class="chip ci-${branch.ci.state}">CI ${branch.ci.state}</span>`);
   if (branch.pr) {
     out.push(
-      `<span class="chip pr-${branch.pr.state}">#${branch.pr.number} ${branch.pr.state}${branch.pr.draft ? ' · draft' : ''}</span>`,
+      `<span class="chip pr-${branch.pr.state}" title="Pull request #${branch.pr.number}">${branch.pr.state}${branch.pr.draft ? ' · draft' : ''}</span>`,
     );
   }
   return out.join('');
@@ -195,7 +202,7 @@ function chips(branch: Branch): string {
 // The list
 // ---------------------------------------------------------------------------
 
-export function renderLeaderList(snapshot: Snapshot, grouping: Grouping, search: string): string {
+export function renderLeaderList(snapshot: Snapshot, grouping: Grouping, search: string, words: number): string {
   const visible = threads(snapshot).filter((b) => matches(b, search));
 
   if (visible.length === 0) {
@@ -204,12 +211,13 @@ export function renderLeaderList(snapshot: Snapshot, grouping: Grouping, search:
       try part of it.</div></div>`;
   }
 
-  return grouping === 'goal' ? byGoal(snapshot, visible) : byBranch(visible);
+  return grouping === 'goal' ? byGoal(snapshot, visible, words) : byBranch(snapshot, visible, words);
 }
 
-function byGoal(snapshot: Snapshot, visible: Branch[]): string {
+function byGoal(snapshot: Snapshot, visible: Branch[], words: number): string {
   return groupByGoal(snapshot, visible)
-    .map((group) => (group.goal ? goalItem(group.goal, group.branches) : unfiledItem(group.branches)))
+    .map((group) =>
+      group.goal ? goalItem(snapshot, group.goal, group.branches, words) : unfiledItem(snapshot, group.branches, words))
     .join('');
 }
 
@@ -221,7 +229,7 @@ const GOAL_WORDS: Record<string, string> = {
   'needs-you': 'Needs you',
 };
 
-function goalItem(goal: Goal, branches: Branch[]): string {
+function goalItem(snapshot: Snapshot, goal: Goal, branches: Branch[], words: number): string {
   const red = branches.filter((b) => b.ci.state === 'failing').length;
   const judged = goal.judgement;
 
@@ -250,26 +258,27 @@ function goalItem(goal: Goal, branches: Branch[]): string {
       ${
         branches.length === 0
           ? '<div class="empty">Nothing filed under this yet — use “file” on any branch.</div>'
-          : branches.map(memberRow).join('')
+          : branches.map((b) => memberRow(snapshot, b, words)).join('')
       }
     </div>
   </article>`;
 }
 
-function unfiledItem(branches: Branch[]): string {
+function unfiledItem(snapshot: Snapshot, branches: Branch[], words: number): string {
   return `<article class="goal-item">
     <span class="eyebrow">Unfiled</span>
     <h2 style="color:var(--dim)">Not yet under a goal</h2>
     <div class="byline">${branches.length} ${branches.length === 1 ? 'branch' : 'branches'} · normal, not a backlog</div>
-    <div class="members">${branches.map(memberRow).join('')}</div>
+    <div class="members">${branches.map((b) => memberRow(snapshot, b, words)).join('')}</div>
   </article>`;
 }
 
-function memberRow(branch: Branch): string {
+function memberRow(snapshot: Snapshot, branch: Branch, words: number): string {
   const head = headline(branch);
-  // The one line from the recap that changes what you do: what is still open. Shown here,
-  // in the compact view, only when something is.
-  const open = branch.recap?.open && !NOTHING_OPEN.test(branch.recap.open) ? branch.recap.open : '';
+  // The same line as the band (D91), and only when it is the thing standing in the way —
+  // "Done." and "Going." are already carried here by the glyph and the chips.
+  const line = nowLine(snapshot, branch);
+  const open = line.restIsOpen ? `${line.lead} ${trimTo(line, words).rest}` : '';
   return `<div class="mrow">
     <span class="g">${glyph(branch)}</span>
     <span style="min-width:0">
@@ -285,7 +294,7 @@ function memberRow(branch: Branch): string {
 }
 
 /** One branch as a broadsheet item: kicker, headline, byline, prose. */
-function byBranch(visible: Branch[]): string {
+function byBranch(snapshot: Snapshot, visible: Branch[], words: number): string {
   return [...visible]
     .sort(byRecency)
     .map((branch) => {
@@ -297,7 +306,7 @@ function byBranch(visible: Branch[]): string {
           <span><b>${esc(branch.repoKey)}</b> · ${esc(branch.name)}</span>
           <span>${statusWords(branch)}</span>
         </div>
-        ${forNow(branch)}
+        ${theLine(snapshot, branch, words)}
         <div class="acts">
           ${chips(branch)}
           <a class="act" href="${esc(branch.url)}" target="_blank" rel="noreferrer noopener">open &#8599;</a>

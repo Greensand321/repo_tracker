@@ -24,7 +24,7 @@ import {
   type Snapshot,
 } from '../../shared/types.ts';
 import { complete } from './client.ts';
-import { NOTHING_OPEN, extractJson } from './prompt.ts';
+import { extractJson } from './prompt.ts';
 
 /** v2: three parts — done, next, now (D89). v4: no branch names in the prose; they sit beside it (D90). */
 export const BRIEF_PROMPT_VERSION = 'v4';
@@ -122,7 +122,7 @@ export function buildBriefPrompt(snapshot: Snapshot, cap: number): string {
     // landed, and the gist folds both into one sentence.
     if (branch.recap) {
       lines.push(`    DID: ${branch.recap.done || branch.recap.last}`);
-      if (branch.recap.open && !NOTHING_OPEN.test(branch.recap.open)) lines.push(`    OPEN: ${branch.recap.open}`);
+      if (branch.recap.next) lines.push(`    LEFT: ${branch.recap.next}`);
     } else if (branch.summary) {
       lines.push(`    DID: ${branch.summary}`);
     }

@@ -20,7 +20,7 @@ import type { RunHandle } from '../work/handle.ts';
 import { contextFor } from '../tools/context.ts';
 import { LlmError } from './client.ts';
 import { converse } from './converse.ts';
-import { PROMPT_VERSION, SYSTEM_PROMPT, buildUserPrompt, parseInsight } from './prompt.ts';
+import { PROMPT_VERSION, buildUserPrompt, parseInsight, systemPrompt } from './prompt.ts';
 import { getInsight, putInsight, type StoredInsight } from './store.ts';
 
 /**
@@ -29,7 +29,10 @@ import { getInsight, putInsight, type StoredInsight } from './store.ts';
  * one written from the messages alone, and the store must not hold both under one key.
  */
 export function summariseVersion(settings: Settings): string {
-  return PROMPT_VERSION + toolSetTag(toolsFor('summarise', settings));
+  // The word budget is in the prompt, so it is in the key as well — the same reasoning as
+  // the tool list (D74). Shorten the line and the summaries are rewritten to fit it rather
+  // than kept at the old length and trimmed for ever.
+  return `${PROMPT_VERSION}w${settings.nowLineWords}${toolSetTag(toolsFor('summarise', settings))}`;
 }
 
 export function llmReady(settings: Settings): boolean {
@@ -77,7 +80,7 @@ export async function summariseBranch(
   handle: RunHandle,
 ): Promise<void> {
   const { text: raw } = await converse(settings, {
-    system: SYSTEM_PROMPT,
+    system: systemPrompt(settings.nowLineWords),
     user: buildUserPrompt(branch, new Date()),
     tools: toolsFor('summarise', settings),
     ctx: contextFor(snapshot, settings, branch),

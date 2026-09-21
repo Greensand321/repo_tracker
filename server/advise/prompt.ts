@@ -11,10 +11,22 @@ import type { Branch, Progress, Recap } from '../../shared/types.ts';
 
 /** Bump when the prompt changes meaningfully — it is part of the cache key, so old
  *  summaries are re-generated rather than silently mixed with new ones.
- *  v2: the summary became a recap — last / done / open — written to be picked up from (D89). */
-export const PROMPT_VERSION = 'v2';
+ *  v2: the summary became a recap — last / done / open — written to be picked up from (D89).
+ *  v3: `open` became `next` — a fragment or nothing at all, short enough for the one line
+ *      the band now prints (D91). */
+export const PROMPT_VERSION = 'v3';
 
 const PROGRESS_VALUES: Progress[] = ['progressing', 'stalled', 'blocked', 'done'];
+
+/**
+ * The budget for `next` is the line's cap less the longest lead ("Not what it was for:",
+ * five words) — so a fragment written to the number still fits the line it ends up on.
+ */
+const LEAD_WORDS = 5;
+
+/** The system prompt with the owner's word budget in it (rule 7: no number is hardcoded). */
+export const systemPrompt = (nowLineWords: number): string =>
+  SYSTEM_PROMPT.replace('NEXT_WORDS', String(Math.max(3, nowLineWords - LEAD_WORDS)));
 
 export const SYSTEM_PROMPT = `You read one git branch and write the note a developer reads to pick the work back up.
 
@@ -25,7 +37,7 @@ Write these, each as plain English, like a colleague, no preamble, no markdown, 
 - title: a short noun phrase, at most 60 characters, no trailing period. The OUTCOME the work is after, not the commits. "Stopping duplicate webhook charges", not "Added idempotency test and dedupe table".
 - last: one sentence. What the newest commits were doing — the thing the branch was in the middle of when it was last touched. Name the concrete piece: the feature, the file, the test. Never "made improvements".
 - done: one sentence. What is finished and landed: merged, passing, complete. If the pull request is merged, say what it delivered. If nothing is clearly finished yet, say so.
-- open: one sentence. What looks unfinished or partial. Read the history for the signs: messages saying WIP, TODO, "part 1", "start", "scaffold", "stub"; a test added with no implementation behind it; the same piece touched again and again without a closing commit; CI failing; an open or draft pull request; a final commit that reads like an intermediate step. Name the piece and why it looks unfinished. If nothing does, write exactly: Nothing looks unfinished.
+- next: the ONE thing left, as a short fragment — not a sentence, no leading capital, no full stop. "the drain worker never re-sends", "CI red since the rename", "four templates unported". At most NEXT_WORDS words, and fewer is better. Read the history for the signs: messages saying WIP, TODO, "part 1", "start", "scaffold", "stub"; a test added with no implementation behind it; the same piece touched again and again without a closing commit; CI failing; an open or draft pull request; a final commit that reads like an intermediate step. Name the piece, not the evidence for it. **If nothing is left, write null** — not a sentence saying so. Where several things are open, write the one that blocks the rest.
 - progress: judge honestly —
     progressing: recent commits that move the work forward
     stalled: nothing has happened for a while and nothing is obviously blocking it
@@ -36,7 +48,7 @@ Write these, each as plain English, like a colleague, no preamble, no markdown, 
 Never invent facts. You only know what is in the commits, the pull request and the CI state. If the history is too thin to tell, say so in the field it affects.
 
 Reply with ONLY a JSON object, no prose around it, no markdown fence:
-{"title": "...", "last": "...", "done": "...", "open": "...", "progress": "progressing|stalled|blocked|done", "evidence": ["sha", ...]}`;
+{"title": "...", "last": "...", "done": "...", "next": "..." or null, "progress": "progressing|stalled|blocked|done", "evidence": ["sha", ...]}`;
 
 /** How much of one branch we are willing to spend tokens on. */
 const MAX_COMMITS = 25;
@@ -87,7 +99,11 @@ export type Insight = {
   evidence: string[];
 };
 
-/** The words the model is told to use when nothing is unfinished. Matched, never shown raw. */
+/**
+ * v2's phrase for "nothing is unfinished". The model is no longer asked for it — it writes
+ * null — but one that says it anyway is understood rather than believed, and nothing about
+ * a non-event reaches the page.
+ */
 export const NOTHING_OPEN = /^nothing (looks|is) (unfinished|open|left)\.?$/i;
 
 export class InsightParseError extends Error {
@@ -126,7 +142,10 @@ export function parseInsight(raw: string, branch: Branch): Insight {
   // ignores the new fields still yields something rather than a parked job.
   const last = cleanText(record['last']) || cleanText(record['summary']);
   const done = cleanText(record['done']);
-  const open = cleanText(record['open']);
+  // A model that still answers in v2's shape is read, not parked — and its "Nothing looks
+  // unfinished." becomes the null it means rather than a sentence about a non-event.
+  const said = cleanText(record['next']) || cleanText(record['open']);
+  const next = said && !NOTHING_OPEN.test(said) && !/^(null|none|n\/a)$/i.test(said) ? said : null;
   if (!title) throw new InsightParseError('reply had no usable title', raw);
   if (!last) throw new InsightParseError('reply said nothing about what the branch did', raw);
 
@@ -135,8 +154,8 @@ export function parseInsight(raw: string, branch: Branch): Insight {
     throw new InsightParseError(`reply had an unknown progress value: ${String(record['progress'])}`, raw);
   }
 
-  const recap: Recap = { last, done, open };
-  const summary = open && !NOTHING_OPEN.test(open) ? `${last} ${open}` : last;
+  const recap: Recap = { last, done, next };
+  const summary = next ? `${last} ${next}` : last;
   return { title, summary, recap, progress, evidence: validEvidence(record['evidence'], branch) };
 }
 

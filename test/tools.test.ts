@@ -543,8 +543,16 @@ test('every station with tools carries them in its version', async () => {
     const on = version(settings({ toolsEnabled: true }));
     const off = version(settings({ toolsEnabled: false }));
     assert.notEqual(on, off);
-    assert.match(off, /^v2$/, 'no tools means the version it always had');
+    assert.doesNotMatch(off, /\+t/, 'no tools means no tool tag on the key');
   }
+
+  // The summary prompt carries the owner's word budget, so the budget is in its key too:
+  // shorten the line and the summaries are rewritten to fit it (D91).
+  assert.notEqual(
+    summariseVersion(settings({ nowLineWords: 12 })),
+    summariseVersion(settings({ nowLineWords: 8 })),
+    'a different budget is a different prompt',
+  );
 
   // And the three do not collide: they have different tools, so different tags.
   const withTools = settings({ toolsEnabled: true });

@@ -194,9 +194,6 @@
             </label>
             <input id="maxOpenQuestions" type="number" min="0" max="40">
           </div>
-        </div>
-
-        <div class="field nums four">
           <div>
             <label for="briefEveryMinutes">Brief (min)
               <span class="info" tabindex="0" role="img" aria-label="about the brief" data-tip="Minutes between routine rewrites of the brief — it reads every branch, so it is the dearest call. The last one stays up, dated, until then. “Write it again” never waits. 0 rewrites every read.">i</span>
@@ -220,6 +217,12 @@
               <span class="info" tabindex="0" role="img" aria-label="about lookups" data-tip="Lookups one job may make before answering. A ceiling, not a target. 0 is the same as turning lookups off.">i</span>
             </label>
             <input id="toolCallsPerJob" type="number" min="0" max="20">
+          </div>
+          <div>
+            <label for="nowLineWords">Line words
+              <span class="info" tabindex="0" role="img" aria-label="about the line" data-tip="The most words “happening now” may use — it says “Done.” in one. The assistant is told the number, and a longer tail is trimmed rather than wrapped. Shorten it and the summaries are rewritten to fit.">i</span>
+            </label>
+            <input id="nowLineWords" type="number" min="5" max="20">
           </div>
         </div>
 

@@ -101,14 +101,24 @@ export type Branch = {
   insight: InsightMeta | null;
 };
 
-/** Three sentences, each answering the question you have when you open a branch cold. */
+/**
+ * What you need when you open a branch cold — and, in `next`, the one thing the band
+ * actually says (D91).
+ */
 export type Recap = {
   /** What the newest commits were doing — the thing it was in the middle of. */
   last: string;
   /** What is finished and landed. */
   done: string;
-  /** What looks unfinished or partial, or "Nothing looks unfinished." */
-  open: string;
+  /**
+   * The one thing left, as a FRAGMENT — "the drain worker never re-sends" — or **null**
+   * when nothing is.
+   *
+   * Null rather than a sentence saying nothing is wrong: the band draws nothing for null,
+   * where "Nothing looks unfinished." had to be printed, matched against by regex, and
+   * then styled to look less important than it read (D91).
+   */
+  next: string | null;
 };
 
 export type Progress = 'progressing' | 'stalled' | 'blocked' | 'done';
@@ -423,6 +433,14 @@ export type Settings = {
   /** How many questions may be waiting at once. A wall of them is a chore list, not help. */
   maxOpenQuestions: number;
   /**
+   * The most words the "happening now" line may run to, counting its lead (D91).
+   *
+   * The line is meant to be read at a glance, and a model given no number will write a
+   * sentence. The model is told this number and the line is trimmed to it on the way out,
+   * so a model that ignores it costs a clipped tail rather than the band's whole point.
+   */
+  nowLineWords: number;
+  /**
    * How long a routine rewrite of the brief waits after the last one, in minutes.
    *
    * The brief reads the whole fleet and its key moves whenever any branch does. With agents
@@ -480,6 +498,7 @@ export const DEFAULT_SETTINGS: Settings = {
   askBranchCap: 60,
   visionAutoDraft: true,
   maxOpenQuestions: 3,
+  nowLineWords: 12,
   briefEveryMinutes: 15,
   toolsEnabled: true,
   toolCallsPerJob: 8,

@@ -1,6 +1,6 @@
 # The "happening now" band — five ways to say the same thing
 
-> **Chosen: N6, "The line"** (21 Sep 2026). The owner's call, after reading the five:
+> **Chosen and built: N6, "The line"** (21 Sep 2026). The owner's call, after reading the five:
 > *"just 'Done' is the best to say when it's actually done. However if there is more to be
 > done, or if the implementation is only one part of a multipart implementation, then that
 > should be said — but also in fewest words possible."*
@@ -28,7 +28,7 @@
 > invented; CI is a chip, and becomes words only when it is the one thing between you and
 > done.
 
-**Status:** N6 chosen, not yet built. Open
+**Status:** N6 chosen and **built** (21 Sep 2026) — see **D91**. The rest is kept as reasoning. Open
 [`index.html`](index.html) — it runs from disk, no server and no build, and the four
 buttons at the top switch the branch state every design is drawn against.
 
