@@ -108,10 +108,11 @@
 
   <h2>The short answer</h2>
   <p class="lede">
-    There is no agent loop and no tool use yet. The assistant is <b>six separate prompts</b>,
-    each a single request and a single reply, fired at different moments. Four run on their own
-    in the background; two run because you pressed something. Everything any of them writes goes
-    to Plane B — never to a repo.
+    The assistant is <b>six separate prompts</b>, fired at different moments. Four run on their
+    own in the background; two run because you pressed something. Four of the six may look
+    things up before they answer (steps 3–6 of the workroom), one of those — the advisor, ⑤ —
+    may put work on the board, and none of them may write a goal or a vision as your own.
+    Everything any of them writes goes to Plane B — never to a repo.
   </p>
 
   <h2>Every path, from the moment it wakes</h2>
@@ -297,13 +298,14 @@
   </div>
 
   <div class="call">
-    <div class="top"><span class="num">⑤</span><h4>Ask the advisor</h4><span class="when">you pressed Ask</span></div>
+    <div class="top"><span class="num">⑤</span><h4>Ask the advisor — the desk</h4><span class="when">you pressed Ask</span></div>
     <dl class="grid">
-      <dt>Sees</dt><dd>A compact line per branch plus the goals — the same shape as ④, cheaper.</dd>
-      <dt>Decides</dt><dd>Four sentences of plain English. Nothing else.</dd>
-      <dt>May not</dt><dd class="never">Write anything at all. This call has no side effects.</dd>
+      <dt>Sees</dt><dd>A compact block per branch — what it is FOR, what it DID, how they COMPARE, its goal — plus every goal and its judgement. The same shape as ④, plus the verdicts.</dd>
+      <dt>May look up</dt><dd><code>what_changed</code> (free, the dated history) and <code>dispatch</code> — the one write any tool has: put a job on the board, through the same door the page's buttons use. It queues; it does not do. Off with the other lookups (<code>toolsEnabled</code>), when it is one turn as before.</dd>
+      <dt>Decides</dt><dd>Four sentences of plain English. Asked to rank: an ordered list of real branches, one reason each — an answer, nothing written. Asked to regroup: a <i>proposal</i> of goals by title and branches under each, filed only when you press <b>file them like this</b>.</dd>
+      <dt>May not</dt><dd class="never">File anything itself, start work the page could not ask for, or describe the result of work it started — it says "started", never "done" (D84).</dd>
       <dt>Cached on</dt><dd class="where">nothing — you asked, so you get a fresh answer</dd>
-      <dt>Prompt</dt><dd class="where">server/advise/ask.ts → SYSTEM</dd>
+      <dt>Prompt</dt><dd class="where">server/advise/ask.ts → SYSTEM · the tool in server/tools/desk.ts</dd>
     </dl>
   </div>
 

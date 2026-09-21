@@ -3,12 +3,13 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 
-import type { Settings } from '../shared/types.ts';
+import { refKey, type JobKind, type Settings } from '../shared/types.ts';
 import { ask } from './advise/ask.ts';
+import { cannotAsk } from './work/asks.ts';
 import { distributeVisions } from './advise/vision.ts';
 import { LlmError, fetchModelsRaw, listModels } from './advise/client.ts';
 import { GitHubError, splitRepoKey, verifyToken } from './github.ts';
-import { GoalError, assignBranch, createGoal, deleteGoal, listGoals, updateGoal } from './goals.ts';
+import { GoalError, assignBranch, createGoal, deleteGoal, listGoals, regroup, updateGoal } from './goals.ts';
 import { VisionError, clearVision, confirmVision, setVision } from './vision.ts';
 import { loadSettings, saveSettings, toSafe } from './settings.ts';
 import { resetBoardState } from './work/run.ts';
@@ -78,6 +79,7 @@ api.put('/settings', async (c) => {
     'llmMaxPerRun',
     'askBranchCap',
     'maxOpenQuestions',
+    'briefEveryMinutes',
     'workers',
     'dispatchWorkers',
     'toolCallsPerJob',
@@ -274,8 +276,10 @@ api.post('/work/dispatch', async (c) => {
   }
   // Only a branch this read is carrying: a request against something that does not exist
   // would sit on the board for ever waiting for a subject that never arrives.
-  const known = snapshot.branches.some((b) => b.repoKey === body.repoKey && b.name === body.branch);
-  if (!known) return c.json({ error: 'no such branch in this read' }, 400);
+  const branch = snapshot.branches.find((b) => b.repoKey === body.repoKey && b.name === body.branch);
+  if (!branch) return c.json({ error: 'no such branch in this read' }, 400);
+  const refused = cannotAsk(kind as JobKind, branch);
+  if (refused) return c.json({ error: refused }, 400);
 
   dispatchWork(kind as 'summarise' | 'draft-vision' | 'assess', {
     kind: 'branch',
@@ -301,15 +305,48 @@ api.delete('/settings/token', (c) => c.json(toSafe(saveSettings({ token: '' })))
 api.delete('/settings/llm-key', (c) => c.json(toSafe(saveSettings({ llmApiKey: '' }))));
 
 /**
- * One question about the snapshot on screen. Single turn, no tools — see advise/ask.ts
- * for why that is deliberate rather than unfinished.
+ * One question about the snapshot on screen. The desk (D84): it answers from what it can
+ * see, may read how the fleet moved, and may put work on the board — through the same
+ * door the page's own buttons use, so it can start nothing they could not.
  */
 api.post('/ask', async (c) => {
   const snapshot = currentResponse().snapshot;
   if (!snapshot) return c.json({ error: 'nothing has been read from GitHub yet' }, 400);
   try {
     const body = (await c.req.json()) as { question?: unknown };
-    return c.json({ answer: await ask(snapshot, String(body.question ?? ''), loadSettings()) });
+    const answer = await ask(snapshot, String(body.question ?? ''), loadSettings(), { dispatch: dispatchWork });
+    return c.json({ answer });
+  } catch (err) {
+    return c.json({ error: describe(err) }, 400);
+  }
+});
+
+/**
+ * Accepting a regrouping the advisor proposed. The only way a proposal becomes filing —
+ * the answer itself writes nothing (D84). Checked again here against the read on screen:
+ * a branch that has gone since the proposal was made is left out, not filed blind.
+ */
+api.post('/goals/regroup', async (c) => {
+  const snapshot = currentResponse().snapshot;
+  if (!snapshot) return c.json({ error: 'nothing has been read from GitHub yet' }, 400);
+  try {
+    const body = (await c.req.json()) as { groups?: unknown };
+    if (!Array.isArray(body.groups)) return c.json({ error: 'groups are required' }, 400);
+    const known = new Set(snapshot.branches.map((b) => refKey(b.repoKey, b.name)));
+    const groups = body.groups
+      .map((row) => {
+        const item = row as { title?: unknown; branches?: unknown };
+        const branches = (Array.isArray(item.branches) ? item.branches : [])
+          .filter((b): b is { repoKey: string; branch: string } =>
+            !!b && typeof (b as { repoKey?: unknown }).repoKey === 'string' && typeof (b as { branch?: unknown }).branch === 'string')
+          .filter((b) => known.has(refKey(b.repoKey, b.branch)))
+          .map((b) => ({ repoKey: b.repoKey, branch: b.branch }));
+        return { title: typeof item.title === 'string' ? item.title : '', branches };
+      })
+      .filter((g) => g.title.trim() && g.branches.length > 0);
+    const result = regroup(groups);
+    reapplyGoals();
+    return c.json({ ...result, goals: listGoals() });
   } catch (err) {
     return c.json({ error: describe(err) }, 400);
   }

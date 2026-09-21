@@ -286,7 +286,7 @@ Each step is useful alone and leaves the program working.
 | **3** ✅ | **The tool layer** | `Tool` contract, the JSON-protocol loop, the free tools (`sibling_branches`, `what_changed`), a per-job lookup budget, the disagreement counter — and `assess` wired to use them | 1 |
 | **4** ✅ | **Tools at the stations** | `repo_readme` + `commit_files`, fetched on demand and cached for ever (D79); wired into draft-vision, assess and summarise; each station's tool list folded into its prompt version (D74) | 3 |
 | **5** ✅ | **Dispatch** | asking from the page, the second lane with its own purse (D82), `data/dispatched.json` and reboot-on-start (D72, D83), "you asked for this" and the finished notice on the floor | 1, 2 |
-| **6** | **The desk** | The advisor may dispatch: reorganise the register, rank by your criteria, go and check something and come back with it on the page | 3, 4, 5 |
+| **6** ✅ | **The desk** | The advisor may look at what moved and may put work on the board (D84); a ranking is an answer, a regrouping is a proposal accepted in one click; "started" is said, never "done" | 3, 4, 5 |
 
 Steps 1 and 2 need no tool calling and no probe, and they are what makes everything after
 them safe to let loose: **tools without a predicate is just a longer guess.**
@@ -341,6 +341,11 @@ one or two.
 **Q74 — Does the floor show finished work, or only live work?** ✅ Half-built and worth your
 eye: it shows **what you asked for**, for ten minutes after it lands, and nothing else.
 Routine work still just appears. The rolling log of everything is still not built.
+
+**Q76 — When the advisor reorganises the register, is it proposing or doing?** ✅ Built as
+**proposing** (D84). Goals are Plane B and reversible, but a regrouping is the largest write
+in the program and D64's rule holds: the assistant proposes, you accept the whole thing with
+one click or leave it. A ranking, by contrast, is just an answer — nothing is written.
 
 **Q75 — Should `repo_readme` read anything else?** ✅ Built as: the README, and `CLAUDE.md`
 **only when there is no README** — so it costs a second call exactly where the first one

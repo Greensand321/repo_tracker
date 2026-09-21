@@ -314,3 +314,111 @@ test('the two lanes cannot both claim the same job', async () => {
   const summaries = asked.filter((n) => n !== 'brief');
   assert.equal(new Set(summaries).size, summaries.length, `paid twice for something: ${summaries.join(', ')}`);
 });
+
+// ---------------------------------------------------------------------------
+// Found in review: what the second lane and the retry button were getting wrong
+// ---------------------------------------------------------------------------
+
+test('the dispatched lane leaves a parked routine job parked', async () => {
+  // Judged by its own slice of the board, the dispatched lane used to forget every routine
+  // failure at the end of its run — and each was tried twice more on the next read.
+  const config = settings();
+  let summaries = 0;
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    const body = String(init.body);
+    const content = body.includes('You are a personal assistant')
+      ? JSON.stringify({ brief: 'Fine.', goals: [], overtaken: [] })
+      : (summaries++, 'not json');
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
+  }) as typeof fetch;
+
+  for (let read = 0; read < 2; read++) {
+    const snap = snapshot([branch('a')]);
+    enrich.applyCached(snap, config);
+    await work.runBoard(snap, config);
+  }
+  assert.equal(summaries, 2, 'tried on two reads, then parked');
+
+  queue.dispatch('brief', { kind: 'fleet' });
+  const during = snapshot([branch('a')]);
+  enrich.applyCached(during, config);
+  await work.runBoard(during, config, { lane: 'dispatched' });
+
+  const after = snapshot([branch('a')]);
+  enrich.applyCached(after, config);
+  work.applyWork(after, config);
+  assert.equal(after.work.jobs.filter((j) => j.state === 'parked').length, 1, 'still parked');
+  await work.runBoard(after, config);
+  assert.equal(summaries, 2, 'and not tried again');
+});
+
+test('a draft never overwrites what the owner said a branch is for', () => {
+  // The station writes over whatever vision is there, so a request to draft is refused
+  // wherever the words are the owner's — and cleared, rather than kept for ever.
+  vision.setVision({ repoKey: 'o/r', branch: 'a' }, 'My own words', 'yours');
+  queue.dispatch('draft-vision', ref);
+  const snap = snapshot([branch('a')]);
+  assist.applyAssist(snap, settings());
+  assert.deepEqual(board.deriveDispatched(snap, settings()), []);
+  assert.deepEqual(queue.listDispatched(), [], 'off the disk');
+  assert.equal(vision.getVision({ repoKey: 'o/r', branch: 'a' })?.text, 'My own words');
+
+  // Its own earlier guess is fair game.
+  vision.setVision({ repoKey: 'o/r', branch: 'a' }, 'A guess', 'proposed');
+  queue.dispatch('draft-vision', ref);
+  const again = snapshot([branch('a')]);
+  assist.applyAssist(again, settings());
+  assert.equal(board.deriveDispatched(again, settings()).length, 1);
+});
+
+test('a request that cannot apply is cleared, not rebooted until it gives up', () => {
+  queue.dispatch('assess', ref);
+  board.deriveDispatched(snapshot([branch('a')]), settings());
+  assert.deepEqual(queue.listDispatched(), [], 'nothing to compare against, so nothing to keep');
+});
+
+test('a request against a deleted branch is dropped; one against a repo that could not be read stands', () => {
+  const gone = { kind: 'branch' as const, repoKey: 'o/r', branch: 'deleted' };
+  const repo = { key: 'o/r', owner: 'o', name: 'r', defaultBranch: 'main', branchCount: 1, url: 'u' };
+
+  queue.dispatch('summarise', gone);
+  // The read did not reach o/r at all: a bad connection, not a deletion.
+  board.deriveDispatched({ ...snapshot([]), repos: [] }, settings());
+  assert.equal(queue.listDispatched().length, 1, 'kept');
+
+  // The read reached o/r and the branch is not in it: deleted.
+  board.deriveDispatched({ ...snapshot([branch('a')]), repos: [repo] }, settings());
+  assert.deepEqual(queue.listDispatched(), [], 'dropped');
+});
+
+test('a parked request hands itself back on retry, so "try again" can ask again', () => {
+  // Parking took it off disk. Forgetting the failure alone left nothing to derive, and the
+  // button did nothing at all.
+  queue.dispatch('summarise', ref);
+  for (let start = 0; start < 3; start++) {
+    queue.resetDispatchedCache();
+    work.forgetResume();
+    work.resumeDispatched();
+  }
+  const snap = snapshot([branch('a')]);
+  work.applyWork(snap, settings());
+  const stuck = snap.work.jobs.find((j) => j.state === 'parked')!;
+  assert.equal(stuck.origin, 'dispatched');
+
+  const job = work.unpark(stuck.id);
+  assert.equal(job?.kind, 'summarise');
+  assert.deepEqual(job?.subject, ref);
+  assert.equal(work.unpark(stuck.id), null, 'once');
+});
+
+test('the door refuses what the board would only drop', () => {
+  const base = branch('main', { isBase: true });
+  assert.match(board.cannotAsk('summarise', base) ?? '', /base branch/);
+  assert.match(board.cannotAsk('summarise', branch('empty', { commits: [] })) ?? '', /no commits/);
+  assert.match(board.cannotAsk('assess', branch('a')) ?? '', /nobody has said/);
+  const mine = { text: 'Mine', state: 'yours' as const, from: '', draftedAt: null, createdAt: 'x', updatedAt: 'x' };
+  assert.match(board.cannotAsk('draft-vision', branch('a', { vision: mine })) ?? '', /already said/);
+  assert.equal(board.cannotAsk('draft-vision', branch('a', { vision: { ...mine, state: 'proposed' } })), null);
+  assert.equal(board.cannotAsk('assess', branch('a', { vision: mine })), null);
+  assert.equal(board.cannotAsk('brief', base), null);
+});

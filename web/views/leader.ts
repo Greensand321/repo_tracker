@@ -45,10 +45,13 @@ export function renderBrief(snapshot: Snapshot): string {
       : 'The assistant is off, so there is no brief. Turn it on in settings.';
     return `<div class="eyebrow">The brief</div><div class="waiting">${esc(why)}</div>`;
   }
+  // Dated, and honest when the fleet has moved since: the routine rewrite waits its
+  // interval, and a brief from ten minutes ago beats a blank space for those ten minutes.
+  const stale = snapshot.brief.stale ? ' · the fleet has moved since' : '';
   return `
     <div class="eyebrow">The brief</div>
     <div class="brief-text">${esc(snapshot.brief.text)}</div>
-    <div class="brief-prov">${esc(snapshot.brief.model)} · ${relativeTime(snapshot.brief.generatedAt)}
+    <div class="brief-prov">${esc(snapshot.brief.model)} · ${relativeTime(snapshot.brief.generatedAt)}${stale}
       <button class="link" data-ask="brief">write it again</button></div>`;
 }
 

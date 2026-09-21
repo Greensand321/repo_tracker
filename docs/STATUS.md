@@ -1,10 +1,50 @@
 # Status — where the project stands
 
-**Updated:** 17 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant · the board** · **Branch:** `claude/kind-meitner-cpis9v`
+**Updated:** 21 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant · the workroom** · **Branch:** `claude/kind-meitner-cpis9v`
 
 > Keep this short and current. It is the first thing to read after any time away.
 
 ---
+
+## The desk is built (workroom step 6), and the room was reviewed
+
+**You can tell the advisor to do things.** It still answers in seconds from what is on
+screen — now including every vision and every verdict — and it has two tools: it can read
+how the fleet moved over the last days, and it can **put work on the board** through the
+same door the page's buttons use. "Read `claude/foo` again", "check everything under
+Webhooks again", "write the brief again" become things you say. It queues; it does not do.
+The floor shows it, the page gets the result, and the advisor is told to say *started*,
+never *done* (D84).
+
+Two asks come back as something you can act on. **"Rank the branches by …"** gives an
+ordered list of real branches with a reason each — an answer, nothing written.
+**"Reorganise the register by …"** gives a proposal: goals by title, branches under each,
+and one button — *file them like this*. Nothing is filed until you press it (Q76).
+
+**The review found the thing that was costing you money.** Three bugs together explain
+"it didn't save between sessions":
+
+- **One bad read deleted everything about a repo.** A repo GitHub would not serve — a bad
+  connection at startup, a rate limit — was missing from the snapshot, and every store was
+  pruned against that snapshot: summaries, visions, and the branches under your goals. The
+  next read paid for the summaries again. Pruning is now scoped to repos the read reached
+  (D86).
+- **Closing the program mid-write left a torn file, and a torn file was treated as empty.**
+  The next write then replaced a hundred entries with one. Every file is now written
+  atomically and a broken one is set aside, never overwritten (D85).
+- **The brief was rewritten on nearly every read.** Its key moves whenever any branch does,
+  which with agents pushing every few minutes is always. It now waits `briefEveryMinutes`
+  (default 15), and the last one stays up, dated, until then (D87).
+
+Also fixed: the dispatched lane forgot every routine job that had parked, so each was tried
+twice more; *try again* on something you asked for did nothing; a dispatched "have a go"
+could overwrite a vision you had written; requests that could not apply sat on disk until
+they gave up; an empty brief was saved as done; a run that outlived its read left the page
+stale until the next one; a page left open through restarts ticked several times a second.
+
+**Not yet verified with a real provider.** Everything above is tested against stubs and
+through the real server modules end to end. `npm run probe` is still unrun, and the desk has
+never been asked a real question.
 
 ## The room is built (workroom steps 1–5)
 
@@ -113,7 +153,7 @@ recommendation there was D6; the owner chose D4 and the reasons are in D57.
 | **Stage 1** | Built. Every branch across your repos, with its real commit history, PR and CI state. ETag change detection; a repo that has not moved costs nothing. |
 | **Stage 2 engine** | Built. Per-branch plain-English title, summary, and progress judgement, cached so an idle branch is never re-summarised. |
 | **Stage 2 surfaces** | Deliberately not built — the comment tool, the chat panel, and "what changed since I last looked" all wait for the real design. |
-| Tests | 233, no network. Recorded GitHub fixtures and a stubbed provider. |
+| Tests | 266, no network. Recorded GitHub fixtures and a stubbed provider. |
 
 ## Try it without the GUI
 
@@ -134,18 +174,19 @@ would fail at the worst moment.
 
 ## The next concrete action
 
-**Workroom step 3 — the tool layer.** The contract, the JSON-protocol loop, the free tools
-(`sibling_branches`, `what_changed` — which finally reads the dated history nothing has ever
-read), and a per-job tool budget. Tools are safe to let loose now that a job's result is
-checked rather than believed.
+**Run it for real.** Every station, the desk and the tools have only ever answered a stub.
+Open it, watch the first read on the floor, ask the desk to rank something and to regroup
+something, and read `data/*.json` afterwards. `npm run probe` (two provider calls) says
+whether native tool calling is available; the JSON protocol is the floor either way.
 
-**Run `npm run probe` alongside it.** Two provider calls. It decides native tool calling
-versus the JSON protocol — *which*, not *whether*, since the protocol floor works on any
-model that can return JSON, which yours demonstrably can.
+Then, in whatever order they earn it:
 
-After that, in order:
-
-- **Step 5, dispatch**, then **step 6, the desk** — see `plans/workroom.md`.
+- **Settle time for summaries.** Agents push in bursts; a branch is summarised at every
+  head it is seen at. Summarising only a head that has stood for a few minutes would cut
+  the routine bill again. Not built — it is a product call about how live the summaries
+  must be.
+- **A rolling log of finished work** (Q74's other half), and `CLAUDE.md` alongside the
+  README (Q75).
 - **Milestones above goals.** `Goal.milestone` is a plain string today so the idea could
   be used before the structure exists. The register already groups by goal; grouping goals
   by milestone is the same move one level up.
@@ -230,6 +271,7 @@ After that, in order:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 21 Sep 2026 | **The workroom, step 6 — the desk**, a review of the room, and the persistence bugs that were re-paying for summaries: pruning against a failed read, torn files treated as empty, the brief rewritten every read. D84–D87 |
 | 18 Sep 2026 | **The workroom, step 5**: you can ask for a second opinion, in its own lane, surviving a restart. Work asked for is decided by freshness rather than by what is missing. D81–D83 |
 | 18 Sep 2026 | **The workroom, step 4**: `repo_readme` and `commit_files` — fetched on demand, cached for ever, and wired into summarise, draft-vision and assess. A tool gets a reader, never the token. D79, D80 |
 | 17 Sep 2026 | **The workroom, step 3 and an audit**: stations can look things up (the JSON protocol, two free tools, `assess` wired). The audit found four: a bad key parked the whole fleet, the call budget could be overshot ninefold, a parked job blocked the brief for ever, and a model that never answered had its tool call stored as a verdict. D75–D78 |

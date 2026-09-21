@@ -15,6 +15,7 @@
 import { createHash } from 'node:crypto';
 
 import type { JobKind, Settings } from '../../shared/types.ts';
+import { dispatchWork } from './desk.ts';
 import { siblingBranches, whatChanged } from './free.ts';
 import { commitFiles, repoReadme } from './github.ts';
 import type { Tool } from './types.ts';
@@ -44,6 +45,21 @@ export function toolsFor(kind: JobKind, settings: Settings): Tool[] {
   if (!settings.toolsEnabled) return [];
   if (settings.toolCallsPerJob <= 0) return [];
   return BY_KIND[kind] ?? [];
+}
+
+/**
+ * What the desk has (D84). It already sees every branch, vision and verdict in its
+ * prompt, so it gets the two things the prompt cannot carry: how the fleet moved over the
+ * last days, and the one write — putting work on the board. Nothing that costs a GitHub
+ * call: a question is answered in seconds or it is not a question, and anything slower is
+ * dispatched.
+ *
+ * Off with the rest of the lookups: without the loop the advisor is one turn, as before.
+ */
+export function deskTools(settings: Settings): Tool[] {
+  if (!settings.toolsEnabled) return [];
+  if (settings.toolCallsPerJob <= 0) return [];
+  return [whatChanged, dispatchWork];
 }
 
 /**

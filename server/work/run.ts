@@ -18,12 +18,9 @@
 import { randomUUID } from 'node:crypto';
 
 import type { Job, JobKind, Settings, Snapshot } from '../../shared/types.ts';
-import { refKey } from '../../shared/types.ts';
 import { LlmError } from '../advise/client.ts';
 import { BudgetError } from '../advise/converse.ts';
 import { isFatal, llmReady } from '../advise/enrich.ts';
-import { insightKey, pruneInsights } from '../advise/store.ts';
-import { pruneVisions } from '../vision.ts';
 import { deriveBoard, deriveDispatched, toJob, type JobSpec } from './board.ts';
 import { clearDispatched, listDispatched, rebootDispatched, subjectKey } from './dispatched.ts';
 
@@ -87,9 +84,11 @@ function recentlyFinished(now = Date.now()): Job[] {
  * attempt count is enough: the job is derived again on the next pass, because it was never
  * stored anywhere in the first place.
  */
-export function unpark(id: string): boolean {
+export function unpark(id: string): Job | null {
   attempts.delete(id);
-  return parked.delete(id);
+  const job = parked.get(id) ?? null;
+  parked.delete(id);
+  return job;
 }
 
 /**
@@ -207,8 +206,10 @@ export async function runBoard(
 ): Promise<RunResult> {
   const onProgress = options.onProgress;
   const lane = options.lane ?? 'all';
-  const derive =
-    options.derive ?? (lane === 'dispatched' ? deriveDispatched : (s: Snapshot, c: Settings) => allSpecs(s, c));
+  /** Everything outstanding, both lanes. What decides which failures are still worth remembering. */
+  const whole = options.derive ?? ((s: Snapshot, c: Settings) => allSpecs(s, c));
+  /** What this lane may claim. */
+  const derive = options.derive ?? (lane === 'dispatched' ? deriveDispatched : whole);
   const result: RunResult = {
     done: 0, failed: 0, parked: 0, claimedButNotDone: 0, errors: [], budgetSpent: false, byKind: {},
   };
@@ -216,12 +217,6 @@ export async function runBoard(
     applyWork(snapshot, settings);
     return result;
   }
-
-  // Housekeeping: branches that no longer exist should not keep their summaries, visions
-  // or assessments forever.
-  const live = new Set(snapshot.branches.map((b) => refKey(b.repoKey, b.name)));
-  pruneVisions(live);
-  pruneInsights(new Set(snapshot.branches.map((b) => insightKey(b.repoKey, b.name))));
 
   /**
    * One budget for the whole read, spent across every station, and counted in **provider
@@ -259,7 +254,7 @@ export async function runBoard(
     );
     snapshot.work = {
       jobs: [...working.values(), ...waiting.map(toJob), ...parked.values()],
-      workers,
+      workers: Math.max(1, settings.workers),
       finished: recentlyFinished(),
     };
     onProgress?.();
@@ -395,7 +390,10 @@ export async function runBoard(
   }
 
   // Anything still derivable and not parked is left for the next read, honestly shown.
-  const stillLive = new Set(derive(snapshot, settings).map((spec) => spec.id));
+  // The whole board decides what is still live, whichever lane ran: judged by its own
+  // slice, the dispatched lane forgot every routine job that had parked, and each was
+  // tried twice more on the next read.
+  const stillLive = new Set(whole(snapshot, settings).map((spec) => spec.id));
   for (const id of [...attempts.keys()]) if (!stillLive.has(id) && !parked.has(id)) attempts.delete(id);
   for (const id of [...parked.keys()]) if (!stillLive.has(id)) parked.delete(id);
 

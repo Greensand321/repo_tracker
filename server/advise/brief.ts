@@ -80,7 +80,10 @@ export function briefKey(snapshot: Snapshot, settings: Settings): string {
     .map((b) => `${b.repoKey}/${b.name}@${b.headSha}#${b.vision?.text ?? ''}#${b.assessment?.verdict ?? ''}`)
     .sort();
   for (const goal of [...snapshot.goals].sort((a, b) => a.id.localeCompare(b.id))) {
-    parts.push(`goal:${goal.id}:${goal.title}:${goal.done}:${goal.branches.length}`);
+    // Which branches, not how many: moving one between two goals of equal size changes
+    // what every judgement rests on and left the key exactly as it was.
+    const members = goal.branches.map((b) => refKey(b.repoKey, b.branch)).sort().join(',');
+    parts.push(`goal:${goal.id}:${goal.title}:${goal.done}:${members}`);
   }
   parts.push(BRIEF_PROMPT_VERSION, settings.llmModel);
   return createHash('sha256').update(parts.join('\n')).digest('hex').slice(0, 16);

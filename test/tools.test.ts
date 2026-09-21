@@ -101,6 +101,7 @@ const ctx = (
     branch: subject,
     now: new Date('2026-09-17T12:00:00Z'),
     github,
+    dispatch: null,
   };
 };
 

@@ -10,11 +10,11 @@
  * marking its own inference as the owner's intent.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { type Assessment, type Branch, type BranchRef, type Settings, type Snapshot } from '../../shared/types.ts';
-import { DATA_DIR, ensureDirs } from '../paths.ts';
+import { readJson, writeJson } from '../jsonfile.ts';
+import { DATA_DIR } from '../paths.ts';
 import { contextFor } from '../tools/context.ts';
 import {
   applyVisions,
@@ -38,7 +38,13 @@ type Stored = {
   generatedAt: string;
   model: string;
   judgements: Record<string, BriefResult['judgements'] extends Map<string, infer V> ? V : never>;
-  overtaken: { ref: BranchRef; by: BranchRef; why: string }[];
+  /**
+   * `visionText` is what the overtaken branch was FOR when the finding was made. Once the
+   * fleet has moved the finding is still applied — but only while that vision stands: a
+   * purpose achieved elsewhere does not un-happen because a commit landed, and a purpose
+   * the owner has since rewritten was never the one compared.
+   */
+  overtaken: { ref: BranchRef; by: BranchRef; why: string; visionText?: string }[];
 };
 
 const FILE = join(DATA_DIR, 'assist.json');
@@ -46,17 +52,12 @@ let cache: Stored | null = null;
 
 function loadStored(): Stored | null {
   if (cache) return cache;
-  try {
-    cache = JSON.parse(readFileSync(FILE, 'utf8')) as Stored;
-  } catch {
-    cache = null;
-  }
+  cache = readJson<Stored>(FILE);
   return cache;
 }
 
 function saveStored(value: Stored): void {
-  ensureDirs();
-  writeFileSync(FILE, JSON.stringify(value, null, 2), 'utf8');
+  writeJson(FILE, value);
   cache = value;
 }
 
@@ -78,32 +79,39 @@ export function applyAssist(snapshot: Snapshot, settings: Settings): void {
   applyVisions(snapshot, assessVersion(settings), settings.llmModel);
 
   const stored = loadStored();
-  if (!stored || stored.key !== briefKey(snapshot, settings)) {
-    // The fleet has moved since this was written, so the reasoning is about a state that
-    // no longer exists. Showing it anyway would be confidently out of date.
+  if (!stored) {
     snapshot.brief = null;
     return;
   }
+
+  // The fleet has moved since this was written — so it is shown dated and marked, not
+  // hidden. It used to be dropped the moment anything moved, which with agents pushing
+  // every few minutes meant a blank space most of the day, and a rewrite on nearly every
+  // read to fill it (`briefEveryMinutes`). Ten minutes old and honest about it is the
+  // more useful of the two.
+  const fresh = stored.key === briefKey(snapshot, settings);
 
   snapshot.brief = {
     text: stored.brief,
     generatedAt: stored.generatedAt,
     model: stored.model,
     promptVersion: BRIEF_PROMPT_VERSION,
+    stale: !fresh,
   };
 
   for (const goal of snapshot.goals) {
     goal.judgement = stored.judgements[goal.id] ?? null;
   }
 
-  // Overtaken is a fleet-level finding, applied over the per-branch verdict.
+  // Overtaken is a fleet-level finding, applied over the per-branch verdict. Once stale,
+  // only while the vision it was made against still stands.
   for (const finding of stored.overtaken) {
     const branch = snapshot.branches.find(
       (b) => b.repoKey === finding.ref.repoKey && b.name === finding.ref.branch,
     );
-    if (branch?.assessment) {
-      branch.assessment = { ...branch.assessment, verdict: 'overtaken', because: finding.why, overtakenBy: finding.by };
-    }
+    if (!branch?.assessment) continue;
+    if (!fresh && finding.visionText !== branch.vision?.text) continue;
+    branch.assessment = { ...branch.assessment, verdict: 'overtaken', because: finding.why, overtakenBy: finding.by };
   }
 }
 
@@ -214,13 +222,19 @@ export async function writeTheBrief(
 ): Promise<void> {
   const key = briefKey(snapshot, settings);
   const written = await writeBrief(snapshot, settings, sessionId);
+  // A reply with no brief in it is not a brief. Saving it would satisfy the predicate with
+  // an empty string, show nothing on the page, and never be tried again until the fleet
+  // moved — a silent failure dressed as a finished job.
+  if (!written.brief) throw new Error('the model did not write a brief');
+  const visionOf = (ref: BranchRef): string | undefined =>
+    snapshot.branches.find((b) => b.repoKey === ref.repoKey && b.name === ref.branch)?.vision?.text;
   saveStored({
     key,
     brief: written.brief,
     generatedAt: new Date().toISOString(),
     model: settings.llmModel,
     judgements: Object.fromEntries(written.judgements),
-    overtaken: written.overtaken,
+    overtaken: written.overtaken.map((finding) => ({ ...finding, visionText: visionOf(finding.ref) })),
   });
   applyAssist(snapshot, settings);
 }
@@ -234,4 +248,20 @@ export function isBriefed(snapshot: Snapshot, settings: Settings): boolean {
 /** When the brief on disk was written. What a re-write the owner asked for turns on (D81). */
 export function briefWrittenAt(): string | null {
   return loadStored()?.generatedAt ?? null;
+}
+
+/**
+ * Whether a routine rewrite may happen yet.
+ *
+ * The brief reads the whole fleet, and its key moves whenever any branch does. With agents
+ * pushing every few minutes that meant the most expensive prompt in the program on nearly
+ * every read — a call a minute, all day, to change a clause. A routine rewrite now waits
+ * `briefEveryMinutes` since the last one. Asking for one does not: that is the dispatched
+ * lane, which never reads this.
+ */
+export function briefDue(settings: Settings, now = new Date()): boolean {
+  const written = briefWrittenAt();
+  if (!written) return true;
+  const age = now.getTime() - Date.parse(written);
+  return !Number.isFinite(age) || age >= settings.briefEveryMinutes * 60_000;
 }

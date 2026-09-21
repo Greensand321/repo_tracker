@@ -23,6 +23,7 @@ import type { Branch, Job, JobKind, Settings, Snapshot } from '../../shared/type
 import {
   draftFor,
   assessFor,
+  briefDue,
   briefWrittenAt,
   isAssessed,
   isBriefed,
@@ -31,11 +32,12 @@ import {
 } from '../advise/assist.ts';
 import { insightWrittenAt } from '../advise/store.ts';
 import { assessedAt, describedAt } from '../vision.ts';
-import { listDispatched, type Dispatched } from './dispatched.ts';
+import { clearDispatched, listDispatched, type Dispatched } from './dispatched.ts';
 import { briefKey, worthAVision } from '../advise/brief.ts';
 import { toolsFor } from '../tools/catalog.ts';
 import { isSummarised, llmReady, summariseBranch, worthSummarising } from '../advise/enrich.ts';
 import type { RunHandle } from './handle.ts';
+export { cannotAsk } from './asks.ts';
 
 /**
  * A job, plus the two things only the server may hold: how to do it, and how to tell
@@ -116,7 +118,7 @@ function forBranch(
  * So the dispatcher re-derives after each pass and the ordering takes care of itself. No
  * foreman, because this is a sort, and a sort is code.
  */
-export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
+export function deriveBoard(snapshot: Snapshot, settings: Settings, now = new Date()): JobSpec[] {
   if (!llmReady(settings)) return [];
 
   const jobs: JobSpec[] = [];
@@ -174,8 +176,9 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings): JobSpec[] {
 
   // The brief reads every branch, every vision and every verdict, so it is worth nothing
   // until those have settled — which is what stage 1 says, and why it is not a condition
-  // on deriving it at all.
-  if (!isBriefed(snapshot, settings)) {
+  // on deriving it at all. And it waits its interval: the fleet moves every few minutes,
+  // and the brief is the one prompt that reads all of it.
+  if (!isBriefed(snapshot, settings) && briefDue(settings, now)) {
     jobs.push({
       stage: 1,
       // Keyed on what the brief would be written FROM, not on when: an unchanged fleet
@@ -260,9 +263,14 @@ function toSpec(asked: Dispatched, snapshot: Snapshot, settings: Settings): JobS
 
   const ref = asked.subject;
   const branch = snapshot.branches.find((b) => b.repoKey === ref.repoKey && b.name === ref.branch);
-  // The branch is gone, or this read did not carry it. The request is dropped rather than
-  // kept for ever against something that may never come back.
-  if (!branch) return null;
+  if (!branch) {
+    // Gone from a repo this read did reach: the branch was deleted, and a request against
+    // it would otherwise sit on disk until its reboots ran out and then park as "could not
+    // be finished", which is not what happened. Missing because the repo itself could not
+    // be read is different — that is a bad connection, and the request stands.
+    if (snapshot.repos.some((r) => r.key === ref.repoKey)) clearDispatched(asked.id);
+    return null;
+  }
 
   switch (asked.kind) {
     case 'summarise':
@@ -273,6 +281,13 @@ function toSpec(asked: Dispatched, snapshot: Snapshot, settings: Settings): JobS
         doneWhen: () => isNewer(insightWrittenAt(branch.repoKey, branch.name, branch.headSha), asked.since),
       };
     case 'draft-vision':
+      // A draft is a proposal, and it must never replace the owner's own words (D61): the
+      // station writes over whatever vision is there, so it is only sent where there is
+      // none, or only its own earlier guess.
+      if (branch.vision && branch.vision.state !== 'proposed') {
+        clearDispatched(asked.id);
+        return null;
+      }
       return {
         ...base,
         title: `Having another go at what ${branch.name} is for`,
@@ -280,8 +295,12 @@ function toSpec(asked: Dispatched, snapshot: Snapshot, settings: Settings): JobS
         doneWhen: () => isNewer(describedAt({ repoKey: branch.repoKey, branch: branch.name }), asked.since),
       };
     case 'assess':
-      // Nothing to compare against is not a failure; the request simply does not apply.
-      if (!branch.vision) return null;
+      // Nothing to compare against is not a failure; the request simply does not apply —
+      // and is cleared, or it would come back on every start until it gave up.
+      if (!branch.vision) {
+        clearDispatched(asked.id);
+        return null;
+      }
       return {
         ...base,
         title: `Checking ${branch.name} against what it is for, again`,

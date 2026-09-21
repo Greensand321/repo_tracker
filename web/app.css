@@ -246,6 +246,14 @@ a:hover { color: var(--text-hi); }
 .answer .a.err { font-family: var(--mono); font-size: 11.5px; color: var(--bad); line-height: 1.6; }
 .answer .prov { font-family: var(--mono); font-size: 9.5px; color: var(--faint); margin-top: 9px; line-height: 1.7; }
 .answer .working { color: var(--muted); font-style: italic; }
+.answer .rank { margin: 8px 0 0 18px; padding: 0; font-size: 12.5px; line-height: 1.6; color: var(--body); }
+.answer .rank li { padding: 2px 0; }
+.answer .rank .mono { font-family: var(--mono); font-size: 11px; color: var(--text-hi); }
+.answer .rank .why { color: var(--dim); }
+.answer .groups { margin-top: 10px; padding: 8px 12px 6px; border: 1px solid var(--line-3); border-radius: 8px; }
+.answer .groups .prop { padding: 7px 0; }
+.answer .groups .q-acts { margin-top: 8px; }
+.answer .started { font-family: var(--mono); font-size: 11px; color: var(--now); margin-top: 8px; line-height: 1.7; }
 
 .gsec { margin-bottom: 14px; }
 .gsec .ghead {

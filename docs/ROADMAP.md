@@ -106,7 +106,7 @@ could have taken, and why these, are in [`design/agent-shapes.html`](design/agen
 | 3 | **The tool layer** — the contract, the JSON-protocol loop, the free tools, a per-job budget, `assess` wired to use them | ✅ built (D75–D78) |
 | 4 | **Tools at the stations** — `repo_readme`, `commit_files`: fetched on demand and cached for ever, at summarise, draft-vision and assess | ✅ built (D79, D80) |
 | 5 | **Dispatch** — asking from the page, a second lane with its own purse, persisted and rebooted on the next start | ✅ built (D81–D83) |
-| 6 | **The desk** — the advisor may act: regroup the register, rank by your criteria, go and check something | next |
+| 6 | **The desk** — the advisor may look at what moved and start work on the board; rankings are answers, regroupings are proposals you accept in one click | ✅ built (D84) |
 
 **Exit:** the assistant answers from evidence it went and got, you can watch it do it, and
 nothing it starts is lost when you close the program.

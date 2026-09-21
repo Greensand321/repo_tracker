@@ -489,6 +489,67 @@ back up. Counting a reboot each time would have parked everything the owner aske
 three visits to the settings screen — a restart is what a reboot means, so it happens once
 per process.
 
+### D84 — The desk: the advisor may look and may start work, and never does the work itself
+
+The advisor gets two tools and no more. `what_changed`, because "what moved while I was
+away" is the question the box is for and the prompt cannot carry a week of history.
+`dispatch`, the one write any tool has: put a job on the board. It queues; it does not do.
+The result lands on the page, on the floor and in the brief, and the model is told to say it
+has started something rather than to describe a result it has not seen — because it cannot
+have seen one, and a model that is not told this will invent one.
+
+It may only queue what the page's own buttons may queue, decided by the same function
+(`cannotAsk`), so it cannot start work the board would only drop. And it is handed a door,
+never the dispatcher: a tool that imported the board would be a tool that could reach
+everything the board reaches.
+
+Two kinds of answer come back as something the page can act on. A **ranking** — "which of
+these matter most, by X" — is an ordered list of real branches with one reason each. It is
+an answer, not a change; nothing is written. A **regrouping** — "organise the register by
+Y" — is a proposal: goals by title, branches under each, accepted or refused whole with one
+click. Goals are Plane B and reversible, but "file everything differently" is the largest
+write in the program, and D64's rule holds for it too: the assistant proposes, the owner
+decides. Nothing reaches the goal store until they have.
+
+### D85 — Every file is written atomically, and a file that cannot be read is set aside
+
+Every store was written with one `writeFileSync`, and a program closed mid-write — the
+normal way it ends, at a moment a worker may well be finishing a summary — left a truncated
+file. Every loader then treated a file it could not parse as empty, and the next write
+replaced a hundred summaries with one. Nothing reported it. The next read paid for all of
+them again, which is the bill the cache exists to prevent.
+
+So every file goes through one helper: written beside itself and renamed into place, so the
+old file is whole until the new one is; and a file that will not parse is renamed
+`.broken-<time>` and named on the console rather than overwritten. Missing is still normal:
+a file that does not exist yet is the first run.
+
+### D86 — Pruning is scoped to the repos a read actually reached
+
+Deleted branches are pruned from every store so they do not accrete. But the pruning ran
+against whatever the snapshot held, and a snapshot is missing a repo whenever GitHub would
+not serve it — a bad connection at startup, a rate limit, the machine waking before the
+network does. One such read deleted every summary, every vision and every filing for the
+repo, and the next read paid to write the summaries again. The goals kept their titles and
+lost their branches.
+
+Now a store is pruned only within repos the read reached (`snapshot.repos`), and only of
+branches that repo no longer has. A repo taken out of settings keeps its entries too:
+nothing is ever dropped from the data (rule 10), and adding it back should cost nothing.
+
+### D87 — The brief is rewritten on an interval, and shown dated when it is behind
+
+The brief is cached on everything it looked at, which is right — and which, on a fleet
+where agents push every few minutes, meant the most expensive prompt in the program ran on
+nearly every read. A call a minute, all day, to change a clause. It was hidden the moment
+anything moved, so the space was blank most of the day as well.
+
+A routine rewrite now waits `briefEveryMinutes` (default 15) since the last one, and until
+then the last brief stays up, dated, with "the fleet has moved since". Its goal judgements
+stay with it; its overtaken findings stay only while the vision each was made against still
+stands. Asking for it — "write it again" — never waits: that is the dispatched lane, which
+does not read the interval. 0 restores the old behaviour.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

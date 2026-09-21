@@ -1,24 +1,21 @@
 /** Load and save settings. I/O only — the token never leaves this machine. */
 
-import { readFileSync, writeFileSync } from 'node:fs';
-
 import { DEFAULT_SETTINGS, type SafeSettings, type Settings } from '../shared/types.ts';
+import { readJson, writeJson } from './jsonfile.ts';
 import { SETTINGS_FILE, ensureDirs } from './paths.ts';
 
 export function loadSettings(): Settings {
-  try {
-    const raw = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8')) as Partial<Settings>;
-    return sanitise({ ...DEFAULT_SETTINGS, ...raw });
-  } catch {
-    // No settings yet is the normal first run, not an error.
-    return { ...DEFAULT_SETTINGS };
-  }
+  // No settings yet is the normal first run, not an error. A file that cannot be read is
+  // set aside rather than overwritten — it holds the token.
+  const raw = readJson<Partial<Settings>>(SETTINGS_FILE);
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_SETTINGS };
+  return sanitise({ ...DEFAULT_SETTINGS, ...raw });
 }
 
 export function saveSettings(patch: Partial<Settings>): Settings {
   ensureDirs();
   const next = sanitise({ ...loadSettings(), ...patch });
-  writeFileSync(SETTINGS_FILE, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  writeJson(SETTINGS_FILE, next);
   return next;
 }
 
@@ -43,6 +40,7 @@ function sanitise(settings: Settings): Settings {
     askBranchCap: clamp(settings.askBranchCap, 1, 400, DEFAULT_SETTINGS.askBranchCap),
     visionAutoDraft: settings.visionAutoDraft !== false,
     maxOpenQuestions: clamp(settings.maxOpenQuestions, 0, 40, DEFAULT_SETTINGS.maxOpenQuestions),
+    briefEveryMinutes: clamp(settings.briefEveryMinutes, 0, 1440, DEFAULT_SETTINGS.briefEveryMinutes),
     toolsEnabled: settings.toolsEnabled !== false,
     // The worst case for a read is llmMaxPerRun jobs times this plus one, so it is capped
     // well below anything that could run away quietly.

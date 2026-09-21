@@ -7,11 +7,11 @@
  * regenerates everything rather than leaving a quiet mix of old and new.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { InsightMeta, Progress } from '../../shared/types.ts';
-import { DATA_DIR, ensureDirs } from '../paths.ts';
+import { repoOfKey, type InsightMeta, type Progress } from '../../shared/types.ts';
+import { readJson, writeJson } from '../jsonfile.ts';
+import { DATA_DIR } from '../paths.ts';
 
 export type StoredInsight = {
   title: string;
@@ -32,11 +32,7 @@ let cache: InsightFile | null = null;
 
 function load(): InsightFile {
   if (cache) return cache;
-  try {
-    cache = JSON.parse(readFileSync(FILE, 'utf8')) as InsightFile;
-  } catch {
-    cache = {};
-  }
+  cache = readJson<InsightFile>(FILE) ?? {};
   return cache;
 }
 
@@ -72,26 +68,31 @@ export function insightWrittenAt(repoKey: string, branch: string, headSha: strin
 }
 
 export function putInsight(repoKey: string, branch: string, insight: StoredInsight): void {
-  ensureDirs();
   const all = load();
   all[insightKey(repoKey, branch)] = insight;
-  writeFileSync(FILE, JSON.stringify(all, null, 2), 'utf8');
+  writeJson(FILE, all);
 }
 
-/** Drops entries for branches that no longer exist, so deleted branches do not accrete. */
-export function pruneInsights(liveKeys: Set<string>): number {
+/**
+ * Drops entries for branches that no longer exist, so deleted branches do not accrete.
+ *
+ * Only within repos this read actually reached. A repo that could not be read is missing
+ * from the snapshot, not from GitHub — and pruning against that snapshot deleted every
+ * summary for it on the strength of one bad connection at startup, then paid to write them
+ * all again. A repo taken out of settings keeps its entries too: nothing is ever dropped
+ * from the data (rule 10), and adding it back should cost nothing.
+ */
+export function pruneInsights(liveKeys: Set<string>, reachedRepos: Set<string>): number {
   const all = load();
   let removed = 0;
   for (const key of Object.keys(all)) {
-    if (!liveKeys.has(key)) {
+    const repo = repoOfKey(key);
+    if (repo !== null && reachedRepos.has(repo) && !liveKeys.has(key)) {
       delete all[key];
       removed++;
     }
   }
-  if (removed > 0) {
-    ensureDirs();
-    writeFileSync(FILE, JSON.stringify(all, null, 2), 'utf8');
-  }
+  if (removed > 0) writeJson(FILE, all);
   return removed;
 }
 
