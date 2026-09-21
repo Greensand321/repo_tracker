@@ -57,6 +57,11 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+/* The page never scrolls sideways. Anything wider than the window is a bug to fix, not a
+   direction to offer — and until it is fixed, it is clipped rather than scrolled to. */
+body { overflow-x: hidden; }
+/* Long unbreakable text — a URL in a warning, an error naming a branch — wraps instead. */
+.notice, .jmeta, .jtitle.wrap, .fn .v, .brief-text, .answer .a, .answer .started, .q-from, .byline, .mrow .tt { overflow-wrap: anywhere; }
 body {
   font-family: var(--sans); font-size: 14px; line-height: 1.5;
   color: var(--text); background: var(--bg);
@@ -131,10 +136,12 @@ a:hover { color: var(--text-hi); }
   color: var(--muted); margin-top: 9px; display: flex; justify-content: center; gap: 22px; flex-wrap: wrap;
 }
 .dateline {
-  display: flex; align-items: center; gap: 16px; font-family: var(--mono); font-size: 10.5px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-family: var(--mono); font-size: 10.5px;
   color: var(--muted); padding: 9px 0; border-bottom: 1px solid var(--line-2);
 }
-.dateline .right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+.dateline .right { margin-left: auto; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: flex-end; }
+/* When the line runs out of room, a phrase moves down whole: "resets in 43m", never "resets in / 43m". */
+.dateline span, .dateline button { white-space: nowrap; }
 .dateline button { font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
 .dateline button:hover { color: var(--now); }
 .dateline .live { color: var(--now); }
@@ -206,7 +213,9 @@ a:hover { color: var(--text-hi); }
 }
 .mrow:hover { background: #ffffff05; }
 .mrow .g { font-size: 10px; color: var(--muted); text-align: center; }
-.mrow .nm { font-family: var(--mono); font-size: 11.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A block, or overflow means nothing and a long agent-generated name walks off the page.
+   It wraps rather than truncating: the literal branch name is always shown (rule 6). */
+.mrow .nm { display: block; font-family: var(--mono); font-size: 11.5px; color: var(--text); overflow-wrap: anywhere; }
 .mrow .nm .repo { color: var(--muted); }
 .mrow .tt { font-family: var(--serif); font-size: 13.5px; color: var(--text-hi); display: block; margin-top: 2px; }
 .mrow .chips { display: flex; gap: 5px; justify-content: flex-end; overflow: hidden; }
@@ -309,7 +318,7 @@ a:hover { color: var(--text-hi); }
 .weather { font-family: var(--mono); font-size: 11px; line-height: 1.95; color: var(--muted); }
 .weather b { color: var(--body); font-weight: 500; display: inline-block; min-width: 26px; }
 .weather .bad b { color: var(--bad); }
-.notice { font-family: var(--mono); font-size: 10.5px; color: var(--bad); line-height: 1.6; margin-bottom: 8px; }
+.notice { font-family: var(--mono); font-size: 10.5px; color: var(--bad); line-height: 1.6; margin-bottom: 8px; overflow-wrap: anywhere; }
 .quietnote { font-size: 11.5px; color: var(--muted); font-style: italic; line-height: 1.6; }
 
 /* ---- filing a branch into a goal --------------------------------------- */
