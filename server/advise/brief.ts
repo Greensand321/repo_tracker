@@ -15,6 +15,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   refKey,
   type Branch,
+  type BriefParts,
   type BranchRef,
   type Goal,
   type GoalJudgement,
@@ -23,24 +24,24 @@ import {
   type Snapshot,
 } from '../../shared/types.ts';
 import { complete } from './client.ts';
-import { extractJson } from './prompt.ts';
+import { NOTHING_OPEN, extractJson } from './prompt.ts';
 
-export const BRIEF_PROMPT_VERSION = 'v1';
+/** v2: the brief is three parts — done, next, now — rather than a paragraph (D89). */
+export const BRIEF_PROMPT_VERSION = 'v2';
 
 const GOAL_STATES: GoalState[] = ['progressing', 'at-risk', 'stalled', 'looks-done', 'needs-you'];
 
 const SYSTEM = `You are a personal assistant to one developer whose branches are all pushed by AI coding agents running week-long sessions. They have big ideas and many threads and cannot hold it all in their head. You can.
 
-You are given every branch: what it is FOR (its vision, where one has been stated), what it actually did, and how those two compare. Plus the goals the owner has authored and which branches sit under each.
+You are given every branch: what it is FOR (its vision, where one has been stated), what it DID and what is still OPEN on it, and how the two compare. Plus the goals the owner has authored and which branches sit under each.
 
 Produce three things.
 
-1. THE BRIEF — 3 to 5 sentences of plain English answering, in this order:
-   what goals look done, what still needs doing, and what is actually going on right now.
-   Lead with the thing most in their way. Name branches by their literal git name.
-   No lists, no headings, no markdown. Write like a colleague, not a status report.
-   If something has no vision and you cannot tell what it is for, say so plainly rather
-   than filling the gap.
+1. THE BRIEF, in three parts. Each is one or two sentences of plain English — no lists, no headings, no markdown — naming branches by their literal git name. Write like a colleague, not a status report.
+     done   what has landed or looks finished: which goals, which branches, what they delivered.
+     next   what still needs doing, leading with the thing most in their way — red CI, a branch that has drifted, half-finished work, a decision only the owner can make.
+     now    what is actually going on: which branches moved most recently and what each is mid-way through.
+   If something has no vision and you cannot tell what it is for, say so plainly rather than filling the gap.
 
 2. GOAL JUDGEMENTS — for each goal, one of:
      progressing   branches are moving toward it
@@ -58,13 +59,18 @@ Produce three things.
 
 Reply with ONLY a JSON object, no prose around it, no markdown fence:
 {
-  "brief": "...",
+  "done": "...",
+  "next": "...",
+  "now": "...",
   "goals": [{"id": "...", "state": "progressing|at-risk|stalled|looks-done|needs-you", "because": "...", "branches": ["branch-name", ...]}],
   "overtaken": [{"repo": "owner/name", "branch": "...", "byRepo": "owner/name", "byBranch": "...", "why": "..."}]
 }`;
 
 export type BriefResult = {
+  /** The parts joined. Empty when the model wrote none of them. */
   brief: string;
+  /** Null when the reply was in the old one-paragraph shape. */
+  parts: BriefParts | null;
   judgements: Map<string, GoalJudgement>;
   overtaken: { ref: BranchRef; by: BranchRef; why: string }[];
 };
@@ -110,7 +116,14 @@ export function buildBriefPrompt(snapshot: Snapshot, cap: number): string {
         ? `    FOR: ${branch.vision.text}${branch.vision.state === 'proposed' ? '  (only my guess — not confirmed)' : ''}`
         : '    FOR: nobody has said.',
     );
-    if (branch.summary) lines.push(`    DID: ${branch.summary}`);
+    // The recap, not the one-line gist: "next" turns on what is open, and "done" on what
+    // landed, and the gist folds both into one sentence.
+    if (branch.recap) {
+      lines.push(`    DID: ${branch.recap.done || branch.recap.last}`);
+      if (branch.recap.open && !NOTHING_OPEN.test(branch.recap.open)) lines.push(`    OPEN: ${branch.recap.open}`);
+    } else if (branch.summary) {
+      lines.push(`    DID: ${branch.summary}`);
+    }
     if (branch.assessment) lines.push(`    COMPARED: ${branch.assessment.verdict} — ${branch.assessment.because}`);
   }
 
@@ -146,11 +159,11 @@ export async function writeBrief(
 }
 
 export function parseBrief(raw: string, snapshot: Snapshot, settings: Settings): BriefResult {
-  const empty: BriefResult = { brief: '', judgements: new Map(), overtaken: [] };
+  const empty: BriefResult = { brief: '', parts: null, judgements: new Map(), overtaken: [] };
   const json = extractJson(raw);
   if (!json) return empty;
 
-  let parsed: { brief?: unknown; goals?: unknown; overtaken?: unknown };
+  let parsed: { brief?: unknown; done?: unknown; next?: unknown; now?: unknown; goals?: unknown; overtaken?: unknown };
   try {
     parsed = JSON.parse(json) as typeof parsed;
   } catch {
@@ -205,11 +218,13 @@ export function parseBrief(raw: string, snapshot: Snapshot, settings: Settings):
     }
   }
 
-  return {
-    brief: typeof parsed.brief === 'string' ? parsed.brief.trim() : '',
-    judgements,
-    overtaken,
-  };
+  // Three parts when the model wrote them; the old single paragraph when it did not.
+  const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
+  const parts: BriefParts = { done: text(parsed.done), next: text(parsed.next), now: text(parsed.now) };
+  const hasParts = Boolean(parts.done || parts.next || parts.now);
+  const brief = hasParts ? [parts.done, parts.next, parts.now].filter(Boolean).join(' ') : text(parsed.brief);
+
+  return { brief, parts: hasParts ? parts : null, judgements, overtaken };
 }
 
 function asRef(repo: unknown, branch: unknown): BranchRef | null {

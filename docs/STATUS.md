@@ -6,6 +6,22 @@
 
 ---
 
+## Merged branches have their history back, and a summary is now a recap
+
+The screen was showing "Nothing of its own yet" on every merged branch, with a "drifted"
+verdict beside it. A branch merged with a merge commit has an empty compare against `main`
+— its work is already there — so the program had no history for exactly the branches that
+finished something, and judged them on nothing. The pull request remembers what the branch
+did, so an empty compare now reads the PR's own commits (D89). Ahead stays 0. A branch with
+nothing to compare is never assessed.
+
+**What the model writes changed shape.** Each branch now carries a recap — **Last** (what
+it was in the middle of), **Done** (what landed), **Open** (what looks half-finished: WIP,
+a hollow test, red CI, an open PR, a final commit that reads like a step) — shown as three
+lines on the branch, with *Open* in amber, and the *Open* line alone in the goal view. The
+brief is three parts too: **Done / Next / Now**. Every prompt version moved to v2, so the
+first read regenerates everything: one pass at `llmMaxPerRun` a read, as before.
+
 ## The desk is built (workroom step 6), and the room was reviewed
 
 **You can tell the advisor to do things.** It still answers in seconds from what is on
@@ -153,7 +169,7 @@ recommendation there was D6; the owner chose D4 and the reasons are in D57.
 | **Stage 1** | Built. Every branch across your repos, with its real commit history, PR and CI state. ETag change detection; a repo that has not moved costs nothing. |
 | **Stage 2 engine** | Built. Per-branch plain-English title, summary, and progress judgement, cached so an idle branch is never re-summarised. |
 | **Stage 2 surfaces** | Deliberately not built — the comment tool, the chat panel, and "what changed since I last looked" all wait for the real design. |
-| Tests | 266, no network. Recorded GitHub fixtures and a stubbed provider. |
+| Tests | 282, no network. Recorded GitHub fixtures and a stubbed provider. |
 
 ## Try it without the GUI
 
@@ -276,6 +292,7 @@ Then, in whatever order they earn it:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 21 Sep 2026 | **Merged branches had no history** — an empty compare read as "nothing of its own", and was judged anyway. The PR's commits are read instead. The summary became a recap (last / done / open) and the brief three parts (done / next / now); every prompt at v2. D89 |
 | 21 Sep 2026 | **First real run** parked every assessment and the brief on "the model returned an empty reply": a reasoning model exhausting per-station caps of 350 and 1200 tokens. One reply allowance in settings, a cut-off reply retried once with double the room, and the error names the cause. D88 |
 | 21 Sep 2026 | **Settings rebuilt**: two columns, GitHub and the advisor, fitting a laptop screen without scrolling; every explanation moved behind an ⓘ that opens on hover or focus |
 | 21 Sep 2026 | **The workroom, step 6 — the desk**, a review of the room, and the persistence bugs that were re-paying for summaries: pruning against a failed read, torn files treated as empty, the brief rewritten every read. D84–D87 |

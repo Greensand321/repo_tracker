@@ -14,6 +14,8 @@ export type CachedDetail = {
   sha: string;
   compare: GhCompare;
   ci: GhCi | null;
+  /** Set when `compare.commits` are the pull request's, because the compare was empty (D89). */
+  viaPull?: number | null;
 };
 
 export type RepoCache = {

@@ -62,7 +62,7 @@ function snapshotOf(...branchNames: string[]): Snapshot {
       title: null,
       summary: null,
       progress: null,
-      insight: null,
+      insight: null, recap: null, commitsFrom: 'ahead',
     })),
   };
 }

@@ -54,7 +54,7 @@ function branch(name: string, over: Partial<Branch> = {}): Branch {
     ahead: 2, behind: 0, lastActivity: '2026-09-15T00:00:00Z',
     diff: { files: 1, additions: 1, deletions: 0 }, activity: ['2026-09-15'],
     pr: null, ci: { state: 'none', url: null }, relevance: 'active', isBase: false, goalId: null,
-    vision: null, assessment: null, title: null, summary: null, progress: null, insight: null, ...over,
+    vision: null, assessment: null, title: null, summary: null, progress: null, insight: null, recap: null, commitsFrom: 'ahead', ...over,
   };
 }
 
@@ -231,7 +231,7 @@ test('an overtaken finding outlives the read it was made in, but not the vision 
     const vision = visions.setVision(ref, purpose, 'yours');
     visions.putAssessment(ref, {
       verdict: 'on-track', because: 'fine', evidence: [], overtakenBy: null, looked: [],
-      model: 'test-model', promptVersion: 'v1', generatedAt: 'x', headSha, visionText: purpose,
+      model: 'test-model', promptVersion: 'v2', generatedAt: 'x', headSha, visionText: purpose,
     });
     return branch(name, { headSha, vision });
   };

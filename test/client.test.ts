@@ -296,7 +296,7 @@ test('every branch in one run shares a session, and runs differ', async () => {
       ahead: 1, behind: 0, lastActivity: '2026-09-15T00:00:00Z',
       diff: { files: 1, additions: 1, deletions: 0 }, activity: ['2026-09-15'],
       pr: null, ci: { state: 'none' as const, url: null }, relevance: 'active' as const,
-      isBase: false, goalId: null, vision: null, assessment: null, title: null, summary: null, progress: null, insight: null,
+      isBase: false, goalId: null, vision: null, assessment: null, title: null, summary: null, progress: null, insight: null, recap: null, commitsFrom: 'ahead' as const,
     })),
   });
 

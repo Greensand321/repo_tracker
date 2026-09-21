@@ -47,7 +47,7 @@ function branch(name: string, over: Partial<Branch> = {}): Branch {
     title: null,
     summary: null,
     progress: null,
-    insight: null,
+    insight: null, recap: null, commitsFrom: 'ahead',
     ...over,
   };
 }

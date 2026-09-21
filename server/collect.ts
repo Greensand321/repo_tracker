@@ -10,16 +10,18 @@
 import type { Snapshot } from '../shared/types.ts';
 import type { Settings } from '../shared/types.ts';
 import { readCache, writeCache, type CachedDetail, type RepoCache } from './cache.ts';
+import type { GhPull } from './gh-types.ts';
 import {
   GitHubError,
   fetchBranches,
   fetchCi,
   fetchCompare,
+  fetchPullCommits,
   fetchPulls,
   fetchRepo,
   getRateLimit,
 } from './github.ts';
-import { buildSnapshot, toCiState, type BranchDetail, type RepoBundle } from './snapshot.ts';
+import { buildSnapshot, pickPull, toCiState, type BranchDetail, type RepoBundle } from './snapshot.ts';
 
 /** Repos in parallel, and branches within a repo in parallel, but both bounded. */
 const REPO_CONCURRENCY = 3;
@@ -73,7 +75,7 @@ async function collectRepo(
 
   await mapLimit(branches, BRANCH_CONCURRENCY, async (branch) => {
     try {
-      const detail = await detailFor(key, token, repo.default_branch, branch.name, branch.commit.sha, cache);
+      const detail = await detailFor(key, token, repo.default_branch, branch.name, branch.commit.sha, cache, pulls);
       if (detail) details[branch.name] = detail;
     } catch (err) {
       // A branch whose detail we could not read still belongs on screen, just bare.
@@ -106,6 +108,9 @@ async function collectRepo(
  * Decides what actually has to be fetched for one branch.
  *
  * - The head SHA moved, or we have never seen it → fetch the compare.
+ * - The compare is empty and the branch has a pull request → the branch was merged with a
+ *   merge commit and its work is already in the base. Read its commits from the pull
+ *   request instead (D89), once per head like everything else.
  * - CI was still running last time → re-fetch it even though the SHA is the same,
  *   because a build finishing is a change the SHA cannot tell us about.
  * - Otherwise → the cache is still correct and this branch costs nothing.
@@ -117,27 +122,43 @@ async function detailFor(
   branchName: string,
   headSha: string,
   cache: RepoCache,
+  pulls: GhPull[],
 ): Promise<CachedDetail | null> {
   const cached = cache.details[branchName];
   const moved = !cached || cached.sha !== headSha;
 
   // The base branch compared against itself is always empty — skip the round trip.
   if (branchName === base) {
-    return { sha: headSha, compare: { ahead_by: 0, behind_by: 0, commits: [], files: [] }, ci: null };
+    return { sha: headSha, compare: { ahead_by: 0, behind_by: 0, commits: [], files: [] }, ci: null, viaPull: null };
   }
 
-  const compare = moved ? await fetchCompare(key, token, base, branchName) : cached.compare;
+  let compare = moved ? await fetchCompare(key, token, base, branchName) : cached.compare;
+  let viaPull: number | null = moved ? null : (cached.viaPull ?? null);
+
+  if (moved && compare.commits.length === 0) {
+    // Nothing ahead of the base is what a merged branch looks like — and "nothing of its
+    // own" was the verdict on exactly the branches whose history is worth having. The pull
+    // request kept it.
+    const pull = pickPull(pulls, branchName);
+    if (pull) {
+      const own = await fetchPullCommits(key, token, pull.pr.number);
+      if (own.length > 0) {
+        compare = { ...compare, commits: own };
+        viaPull = pull.pr.number;
+      }
+    }
+  }
 
   const ciUnsettled = !cached || toCiState(cached.ci).state === 'pending';
   const ci = moved || ciUnsettled ? await fetchCi(key, token, headSha) : cached.ci;
 
-  return { sha: headSha, compare, ci };
+  return { sha: headSha, compare, ci, viaPull };
 }
 
 function toBranchDetails(details: Record<string, CachedDetail>): Record<string, BranchDetail> {
   const out: Record<string, BranchDetail> = {};
   for (const [name, detail] of Object.entries(details)) {
-    out[name] = { compare: detail.compare, ci: detail.ci };
+    out[name] = { compare: detail.compare, ci: detail.ci, viaPull: detail.viaPull ?? null };
   }
   return out;
 }

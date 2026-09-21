@@ -16,6 +16,7 @@ export function cannotAsk(kind: JobKind, branch: Branch): string | null {
   if (branch.isBase) return `${branch.name} is the base branch — there is nothing of its own to read`;
   if (kind === 'summarise' && branch.commits.length === 0) return `${branch.name} has no commits of its own to read`;
   if (kind === 'assess' && !branch.vision) return `nobody has said what ${branch.name} is for, so there is nothing to check it against`;
+  if (kind === 'assess' && branch.commits.length === 0) return `${branch.name} has no commits of its own to check`;
   if (kind === 'draft-vision' && branch.vision && branch.vision.state !== 'proposed') {
     return `you have already said what ${branch.name} is for — edit that instead`;
   }

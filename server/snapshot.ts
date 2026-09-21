@@ -28,6 +28,8 @@ export type RepoBundle = {
 export type BranchDetail = {
   compare: GhCompare;
   ci: GhCi | null;
+  /** The pull request whose commits `compare.commits` are, when the compare was empty (D89). */
+  viaPull?: number | null;
 };
 
 export type BuildOptions = {
@@ -94,6 +96,7 @@ function toBranch(bundle: RepoBundle, ghBranch: GhBranch, opts: BuildOptions): B
     headSha: ghBranch.commit.sha,
     url: `${bundle.repo.html_url}/tree/${encodeURIComponent(ghBranch.name)}`,
     commits,
+    commitsFrom: detail?.viaPull ? 'pull' : 'ahead',
     ahead: detail?.compare.ahead_by ?? 0,
     behind: detail?.compare.behind_by ?? 0,
     lastActivity,
@@ -108,6 +111,7 @@ function toBranch(bundle: RepoBundle, ghBranch: GhBranch, opts: BuildOptions): B
     isBase: ghBranch.name === bundle.repo.default_branch,
     title: null,
     summary: null,
+    recap: null,
     progress: null,
     insight: null,
   };

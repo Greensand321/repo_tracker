@@ -566,6 +566,34 @@ raise. An empty reply the model *chose* to give is still reported as empty, once
 would not help it. The wait for a reply is a setting too (`llmTimeoutSeconds`, default 120),
 because the same models take their time on a big prompt.
 
+### D89 — A merged branch keeps its history, and a summary is a recap you pick the work up from
+
+**The history.** Once a branch is merged with a merge commit, every one of its commits is
+in the base and the compare against the base comes back empty. The program read that as
+"nothing of its own" — for exactly the branches whose history is most worth having, since
+they are the ones that finished something — and then judged them anyway, producing
+"drifted" against an empty commit list. Now an empty compare on a branch with a pull request
+reads the pull request's own commits instead, once per head like everything else, and the
+branch says where its commits came from (`commitsFrom`). Ahead stays 0, because that is true.
+A branch with neither commits ahead nor a pull request still has nothing of its own, and is
+never assessed: a verdict with nothing to compare is a guess dressed as a finding.
+
+**The recap.** What the owner needs when they open a branch cold is not a paragraph but three
+answers: what it was doing last, what it got done, and whether anything looks half-finished.
+So the summary station writes exactly those — `last`, `done`, `open` — and is told the signs
+of unfinished work to read for: WIP and TODO in messages, a test with no implementation
+behind it, the same piece touched again and again with no closing commit, red CI, an open
+or draft pull request, a final commit that reads like a step. "Nothing looks unfinished." is
+the exact phrase for the good case, so the page can tell it from a finding. The one-line
+`summary` stays as the gist (last, plus open when something is), for search and for the
+prompts that read a branch in a line.
+
+**The brief** follows the same rule: three parts, `done`, `next`, `now`, each findable
+without reading the others, and it is fed each branch's recap rather than its gist so that
+"next" turns on what is actually open.
+
+Every prompt version moved to v2, so nothing written on the old evidence survives.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

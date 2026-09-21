@@ -160,7 +160,10 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings, now = new Da
   }
 
   for (const branch of branches) {
-    if (!branch.isBase && branch.vision !== null && !isAssessed(branch, settings)) {
+    // A vision and nothing to compare it against is not a job: the verdict on a branch with
+    // no commits is a guess dressed as a finding, and "drifted" on a merged, empty compare
+    // was exactly that.
+    if (!branch.isBase && branch.vision !== null && branch.commits.length > 0 && !isAssessed(branch, settings)) {
       jobs.push(
         forBranch(
           'assess',
@@ -295,9 +298,9 @@ function toSpec(asked: Dispatched, snapshot: Snapshot, settings: Settings): JobS
         doneWhen: () => isNewer(describedAt({ repoKey: branch.repoKey, branch: branch.name }), asked.since),
       };
     case 'assess':
-      // Nothing to compare against is not a failure; the request simply does not apply —
-      // and is cleared, or it would come back on every start until it gave up.
-      if (!branch.vision) {
+      // Nothing to compare against — or nothing to compare — is not a failure; the request
+      // simply does not apply, and is cleared, or it would come back on every start.
+      if (!branch.vision || branch.commits.length === 0) {
         clearDispatched(asked.id);
         return null;
       }

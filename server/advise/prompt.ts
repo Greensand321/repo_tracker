@@ -7,32 +7,36 @@
  * invents evidence gets that evidence dropped, not rendered.
  */
 
-import type { Branch, Progress } from '../../shared/types.ts';
+import type { Branch, Progress, Recap } from '../../shared/types.ts';
 
 /** Bump when the prompt changes meaningfully — it is part of the cache key, so old
- *  summaries are re-generated rather than silently mixed with new ones. */
-export const PROMPT_VERSION = 'v1';
+ *  summaries are re-generated rather than silently mixed with new ones.
+ *  v2: the summary became a recap — last / done / open — written to be picked up from (D89). */
+export const PROMPT_VERSION = 'v2';
 
 const PROGRESS_VALUES: Progress[] = ['progressing', 'stalled', 'blocked', 'done'];
 
-export const SYSTEM_PROMPT = `You read git branch history and explain, in plain English, what a thread of work is actually doing.
+export const SYSTEM_PROMPT = `You read one git branch and write the note a developer reads to pick the work back up.
 
-You are writing for one developer who has ~100 branches across several repos, nearly all of them created by AI coding agents. They cannot hold it all in their head. Your job is to let them glance at a card and know what this branch is.
+The reader has ~100 branches, nearly all written by AI coding agents in week-long sessions. They open a branch cold and need to know, in seconds: what it was doing last, what it got done, and whether anything is half-finished — so they can carry on where it left off.
 
-Rules:
-- Write like a colleague answering "what's this branch?", not like a changelog.
-- The title is a short noun phrase, at most 60 characters, no trailing period. Describe the OUTCOME the work is after, not the commits. "Stopping duplicate webhook charges", not "Added idempotency test and dedupe table".
-- The summary is 1-3 sentences. Say what the thread is doing, where it got to, and what is in the way if anything. No preamble, no restating the branch name.
-- Never invent facts. You only know what is in the commits, the PR title and the CI state. If the history is too thin to tell, say so plainly in the summary.
-- Judge progress honestly:
-  - progressing: recent commits that move the work forward
-  - stalled: nothing has happened for a while and nothing is obviously blocking it
-  - blocked: something concrete is in the way (CI failing, an unresolved problem named in the commits)
-  - done: the work looks finished, or its PR is merged
-- Cite evidence: the short SHAs of the commits your summary is based on, most important first, at most 4.
+Write these, each as plain English, like a colleague, no preamble, no markdown, never restating the branch name:
+
+- title: a short noun phrase, at most 60 characters, no trailing period. The OUTCOME the work is after, not the commits. "Stopping duplicate webhook charges", not "Added idempotency test and dedupe table".
+- last: one sentence. What the newest commits were doing — the thing the branch was in the middle of when it was last touched. Name the concrete piece: the feature, the file, the test. Never "made improvements".
+- done: one sentence. What is finished and landed: merged, passing, complete. If the pull request is merged, say what it delivered. If nothing is clearly finished yet, say so.
+- open: one sentence. What looks unfinished or partial. Read the history for the signs: messages saying WIP, TODO, "part 1", "start", "scaffold", "stub"; a test added with no implementation behind it; the same piece touched again and again without a closing commit; CI failing; an open or draft pull request; a final commit that reads like an intermediate step. Name the piece and why it looks unfinished. If nothing does, write exactly: Nothing looks unfinished.
+- progress: judge honestly —
+    progressing: recent commits that move the work forward
+    stalled: nothing has happened for a while and nothing is obviously blocking it
+    blocked: something concrete is in the way (CI failing, an unresolved problem named in the commits)
+    done: the work looks finished, or its PR is merged and nothing is left open
+- evidence: the short SHAs your reading rests on, most important first, at most 4.
+
+Never invent facts. You only know what is in the commits, the pull request and the CI state. If the history is too thin to tell, say so in the field it affects.
 
 Reply with ONLY a JSON object, no prose around it, no markdown fence:
-{"title": "...", "summary": "...", "progress": "progressing|stalled|blocked|done", "evidence": ["sha", ...]}`;
+{"title": "...", "last": "...", "done": "...", "open": "...", "progress": "progressing|stalled|blocked|done", "evidence": ["sha", ...]}`;
 
 /** How much of one branch we are willing to spend tokens on. */
 const MAX_COMMITS = 25;
@@ -49,9 +53,12 @@ export function buildUserPrompt(branch: Branch, now: Date): string {
     branch.pr
       ? `Pull request #${branch.pr.number} "${branch.pr.title}" — ${branch.pr.state}${branch.pr.draft ? ' (draft)' : ''}.`
       : 'No pull request.',
-    '',
-    'Commits, newest first:',
   ];
+  if (branch.commitsFrom === 'pull') {
+    // Said plainly, or "0 ahead" beside a list of commits reads as a contradiction.
+    lines.push('The commits below are the branch\'s own work as recorded on its pull request; they are already merged into the base, which is why it is 0 ahead.');
+  }
+  lines.push('', 'Commits, newest first:');
 
   if (branch.commits.length === 0) {
     lines.push('(none — this branch has nothing of its own ahead of the base)');
@@ -73,10 +80,15 @@ export function buildUserPrompt(branch: Branch, now: Date): string {
 
 export type Insight = {
   title: string;
+  /** The one-line gist: what it did last, plus what is open when something is. */
   summary: string;
+  recap: Recap;
   progress: Progress;
   evidence: string[];
 };
+
+/** The words the model is told to use when nothing is unfinished. Matched, never shown raw. */
+export const NOTHING_OPEN = /^nothing (looks|is) (unfinished|open|left)\.?$/i;
 
 export class InsightParseError extends Error {
   raw: string;
@@ -110,16 +122,22 @@ export function parseInsight(raw: string, branch: Branch): Insight {
 
   const record = parsed as Record<string, unknown>;
   const title = cleanTitle(record['title']);
-  const summary = cleanText(record['summary']);
+  // The old shape — one `summary` — is still read as the `last` line, so a model that
+  // ignores the new fields still yields something rather than a parked job.
+  const last = cleanText(record['last']) || cleanText(record['summary']);
+  const done = cleanText(record['done']);
+  const open = cleanText(record['open']);
   if (!title) throw new InsightParseError('reply had no usable title', raw);
-  if (!summary) throw new InsightParseError('reply had no usable summary', raw);
+  if (!last) throw new InsightParseError('reply said nothing about what the branch did', raw);
 
   const progress = PROGRESS_VALUES.find((value) => value === record['progress']);
   if (!progress) {
     throw new InsightParseError(`reply had an unknown progress value: ${String(record['progress'])}`, raw);
   }
 
-  return { title, summary, progress, evidence: validEvidence(record['evidence'], branch) };
+  const recap: Recap = { last, done, open };
+  const summary = open && !NOTHING_OPEN.test(open) ? `${last} ${open}` : last;
+  return { title, summary, recap, progress, evidence: validEvidence(record['evidence'], branch) };
 }
 
 /**

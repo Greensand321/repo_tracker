@@ -49,8 +49,15 @@ export type Branch = {
   headSha: string;
   url: string;
 
-  /** Only the commits this branch adds to the base. Newest first. The point of Stage 1. */
+  /** The branch's own commits, newest first. The point of Stage 1. */
   commits: Commit[];
+  /**
+   * Where those commits came from. `ahead` is the compare against the base. `pull` means
+   * the compare was empty — the branch was merged with a merge commit, so its work is
+   * already in the base — and the commits are the ones its pull request recorded (D89).
+   * Exactly the branches whose history is most worth having read "nothing of its own".
+   */
+  commitsFrom: 'ahead' | 'pull';
   ahead: number;
   behind: number;
   /** null when the branch has no commits of its own and no PR to date it. */
@@ -83,9 +90,25 @@ export type Branch = {
   /** LLM-written title, shown ALONGSIDE `name` and marked as generated. Never instead of it. */
   title: string | null;
   summary: string | null;
+  /**
+   * The note you read to pick the work back up: what it did last, what it got done, and
+   * whether anything looks half-finished (D89). `summary` is the one-line gist of it, kept
+   * for search and for the prompts that read a branch in a line.
+   */
+  recap: Recap | null;
   progress: Progress | null;
   /** Where the summary came from, so a wrong one is debuggable rather than mysterious. */
   insight: InsightMeta | null;
+};
+
+/** Three sentences, each answering the question you have when you open a branch cold. */
+export type Recap = {
+  /** What the newest commits were doing — the thing it was in the middle of. */
+  last: string;
+  /** What is finished and landed. */
+  done: string;
+  /** What looks unfinished or partial, or "Nothing looks unfinished." */
+  open: string;
 };
 
 export type Progress = 'progressing' | 'stalled' | 'blocked' | 'done';
@@ -147,6 +170,15 @@ export type Assessment = {
 // Judgement and the brief
 // ---------------------------------------------------------------------------
 
+export type BriefParts = {
+  /** What has landed or looks finished: which goals, which branches. */
+  done: string;
+  /** What still needs doing, leading with the thing most in the way. */
+  next: string;
+  /** What is actually going on: what moved most recently and what each is mid-way through. */
+  now: string;
+};
+
 export type GoalState = 'progressing' | 'at-risk' | 'stalled' | 'looks-done' | 'needs-you';
 
 /**
@@ -165,7 +197,10 @@ export type GoalJudgement = {
 
 /** The standing answer to what is done, what is left, and what is going on. */
 export type Brief = {
+  /** The three parts joined, for anything that reads the brief in one string. */
   text: string;
+  /** The same brief in its three parts (D89). Null for a brief written before they existed. */
+  parts: BriefParts | null;
   generatedAt: string;
   model: string;
   promptVersion: string;

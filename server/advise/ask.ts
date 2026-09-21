@@ -29,7 +29,7 @@ import { deskTools } from '../tools/catalog.ts';
 import { contextFor } from '../tools/context.ts';
 import { LlmError } from './client.ts';
 import { converse } from './converse.ts';
-import { extractJson } from './prompt.ts';
+import { NOTHING_OPEN, extractJson } from './prompt.ts';
 
 export type Ranked = { ref: BranchRef; why: string };
 export type ProposedGroup = { title: string; branches: BranchRef[] };
@@ -138,7 +138,13 @@ function describeBranch(branch: Branch, goal: Goal | null): string {
   if (branch.vision) {
     out.push(`    FOR: ${branch.vision.text}${branch.vision.state === 'proposed' ? ' (my guess — not confirmed)' : ''}`);
   }
-  if (branch.summary) out.push(`    DID: ${branch.summary}`);
+  if (branch.recap) {
+    out.push(`    LAST: ${branch.recap.last}`);
+    if (branch.recap.done) out.push(`    DONE: ${branch.recap.done}`);
+    if (branch.recap.open && !NOTHING_OPEN.test(branch.recap.open)) out.push(`    OPEN: ${branch.recap.open}`);
+  } else if (branch.summary) {
+    out.push(`    DID: ${branch.summary}`);
+  }
   if (branch.assessment) out.push(`    COMPARED: ${branch.assessment.verdict} — ${branch.assessment.because}`);
   // Three messages is enough to tell what a branch is doing without paying for fifty.
   for (const commit of branch.commits.slice(0, 3)) out.push(`    commit: ${commit.message}`);

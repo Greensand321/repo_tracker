@@ -18,8 +18,10 @@ import { converse } from './converse.ts';
 import { extractJson, shortSha, validEvidence } from './prompt.ts';
 
 /** Part of every assessment cache key: bumping it re-judges everything rather than
- *  leaving a silent mix of old reasoning and new. */
-export const VISION_PROMPT_VERSION = 'v1';
+ *  leaving a silent mix of old reasoning and new.
+ *  v2: merged branches carry their real history now (D89), and the station sees the
+ *  recap. Every verdict drawn on an empty compare is retired by this. */
+export const VISION_PROMPT_VERSION = 'v2';
 
 /**
  * The version an assessment is cached under, **including the tools the station had**
@@ -347,9 +349,14 @@ export function describeBranch(branch: Branch): string {
     branch.pr
       ? `Pull request #${branch.pr.number} "${branch.pr.title}" — ${branch.pr.state}${branch.pr.draft ? ' (draft)' : ''}.`
       : 'No pull request.',
-    '',
-    'Commits, newest first:',
   ];
+  if (branch.commitsFrom === 'pull') {
+    lines.push('The commits below are the branch\'s own work as recorded on its pull request; they are already merged into the base.');
+  }
+  if (branch.recap) {
+    lines.push('', `Last: ${branch.recap.last}`, `Done: ${branch.recap.done}`, `Open: ${branch.recap.open}`);
+  }
+  lines.push('', 'Commits, newest first:');
 
   if (branch.commits.length === 0) {
     lines.push('(none of its own)');

@@ -60,7 +60,7 @@ function branch(name: string, over: Partial<Branch> = {}): Branch {
     ahead: 2, behind: 0, lastActivity: '2026-09-15T00:00:00Z',
     diff: { files: 1, additions: 1, deletions: 0 }, activity: ['2026-09-15'],
     pr: null, ci: { state: 'none', url: null }, relevance: 'active', isBase: false, goalId: null,
-    vision: null, assessment: null, title: null, summary: null, progress: null, insight: null, ...over,
+    vision: null, assessment: null, title: null, summary: null, progress: null, insight: null, recap: null, commitsFrom: 'ahead', ...over,
   };
 }
 
@@ -330,8 +330,8 @@ test('changing a station\'s tools changes its prompt version', async () => {
   const without = assessVersion(settings({ toolsEnabled: false }));
 
   assert.notEqual(withTools, without, 'answers drawn from different evidence are not the same answer');
-  assert.equal(without, 'v1', 'no tools means the version it always had — nothing needless is regenerated');
-  assert.equal(assessVersion(settings({ toolCallsPerJob: 0 })), 'v1', 'no lookups allowed is no tools');
+  assert.equal(without, 'v2', 'no tools means the version it always had — nothing needless is regenerated');
+  assert.equal(assessVersion(settings({ toolCallsPerJob: 0 })), 'v2', 'no lookups allowed is no tools');
   assert.equal(withTools, assessVersion(settings({ toolsEnabled: true })), 'and it is stable');
 });
 
@@ -543,7 +543,7 @@ test('every station with tools carries them in its version', async () => {
     const on = version(settings({ toolsEnabled: true }));
     const off = version(settings({ toolsEnabled: false }));
     assert.notEqual(on, off);
-    assert.match(off, /^v1$/, 'no tools means the version it always had');
+    assert.match(off, /^v2$/, 'no tools means the version it always had');
   }
 
   // And the three do not collide: they have different tools, so different tags.
