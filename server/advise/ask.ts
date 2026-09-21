@@ -170,7 +170,6 @@ export async function ask(
     user: buildAskPrompt(snapshot, text, settings.askBranchCap),
     tools: deskTools(settings),
     ctx: { ...contextFor(snapshot, settings, null), dispatch: doors.dispatch ?? null },
-    maxTokens: 900,
     // One question is one session. Nothing is carried between them, by design: a fresh
     // context per question is cheaper and cannot drift (agent-plan.md).
     sessionId: randomUUID(),

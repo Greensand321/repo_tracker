@@ -77,6 +77,8 @@ api.put('/settings', async (c) => {
     'quietAfterDays',
     'commitsPerBranch',
     'llmMaxPerRun',
+    'llmReplyTokens',
+    'llmTimeoutSeconds',
     'askBranchCap',
     'maxOpenQuestions',
     'briefEveryMinutes',

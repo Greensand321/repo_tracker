@@ -37,6 +37,8 @@ function sanitise(settings: Settings): Settings {
     llmModel: settings.llmModel.trim(),
     llmEnabled: settings.llmEnabled !== false,
     llmMaxPerRun: clamp(settings.llmMaxPerRun, 0, 500, DEFAULT_SETTINGS.llmMaxPerRun),
+    llmReplyTokens: clamp(settings.llmReplyTokens, 256, 32_000, DEFAULT_SETTINGS.llmReplyTokens),
+    llmTimeoutSeconds: clamp(settings.llmTimeoutSeconds, 15, 600, DEFAULT_SETTINGS.llmTimeoutSeconds),
     askBranchCap: clamp(settings.askBranchCap, 1, 400, DEFAULT_SETTINGS.askBranchCap),
     visionAutoDraft: settings.visionAutoDraft !== false,
     maxOpenQuestions: clamp(settings.maxOpenQuestions, 0, 40, DEFAULT_SETTINGS.maxOpenQuestions),

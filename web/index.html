@@ -169,7 +169,7 @@
           </div>
         </div>
 
-        <div class="field nums">
+        <div class="field nums four">
           <div>
             <label for="llmMaxPerRun">Calls per read
               <span class="info" tabindex="0" role="img" aria-label="about the call budget" data-tip="The most provider calls one read may make — every job and every lookup. Work left over waits for the next read.">i</span>
@@ -177,7 +177,13 @@
             <input id="llmMaxPerRun" type="number" min="0" max="500">
           </div>
           <div>
-            <label for="askBranchCap">Branches shown
+            <label for="llmReplyTokens">Reply tokens
+              <span class="info" tabindex="0" role="img" aria-label="about reply room" data-tip="How long one reply may run. A cap, not a target: a plain model uses a few hundred and the rest costs nothing. A reasoning model thinks out of the same allowance and, capped too low, returns nothing — “the model returned an empty reply”. A reply that hits the cap is tried once more with double the room.">i</span>
+            </label>
+            <input id="llmReplyTokens" type="number" min="256" max="32000" step="100">
+          </div>
+          <div>
+            <label for="askBranchCap">Branches
               <span class="info" tabindex="0" role="img" aria-label="about the question size" data-tip="How much of the register a question may put in front of the model. Every question grows with it.">i</span>
             </label>
             <input id="askBranchCap" type="number" min="1" max="400">

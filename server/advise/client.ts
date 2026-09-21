@@ -24,23 +24,27 @@
 
 import { randomUUID } from 'node:crypto';
 
-import type { Settings } from '../../shared/types.ts';
+import { DEFAULT_SETTINGS, type Settings } from '../../shared/types.ts';
 
 export class LlmError extends Error {
   status: number | undefined;
-  constructor(message: string, status?: number) {
+  /** The reply hit the token cap before it held an answer. Worth one more try with more room. */
+  cutOff: boolean;
+  constructor(message: string, status?: number, options: { cutOff?: boolean } = {}) {
     super(message);
     this.name = 'LlmError';
     this.status = status;
+    this.cutOff = options.cutOff ?? false;
   }
 }
 
-/** A slow model must not hold up the whole refresh. */
-const TIMEOUT_MS = 90_000;
+/** Past this, a second try with double the room is a bill rather than a fix. */
+const MAX_REPLY_TOKENS = 32_000;
 
 export type CompletionRequest = {
   system: string;
   user: string;
+  /** Rarely set: the reply room is `llmReplyTokens` in settings, the same for every station. */
   maxTokens?: number;
   /**
    * Opaque, stable for one batch of work, distinct between batches. OpenCode requires
@@ -87,6 +91,21 @@ export async function complete(settings: Settings, request: CompletionRequest): 
   if (!settings.llmApiKey) throw new LlmError('no API key set');
   if (!settings.llmModel) throw new LlmError('no model chosen');
 
+  const room = request.maxTokens ?? settings.llmReplyTokens;
+  try {
+    return await tryProtocols(settings, request, room);
+  } catch (err) {
+    // The reply hit the cap before it held an answer. On a reasoning model that means the
+    // thinking used the whole allowance — the answer was never reached, and the call was
+    // paid for. One more try with double the room, then the error says what to change.
+    if (err instanceof LlmError && err.cutOff && room < MAX_REPLY_TOKENS) {
+      return tryProtocols(settings, request, Math.min(MAX_REPLY_TOKENS, room * 2));
+    }
+    throw err;
+  }
+}
+
+async function tryProtocols(settings: Settings, request: CompletionRequest, maxTokens: number): Promise<string> {
   const model = settings.llmModel;
   const known = learned.get(model);
   const first = guessProtocol(model, settings.llmBaseUrl);
@@ -97,7 +116,7 @@ export async function complete(settings: Settings, request: CompletionRequest): 
 
   for (const protocol of order) {
     try {
-      const text = await callProtocol(protocol, settings, request);
+      const text = await callProtocol(protocol, settings, request, maxTokens);
       learned.set(model, protocol);
       return text;
     } catch (err) {
@@ -128,8 +147,8 @@ async function callProtocol(
   protocol: Protocol,
   settings: Settings,
   request: CompletionRequest,
+  maxTokens: number,
 ): Promise<string> {
-  const maxTokens = request.maxTokens ?? 700;
   const spec =
     protocol === 'messages'
       ? {
@@ -185,13 +204,15 @@ async function callProtocol(
     headers['x-opencode-session'] = request.sessionId ?? randomUUID();
   }
 
-  const res = await withTimeout((signal) =>
-    fetch(`${baseUrl(settings)}${spec.path}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(spec.body),
-      signal,
-    }),
+  const res = await withTimeout(
+    (signal) =>
+      fetch(`${baseUrl(settings)}${spec.path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(spec.body),
+        signal,
+      }),
+    settings.llmTimeoutSeconds * 1000,
   );
 
   if (!res.ok) throw new LlmError(await describeFailure(res), res.status);
@@ -201,9 +222,63 @@ async function callProtocol(
   if (error) throw new LlmError(typeof error === 'string' ? error : (error.message ?? 'provider error'));
 
   const text = extractText(payload);
-  if (!text) throw new LlmError('the model returned an empty reply');
-  return text;
+  if (text) return text;
+
+  // Nothing to read. Two very different reasons look identical from the outside, and only
+  // one of them is fixed by trying again: the cap was reached before the answer (a
+  // reasoning model thinking out loud until the room ran out), or the model simply said
+  // nothing. The finish reason tells them apart, and a 200 with an empty body used to be
+  // reported as the second when it was nearly always the first.
+  if (finishReason(payload) === 'length') {
+    throw new LlmError(
+      `the model ran out of room before it answered — all ${maxTokens} reply tokens were used, ` +
+        `most likely on reasoning. Raise "reply tokens" in settings`,
+      undefined,
+      { cutOff: true },
+    );
+  }
+  throw new LlmError(
+    heldOnlyReasoning(payload)
+      ? 'the model returned only its reasoning and no answer'
+      : 'the model returned an empty reply',
+  );
 }
+
+/**
+ * Why the reply stopped, in whichever shape it came: `length` when the token cap did it,
+ * `stop` when the model finished on its own, `unknown` when the payload does not say.
+ */
+export function finishReason(payload: Record<string, unknown>): 'length' | 'stop' | 'unknown' {
+  const choice = (Array.isArray(payload['choices']) ? payload['choices'][0] : null) as
+    | { finish_reason?: unknown }
+    | null;
+  const chat = choice?.finish_reason;
+  if (chat === 'length') return 'length';
+  if (typeof chat === 'string') return 'stop';
+
+  const stop = payload['stop_reason'];
+  if (stop === 'max_tokens') return 'length';
+  if (typeof stop === 'string') return 'stop';
+
+  // The Responses API: an incomplete status with the reason beside it.
+  const incomplete = payload['incomplete_details'] as { reason?: unknown } | null | undefined;
+  if (incomplete?.reason === 'max_output_tokens') return 'length';
+  if (payload['status'] === 'completed') return 'stop';
+  return 'unknown';
+}
+
+/** A reply with thinking in it and nothing else — the reasoning fields gateways add. */
+function heldOnlyReasoning(payload: Record<string, unknown>): boolean {
+  const choice = (Array.isArray(payload['choices']) ? payload['choices'][0] : null) as
+    | { message?: { reasoning_content?: unknown; reasoning?: unknown } }
+    | null;
+  const message = choice?.message;
+  if (message && (isText(message.reasoning_content) || isText(message.reasoning))) return true;
+  const blocks = payload['content'];
+  return Array.isArray(blocks) && blocks.length > 0 && blocks.every((b) => (b as { type?: unknown })?.type === 'thinking');
+}
+
+const isText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 
 /**
  * Pulls the reply text out of whichever shape came back. Written to accept all three
@@ -325,14 +400,18 @@ export function toModelInfo(row: unknown): ModelInfo | null {
 
 const baseUrl = (settings: Settings): string => settings.llmBaseUrl.replace(/\/+$/, '');
 
-async function withTimeout(run: (signal: AbortSignal) => Promise<Response>): Promise<Response> {
+/** A slow model must not hold up the whole refresh. How long is the owner's to say. */
+async function withTimeout(
+  run: (signal: AbortSignal) => Promise<Response>,
+  ms: number = DEFAULT_SETTINGS.llmTimeoutSeconds * 1000,
+): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), ms);
   try {
     return await run(controller.signal);
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new LlmError(`the model did not answer within ${TIMEOUT_MS / 1000}s`);
+      throw new LlmError(`the model did not answer within ${Math.round(ms / 1000)}s — raise "llmTimeoutSeconds" in data/settings.json if it is a slow model`);
     }
     throw new LlmError(err instanceof Error ? err.message : String(err));
   } finally {

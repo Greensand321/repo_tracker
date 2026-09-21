@@ -371,3 +371,80 @@ test('every advisor call site reaches a provider through complete()', async () =
   }
   assert.deepEqual(offenders, [], 'these bypass complete() and would miss its headers');
 });
+
+// ---------------------------------------------------------------------------
+// Reply room — the empty replies a reasoning model gives when the cap is too low
+// ---------------------------------------------------------------------------
+
+/** Answers the same path every time, from a script of bodies. Records what was sent. */
+function scripted(bodies: unknown[]): { sent: Record<string, unknown>[] } {
+  const sent: Record<string, unknown>[] = [];
+  let i = 0;
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    sent.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+    const body = bodies[Math.min(i++, bodies.length - 1)];
+    return new Response(JSON.stringify(body), { status: 200 });
+  }) as typeof fetch;
+  return { sent };
+}
+
+const cutOff = { choices: [{ message: { content: '', reasoning_content: 'Let me think about this at length…' }, finish_reason: 'length' }] };
+const fine = { choices: [{ message: { content: '{"ok":true}' }, finish_reason: 'stop' }] };
+
+test('the reply room comes from settings, the same for every station', async () => {
+  const { sent } = scripted([fine]);
+  await complete({ ...settings('deepseek-v4'), llmReplyTokens: 3210 }, request);
+  assert.equal(sent[0]!['max_tokens'], 3210);
+});
+
+test('a reply cut off by the cap is tried once more with twice the room', async () => {
+  // A reasoning model spends its thinking out of the same allowance. Capped at 350 every
+  // assessment came back empty, was paid for, and parked after the second read.
+  const { sent } = scripted([cutOff, fine]);
+  const text = await complete({ ...settings('deepseek-v4'), llmReplyTokens: 500 }, request);
+  assert.equal(text, '{"ok":true}');
+  assert.equal(sent.length, 2);
+  assert.equal(sent[0]!['max_tokens'], 500);
+  assert.equal(sent[1]!['max_tokens'], 1000, 'double, once');
+});
+
+test('still cut off after that, the error says what to raise — and stops', async () => {
+  const { sent } = scripted([cutOff, cutOff, cutOff]);
+  await assert.rejects(
+    complete({ ...settings('deepseek-v4'), llmReplyTokens: 500 }, request),
+    (err: unknown) => err instanceof LlmError && err.cutOff && /1000 reply tokens/.test(err.message) && /reply tokens/.test(err.message),
+  );
+  assert.equal(sent.length, 2, 'not a loop');
+});
+
+test('an empty reply the model chose to give is reported as empty, once', async () => {
+  const { sent } = scripted([{ choices: [{ message: { content: '' }, finish_reason: 'stop' }] }]);
+  await assert.rejects(complete(settings('deepseek-v4'), request), /returned an empty reply/);
+  assert.equal(sent.length, 1, 'more room would not help');
+});
+
+test('a reply that is all reasoning and no answer says so', async () => {
+  scripted([{ choices: [{ message: { content: '', reasoning_content: 'thoughts' }, finish_reason: 'stop' }] }]);
+  await assert.rejects(complete(settings('deepseek-v4'), request), /only its reasoning/);
+});
+
+test('the Anthropic shape reports the cap the same way', async () => {
+  const { sent } = scripted([
+    { content: [{ type: 'thinking', thinking: 'hmm' }], stop_reason: 'max_tokens' },
+    { content: [{ type: 'text', text: 'done' }], stop_reason: 'end_turn' },
+  ]);
+  assert.equal(await complete({ ...settings('claude-opus-5'), llmReplyTokens: 400 }, request), 'done');
+  assert.equal(sent[1]!['max_tokens'], 800);
+});
+
+test('the wait for a reply comes from settings, and the timeout names it', async () => {
+  globalThis.fetch = ((_url: string, init: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+    })) as typeof fetch;
+  // Below the clamp floor on purpose: sanitise is not in the path, so the raw number is used.
+  await assert.rejects(
+    complete({ ...settings('deepseek-v4'), llmTimeoutSeconds: 0.05 }, request),
+    /did not answer within 0s.*llmTimeoutSeconds/,
+  );
+});

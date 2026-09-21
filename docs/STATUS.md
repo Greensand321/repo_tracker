@@ -167,7 +167,8 @@ npm run brief -- --no-llm    # deterministic only, no provider calls
 ```
 
 Settings live in `data/settings.json` and can be hand-edited: `llmApiKey`, `llmBaseUrl`
-(defaults to `https://opencode.ai/zen/v1`), `llmModel`, `llmMaxPerRun`, `workers`.
+(defaults to `https://opencode.ai/zen/v1`), `llmModel`, `llmMaxPerRun`, `llmReplyTokens`,
+`llmTimeoutSeconds` (not on the settings screen; 120 by default), `workers`.
 
 **`llmModel` is empty on purpose.** Run `npm run models` and pick one — a guessed model ID
 would fail at the worst moment.
@@ -204,6 +205,10 @@ Then, in whatever order they earn it:
 - **Every cited commit is checked against the branch.** An invented SHA is dropped rather
   than rendered as a link.
 - **A fatal provider error stops the run** rather than failing identically 99 more times.
+- **"The model returned an empty reply" almost always means the reply cap was hit by a
+  reasoning model** thinking out loud. The client now reads the finish reason, retries
+  once with double the room, and says which setting to raise (D88). Parked jobs are held in
+  memory only: restarting the program, or saving settings, retries them all.
 - **`data/history/*.jsonl`** has been accumulating since the first run and nothing reads it
   yet. That is deliberate (D31).
 - **`BEARING_DATA_DIR`** relocates everything the tool stores — `settings.json`, `goals.json`,
@@ -271,6 +276,7 @@ Then, in whatever order they earn it:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 21 Sep 2026 | **First real run** parked every assessment and the brief on "the model returned an empty reply": a reasoning model exhausting per-station caps of 350 and 1200 tokens. One reply allowance in settings, a cut-off reply retried once with double the room, and the error names the cause. D88 |
 | 21 Sep 2026 | **Settings rebuilt**: two columns, GitHub and the advisor, fitting a laptop screen without scrolling; every explanation moved behind an ⓘ that opens on hover or focus |
 | 21 Sep 2026 | **The workroom, step 6 — the desk**, a review of the room, and the persistence bugs that were re-paying for summaries: pruning against a failed read, torn files treated as empty, the brief rewritten every read. D84–D87 |
 | 18 Sep 2026 | **The workroom, step 5**: you can ask for a second opinion, in its own lane, surviving a restart. Work asked for is decided by freshness rather than by what is missing. D81–D83 |

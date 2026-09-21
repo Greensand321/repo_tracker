@@ -550,6 +550,22 @@ stay with it; its overtaken findings stay only while the vision each was made ag
 stands. Asking for it — "write it again" — never waits: that is the dispatched lane, which
 does not read the interval. 0 restores the old behaviour.
 
+### D88 — One reply allowance for every station, and a cut-off reply is tried once more with double the room
+
+Each station set its own token cap: 300 for a draft, 350 for an assessment, 700 for a
+summary, 1200 for the brief. Sensible numbers for the size of the *answer* — and wrong for
+a reasoning model, which spends its thinking out of the same allowance and, capped at 350,
+returns an empty reply after using every token on reasoning. The first real run parked every
+assessment and the brief on "the model returned an empty reply", having paid for each twice.
+
+So the cap is one setting, `llmReplyTokens` (default 2000), the same for every station: a
+plain model uses a few hundred and the rest costs nothing, and a reasoning model gets room to
+think. The client reads the finish reason, and a reply that hit the cap with nothing in it
+is tried once more with double the room before it is reported — and the report says what to
+raise. An empty reply the model *chose* to give is still reported as empty, once; more room
+would not help it. The wait for a reply is a setting too (`llmTimeoutSeconds`, default 120),
+because the same models take their time on a big prompt.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

@@ -798,6 +798,7 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#quietAfterDays').value = String(settings.quietAfterDays);
     $<HTMLInputElement>('#commitsPerBranch').value = String(settings.commitsPerBranch);
     $<HTMLInputElement>('#llmMaxPerRun').value = String(settings.llmMaxPerRun);
+    $<HTMLInputElement>('#llmReplyTokens').value = String(settings.llmReplyTokens);
     $<HTMLInputElement>('#askBranchCap').value = String(settings.askBranchCap);
     $<HTMLInputElement>('#maxOpenQuestions').value = String(settings.maxOpenQuestions);
     $<HTMLInputElement>('#briefEveryMinutes').value = String(settings.briefEveryMinutes);
@@ -850,6 +851,7 @@ async function saveSettings(): Promise<void> {
       quietAfterDays: Number($<HTMLInputElement>('#quietAfterDays').value),
       commitsPerBranch: Number($<HTMLInputElement>('#commitsPerBranch').value),
       llmMaxPerRun: Number($<HTMLInputElement>('#llmMaxPerRun').value),
+      llmReplyTokens: Number($<HTMLInputElement>('#llmReplyTokens').value),
       askBranchCap: Number($<HTMLInputElement>('#askBranchCap').value),
       maxOpenQuestions: Number($<HTMLInputElement>('#maxOpenQuestions').value),
       briefEveryMinutes: Number($<HTMLInputElement>('#briefEveryMinutes').value),

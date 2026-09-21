@@ -362,6 +362,8 @@ a:hover { color: var(--text-hi); }
 .field { margin-top: 12px; }
 .field.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .field.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.field.nums > div, .field.two > div { min-width: 0; }
+.field.nums label { overflow: hidden; }
 .field.nums.four { grid-template-columns: repeat(4, 1fr); }
 .model-row { display: flex; gap: 8px; align-items: center; }
 .model-row .picker { flex: 1; min-width: 0; }
