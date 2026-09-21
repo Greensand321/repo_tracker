@@ -16,6 +16,8 @@ import { collect } from './collect.ts';
 import { applyGoals, pruneGoals } from './goals.ts';
 import { recordHistory } from './history.ts';
 import { loadSettings } from './settings.ts';
+import { pruneVisions } from './vision.ts';
+import { pruneInsights } from './advise/store.ts';
 
 type Listener = (event: string) => void;
 
@@ -91,11 +93,20 @@ export async function refresh(): Promise<void> {
   try {
     const next = await collect(settings);
 
-    // Both of these are free and local, so they go on before anyone sees the snapshot:
+    // A branch that no longer exists should not sit in a goal forever, or keep a summary
+    // and a vision on disk. Pruned here, once, and only within the repos this read actually
+    // reached: a repo GitHub would not serve just now is missing from the snapshot, not
+    // from GitHub — and pruning against that snapshot deleted every summary, every vision
+    // and every filing for it on the strength of one bad connection at startup, then paid
+    // to write the summaries again. The goals themselves are kept either way.
+    const live = new Set(next.branches.map((b) => refKey(b.repoKey, b.name)));
+    const reached = new Set(next.repos.map((r) => r.key));
+    pruneGoals(live, reached);
+    pruneVisions(live, reached);
+    pruneInsights(live, reached);
+
+    // All of these are free and local, so they go on before anyone sees the snapshot:
     // goals are the owner's own filing, summaries are already paid for and on disk.
-    // A branch that no longer exists should not sit in a goal forever. The goal is
-    // kept either way — it is the owner's, not GitHub's.
-    pruneGoals(new Set(next.branches.map((b) => refKey(b.repoKey, b.name))));
     applyGoals(next);
     applyCached(next, settings);
     // Visions, assessments, judgements and the brief that are already on disk. Free.
@@ -162,8 +173,29 @@ async function workInBackground(target: Snapshot): Promise<void> {
     console.error('the assistant failed:', message(err));
   } finally {
     working = false;
-    if (snapshot === target) announce('snapshot');
+    if (snapshot === target) {
+      announce('snapshot');
+    } else if (snapshot) {
+      // A read landed while this run was going, so everything it wrote went onto a
+      // snapshot nobody is looking at any more. Hand the results to the one on screen —
+      // they are on disk, and applying them is free — and work its board now rather than
+      // leaving both to the next read a minute away. With polling off, there is no next read.
+      carryOver(snapshot);
+      void workInBackground(snapshot);
+    }
   }
+}
+
+/**
+ * Everything on disk, applied to the snapshot on screen, and the page told. What a run
+ * that outlived its read owes the read that replaced it.
+ */
+function carryOver(target: Snapshot): void {
+  const settings = loadSettings();
+  applyCached(target, settings);
+  applyAssist(target, settings);
+  applyWork(target, settings);
+  announce('snapshot');
 }
 
 /**
@@ -215,10 +247,16 @@ export function dispatchWork(kind: JobKind, subject: JobSubject): void {
 }
 
 let dispatching = false;
+/** An ask that arrived while the lane was busy. It runs when the lane frees, not next read. */
+let askedMeanwhile = false;
 
 async function dispatchInBackground(target: Snapshot): Promise<void> {
-  if (dispatching) return;
+  if (dispatching) {
+    askedMeanwhile = true;
+    return;
+  }
   dispatching = true;
+  askedMeanwhile = false;
   try {
     const result = await runBoard(target, loadSettings(), {
       lane: 'dispatched',
@@ -235,6 +273,10 @@ async function dispatchInBackground(target: Snapshot): Promise<void> {
   } finally {
     dispatching = false;
     if (snapshot === target) announce('snapshot');
+    else if (snapshot) carryOver(snapshot);
+    // Something was asked for while this was running. The lane exists so that what you
+    // ask for never waits behind other work — including its own previous batch.
+    if (askedMeanwhile && snapshot && llmReady(loadSettings())) void dispatchInBackground(snapshot);
   }
 }
 
@@ -246,11 +288,19 @@ async function dispatchInBackground(target: Snapshot): Promise<void> {
  */
 export function retryJob(id: string): boolean {
   if (!snapshot) return false;
-  const found = unpark(id);
+  const job = unpark(id);
+  if (!job) return false;
+  if (job.origin === 'dispatched') {
+    // A routine job is derived again the moment it is forgotten. A dispatched one is not
+    // derived from anything: parking took it off disk, so "try again" has to ask again —
+    // otherwise the button forgot the failure and then did nothing at all.
+    dispatchWork(job.kind, job.subject);
+    return true;
+  }
   applyWork(snapshot, loadSettings());
   announce('snapshot');
-  if (found && llmReady(loadSettings())) void workInBackground(snapshot);
-  return found;
+  if (llmReady(loadSettings())) void workInBackground(snapshot);
+  return true;
 }
 
 /** Fresh on open, then keep going. `refreshSeconds: 0` turns polling off. */

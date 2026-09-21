@@ -20,7 +20,7 @@
  *   **A tool never sees a secret.** Its context carries `SafeSettings`, not `Settings`.
  */
 
-import type { Branch, SafeSettings, Snapshot } from '../../shared/types.ts';
+import type { Branch, JobKind, JobSubject, SafeSettings, Snapshot } from '../../shared/types.ts';
 import type { GitHubReader } from './evidence.ts';
 
 /**
@@ -57,6 +57,12 @@ export type ToolContext = {
    * as a crash. A tool is never handed the credential itself (D77).
    */
   github: GitHubReader | null;
+  /**
+   * The one write any tool may make, and only the desk is handed it: put a job on the
+   * board. Null at every station — a worker judging one branch has no business starting
+   * work on another. It queues; it never does the work itself (D84).
+   */
+  dispatch: ((kind: JobKind, subject: JobSubject) => void) | null;
 };
 
 export type ToolArg = {

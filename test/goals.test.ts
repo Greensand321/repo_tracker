@@ -170,7 +170,10 @@ test('pruning drops assignments for branches that are gone, and keeps the goal',
   goals.assignBranch(ref('still-here'), goal.id);
   goals.assignBranch(ref('deleted-upstream'), goal.id);
 
-  const removed = goals.pruneGoals(new Set([refKey('greensand321/repo_tracker', 'still-here')]));
+  const removed = goals.pruneGoals(
+    new Set([refKey('greensand321/repo_tracker', 'still-here')]),
+    new Set(['greensand321/repo_tracker']),
+  );
 
   assert.equal(removed, 1);
   const after = goals.listGoals();
@@ -183,7 +186,10 @@ test('pruning nothing writes nothing', () => {
   const goal = goals.createGoal({ title: 'A' });
   goals.assignBranch(ref('still-here'), goal.id);
   const before = goals.listGoals()[0]!.updatedAt;
-  assert.equal(goals.pruneGoals(new Set([refKey('greensand321/repo_tracker', 'still-here')])), 0);
+  assert.equal(
+    goals.pruneGoals(new Set([refKey('greensand321/repo_tracker', 'still-here')]), new Set(['greensand321/repo_tracker'])),
+    0,
+  );
   assert.equal(goals.listGoals()[0]!.updatedAt, before);
 });
 

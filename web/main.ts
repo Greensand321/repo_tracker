@@ -10,12 +10,19 @@
 import type { Answer } from '../server/advise/ask.ts';
 import type { BranchRef, Goal, SafeSettings, SnapshotResponse } from '../shared/types.ts';
 import { createPicker, type Picker } from './components/picker.ts';
-import { floor, tallies, threads } from './derive.ts';
+import { floor, tallies, threads, toolLabel } from './derive.ts';
 import { clockTime, countdown, esc, exactTime, relativeTime } from './format.ts';
 import { branchKey, parseBranchKey, renderBrief, renderLeaderList, renderNow, type Grouping } from './views/leader.ts';
 import { renderConditions, renderFloor, renderNotices, renderQuestions, renderRegister } from './views/side.ts';
 
-type Asked = { question: string; answer: Answer | null; error: string | null; pending: boolean };
+type Asked = {
+  question: string;
+  answer: Answer | null;
+  error: string | null;
+  pending: boolean;
+  /** What happened to a proposed regrouping: still offered, accepted, or declined. */
+  filed: 'offered' | 'filing' | 'done' | 'declined';
+};
 
 const state = {
   data: null as SnapshotResponse | null,
@@ -89,11 +96,15 @@ async function loadSnapshot(): Promise<void> {
   render();
 }
 
-/** The server pushes; the page does not poll. Reconnects on its own if dropped. */
-function listen(): void {
-  // The clock on a working job counts up between events, and a job with no lookups sends
-  // none for a minute. One second of ticking, and only the panel that moves is redrawn —
-  // re-reading a hundred branches to advance a timer would be absurd.
+/**
+ * The clock on a working job counts up between events, and a job with no lookups sends
+ * none for a minute. One second of ticking, and only the panel that moves is redrawn —
+ * re-reading a hundred branches to advance a timer would be absurd.
+ *
+ * Started once. It used to start inside `listen`, which runs again on every reconnect, so
+ * a page left open through a few restarts of the program was ticking several times a second.
+ */
+function tick(): void {
   setInterval(() => {
     const snapshot = state.data?.snapshot;
     if (!snapshot || floor(snapshot).working.length === 0) return;
@@ -103,7 +114,10 @@ function listen(): void {
       // A tick must never be the thing that breaks the page.
     }
   }, 1000);
+}
 
+/** The server pushes; the page does not poll. Reconnects on its own if dropped. */
+function listen(): void {
   const events = new EventSource('/api/events');
   events.addEventListener('snapshot', () => void loadSnapshot());
   events.addEventListener('state', () => void loadSnapshot());
@@ -174,10 +188,10 @@ function draw(): void {
   $('#notices').innerHTML = renderNotices(snapshot, { error: data?.error ?? null });
 
   $('#askHint').textContent = snapshot.llm.enabled
-    ? `sees ${t.branches} branches · one turn`
+    ? `sees ${t.branches} branches · can start work`
     : 'advisor off — see settings';
   $('#askHint').title = snapshot.llm.enabled
-    ? 'One question, one answer, over the snapshot on screen. It has no tools and fetches nothing.'
+    ? 'One question, one answer, over the snapshot on screen. It can read how things moved lately and put work on the board — which lands on the floor, not here. Ask it to rank branches by your criteria, or to regroup the register: it proposes, you accept.'
     : 'Turn the advisor on in settings to ask questions.';
 
   renderAnswers();
@@ -298,20 +312,90 @@ function firstRun(data: SnapshotResponse | null): string {
 
 function renderAnswers(): void {
   $('#answers').innerHTML = state.asked
-    .map((item) => {
+    .map((item, index) => {
       const body = item.pending
         ? '<div class="a working">thinking…</div>'
         : item.error
           ? `<div class="a err">${esc(item.error)}</div>`
           : `<div class="a">${esc(item.answer?.text ?? '')}</div>`;
-      const prov =
-        !item.pending && item.answer
-          ? `<div class="prov">${item.answer.model} · saw ${item.answer.sawBranches} branches,
-             ${item.answer.sawGoals} goals · ${(item.answer.ms / 1000).toFixed(1)}s</div>`
-          : '';
-      return `<div class="answer"><div class="q">${esc(item.question)}</div>${body}${prov}</div>`;
+      const answer = !item.pending ? item.answer : null;
+      return `<div class="answer"><div class="q">${esc(item.question)}</div>${body}${
+        answer ? renderRanking(answer) + renderGroups(answer, item, index) + renderStarted(answer) + renderProv(answer) : ''
+      }</div>`;
     })
     .join('');
+}
+
+/** An order the owner asked for. Literal branch names, always (rule 6); it writes nothing. */
+function renderRanking(answer: Answer): string {
+  if (answer.ranking.length === 0) return '';
+  return `<ol class="rank">${answer.ranking
+    .map(
+      (row) => `<li><span class="mono">${esc(row.ref.repoKey.split('/')[1] ?? row.ref.repoKey)} / ${esc(row.ref.branch)}</span>${
+        row.why ? ` <span class="why">${esc(row.why)}</span>` : ''
+      }</li>`,
+    )
+    .join('')}</ol>`;
+}
+
+/**
+ * A regrouping the advisor proposed. Nothing is filed until the button is pressed: it is
+ * the largest write in the program, and the assistant proposes while the owner decides.
+ */
+function renderGroups(answer: Answer, item: Asked, index: number): string {
+  if (answer.groups.length === 0) return '';
+  const list = answer.groups
+    .map(
+      (group) => `<div class="prop">
+        <div class="reflect">${esc(group.title)}</div>
+        <div class="mono">${group.branches.map((b) => esc(b.branch)).join(' · ')}</div>
+      </div>`,
+    )
+    .join('');
+  const acts =
+    item.filed === 'done'
+      ? '<div class="q-from">filed like this</div>'
+      : item.filed === 'declined'
+        ? '<div class="q-from">left as it was</div>'
+        : `<div class="q-acts">
+            <button class="q-btn yes" data-regroup="${index}" ${item.filed === 'filing' ? 'disabled' : ''}>file them like this</button>
+            <button class="q-btn" data-noregroup="${index}">leave it</button>
+          </div>`;
+  return `<div class="groups"><div class="eyebrow">I would file them as</div>${list}${acts}</div>`;
+}
+
+/** Work it set going. It lands on the floor and on the page, not in this answer. */
+function renderStarted(answer: Answer): string {
+  if (answer.started.length === 0) return '';
+  return `<div class="started">${answer.started.map((line) => `<div>&#9670; ${esc(line)}</div>`).join('')}</div>`;
+}
+
+function renderProv(answer: Answer): string {
+  const looked = answer.looked.length > 0 ? ` · after ${[...new Set(answer.looked)].map(toolLabel).join(' and ')}` : '';
+  return `<div class="prov">${esc(answer.model)} · saw ${answer.sawBranches} branches,
+    ${answer.sawGoals} goals${esc(looked)} · ${(answer.ms / 1000).toFixed(1)}s</div>`;
+}
+
+/** Accepting a proposed regrouping. One click, one write, then the page re-reads. */
+async function acceptGroups(index: number): Promise<void> {
+  const item = state.asked[index];
+  if (!item?.answer || item.filed !== 'offered') return;
+  item.filed = 'filing';
+  renderAnswers();
+  try {
+    const res = await fetch('/api/goals/regroup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ groups: item.answer.groups }),
+    });
+    if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'could not file them');
+    item.filed = 'done';
+    await loadSnapshot();
+  } catch (err) {
+    item.filed = 'offered';
+    showFailure('Could not file them:', err);
+    renderAnswers();
+  }
 }
 
 async function askAdvisor(): Promise<void> {
@@ -319,7 +403,7 @@ async function askAdvisor(): Promise<void> {
   const question = box.value.trim();
   if (!question) return;
 
-  const item: Asked = { question, answer: null, error: null, pending: true };
+  const item: Asked = { question, answer: null, error: null, pending: true, filed: 'offered' };
   state.asked.unshift(item);
   box.value = '';
   $<HTMLButtonElement>('#askGo').disabled = true;
@@ -715,6 +799,7 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#llmMaxPerRun').value = String(settings.llmMaxPerRun);
     $<HTMLInputElement>('#askBranchCap').value = String(settings.askBranchCap);
     $<HTMLInputElement>('#maxOpenQuestions').value = String(settings.maxOpenQuestions);
+    $<HTMLInputElement>('#briefEveryMinutes').value = String(settings.briefEveryMinutes);
     $<HTMLInputElement>('#workers').value = String(settings.workers);
     $<HTMLInputElement>('#dispatchWorkers').value = String(settings.dispatchWorkers);
     $<HTMLInputElement>('#toolCallsPerJob').value = String(settings.toolCallsPerJob);
@@ -766,6 +851,7 @@ async function saveSettings(): Promise<void> {
       llmMaxPerRun: Number($<HTMLInputElement>('#llmMaxPerRun').value),
       askBranchCap: Number($<HTMLInputElement>('#askBranchCap').value),
       maxOpenQuestions: Number($<HTMLInputElement>('#maxOpenQuestions').value),
+      briefEveryMinutes: Number($<HTMLInputElement>('#briefEveryMinutes').value),
       workers: Number($<HTMLInputElement>('#workers').value),
       dispatchWorkers: Number($<HTMLInputElement>('#dispatchWorkers').value),
       toolCallsPerJob: Number($<HTMLInputElement>('#toolCallsPerJob').value),
@@ -833,6 +919,15 @@ function wire(): void {
 
     const retry = target.closest<HTMLElement>('[data-retry]');
     if (retry) { void retryJob(retry.dataset['retry'] ?? ''); return; }
+
+    const regroup = target.closest<HTMLElement>('[data-regroup]');
+    if (regroup) { void acceptGroups(Number(regroup.dataset['regroup'])); return; }
+    const noRegroup = target.closest<HTMLElement>('[data-noregroup]');
+    if (noRegroup) {
+      const item = state.asked[Number(noRegroup.dataset['noregroup'])];
+      if (item) { item.filed = 'declined'; renderAnswers(); }
+      return;
+    }
 
     const say = target.closest<HTMLElement>('[data-say]');
     if (say) { void sayVision(say.dataset['say'] ?? ''); return; }
@@ -977,4 +1072,5 @@ void fetch('/api/settings')
     /* the default stands; the snapshot load will report if the program is not running */
   })
   .finally(() => void loadSnapshot());
+tick();
 listen();

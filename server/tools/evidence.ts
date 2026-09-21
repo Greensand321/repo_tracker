@@ -11,11 +11,11 @@
  * removed and added again.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { fetchCommitFiles, fetchReadme, fetchTextFile } from '../github.ts';
-import { DATA_DIR, ensureDirs } from '../paths.ts';
+import { readJson, writeJson } from '../jsonfile.ts';
+import { DATA_DIR } from '../paths.ts';
 
 /** Commits whose file lists are remembered. Well past a fleet's worth of asking. */
 const MAX_FILE_ENTRIES = 600;
@@ -39,18 +39,13 @@ let cache: Stored | null = null;
 
 function load(): Stored {
   if (cache) return cache;
-  try {
-    const parsed = JSON.parse(readFileSync(FILE, 'utf8')) as Partial<Stored>;
-    cache = { readmes: parsed.readmes ?? {}, files: parsed.files ?? {} };
-  } catch {
-    cache = { readmes: {}, files: {} };
-  }
+  const parsed = readJson<Partial<Stored>>(FILE);
+  cache = { readmes: parsed?.readmes ?? {}, files: parsed?.files ?? {} };
   return cache;
 }
 
 function persist(all: Stored): void {
-  ensureDirs();
-  writeFileSync(FILE, JSON.stringify(all, null, 2), 'utf8');
+  writeJson(FILE, all);
   cache = all;
 }
 

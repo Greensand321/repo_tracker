@@ -60,7 +60,7 @@ Revisit at Stage 3 if the UI gets painful.
 
 ## How the assistant works
 
-Six single-turn prompts, no tools, all of them Plane B. Before changing any of them, open
+Six prompts, all of them Plane B. Before changing any of them, open
 [`docs/design/ai-map.html`](docs/design/ai-map.html): every path, what each call sees and
 decides, what it may never do, and which `PROMPT_VERSION` to bump when you edit one.
 
@@ -68,9 +68,15 @@ The four background ones are **derived onto a board and run by one dispatcher**
 (`server/work/`), which checks each job against the snapshot rather than believing the
 model, and parks anything that fails twice. Three of them can **look things up** before
 answering — a station's tool list is part of its cache key (D74). Work the owner asks for
-runs in its own lane and is the only kind written to disk (D72). Adding a station is adding
-a row in `board.ts`, not a stage in a pipeline. The plan, and what comes next (the advisor
-that can act), is [`docs/plans/workroom.md`](docs/plans/workroom.md).
+runs in its own lane and is the only kind written to disk (D72). The advisor is **the desk**
+(D84): it may read how the fleet moved and may put work on the board through the same door
+the page's buttons use — never do it, never write a goal; a regrouping it proposes is filed
+only when the owner accepts it. Adding a station is adding a row in `board.ts`, not a stage
+in a pipeline. Plan: [`docs/plans/workroom.md`](docs/plans/workroom.md).
+
+**Every file the program keeps goes through `server/jsonfile.ts`** (D85): atomic writes, and
+a broken file set aside rather than overwritten. Pruning is scoped to repos a read reached
+(D86) — a repo GitHub would not serve is missing, not deleted.
 
 ## Before adding anything
 

@@ -58,6 +58,8 @@ const settings = (over: Partial<Settings> = {}): Settings => ({
   llmApiKey: 'key',
   llmModel: 'test-model',
   visionAutoDraft: false,
+  // These tests count calls read by read; the brief interval is tested on its own.
+  briefEveryMinutes: 0,
   ...over,
 });
 
@@ -92,11 +94,20 @@ function stubProvider(reply: unknown, status = 200): { calls: number; bodies: st
   };
   globalThis.fetch = (async (_url: string, init: RequestInit) => {
     state.calls++;
-    state.bodies.push(String(init?.body ?? ''));
-    return new Response(JSON.stringify(reply), { status, headers: { 'content-type': 'application/json' } });
+    const body = String(init?.body ?? '');
+    state.bodies.push(body);
+    // The brief station gets a brief. A reply with no brief in it is a failed job, not an
+    // empty brief quietly saved as done — so a stub for the summariser must not double as
+    // the fleet's answer.
+    const isBrief = status === 200 && body.includes('You are a personal assistant');
+    return new Response(JSON.stringify(isBrief ? BRIEF_OK : reply), { status, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
   return state;
 }
+
+const BRIEF_OK = {
+  choices: [{ message: { content: JSON.stringify({ brief: 'All quiet.', goals: [], overtaken: [] }) } }],
+};
 
 const insight = (over: Record<string, unknown> = {}) => ({
   choices: [{ message: { content: JSON.stringify({

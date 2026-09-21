@@ -13,18 +13,19 @@
  * Both live in `data/visions.json` and are never written into a git repo (rule 1).
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
   refKey,
+  repoOfKey,
   type Assessment,
   type BranchRef,
   type Snapshot,
   type Vision,
   type VisionState,
 } from '../shared/types.ts';
-import { DATA_DIR, ensureDirs } from './paths.ts';
+import { readJson, writeJson } from './jsonfile.ts';
+import { DATA_DIR } from './paths.ts';
 
 const FILE = join(DATA_DIR, 'visions.json');
 
@@ -49,17 +50,12 @@ let cache: VisionFile | null = null;
 
 function load(): VisionFile {
   if (cache) return cache;
-  try {
-    cache = JSON.parse(readFileSync(FILE, 'utf8')) as VisionFile;
-  } catch {
-    cache = {};
-  }
+  cache = readJson<VisionFile>(FILE) ?? {};
   return cache;
 }
 
 function persist(all: VisionFile): void {
-  ensureDirs();
-  writeFileSync(FILE, JSON.stringify(all, null, 2), 'utf8');
+  writeJson(FILE, all);
   cache = all;
 }
 
@@ -238,12 +234,18 @@ export function applyVisions(snapshot: Snapshot, promptVersion: string, model: s
   }
 }
 
-/** Drops entries for branches that no longer exist, so they do not accrete forever. */
-export function pruneVisions(liveKeys: Set<string>): number {
+/**
+ * Drops entries for branches that no longer exist, so they do not accrete forever — but
+ * only within repos this read reached. A repo that could not be read is missing from the
+ * snapshot, not from GitHub, and pruning against it once took every vision the owner had
+ * written for it (see `pruneInsights`).
+ */
+export function pruneVisions(liveKeys: Set<string>, reachedRepos: Set<string>): number {
   const all = load();
   let removed = 0;
   for (const key of Object.keys(all)) {
-    if (!liveKeys.has(key)) {
+    const repo = repoOfKey(key);
+    if (repo !== null && reachedRepos.has(repo) && !liveKeys.has(key)) {
       delete all[key];
       removed++;
     }

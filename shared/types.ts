@@ -169,6 +169,12 @@ export type Brief = {
   generatedAt: string;
   model: string;
   promptVersion: string;
+  /**
+   * True when the fleet has moved since this was written. Shown rather than hidden: a
+   * brief from ten minutes ago, dated, beats a blank space — and a routine rewrite waits
+   * for `briefEveryMinutes`, so the space would be blank most of the day.
+   */
+  stale: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -272,6 +278,16 @@ export type BranchRef = {
 export const refKey = (repoKey: string, branch: string): string =>
   JSON.stringify([repoKey, branch]);
 
+/** The repo half of a `refKey`, or null for a key that was never one. */
+export function repoOfKey(key: string): string | null {
+  try {
+    const parsed = JSON.parse(key) as unknown;
+    return Array.isArray(parsed) && typeof parsed[0] === 'string' ? parsed[0] : null;
+  } catch {
+    return null;
+  }
+}
+
 export type InsightMeta = {
   /** Short SHAs the model cited. Validated against the branch's own commits. */
   evidence: string[];
@@ -357,6 +373,15 @@ export type Settings = {
   /** How many questions may be waiting at once. A wall of them is a chore list, not help. */
   maxOpenQuestions: number;
   /**
+   * How long a routine rewrite of the brief waits after the last one, in minutes.
+   *
+   * The brief reads the whole fleet and its key moves whenever any branch does. With agents
+   * pushing every few minutes that meant the most expensive prompt in the program ran on
+   * nearly every read — a call a minute, all day, to change a clause. Asking for it
+   * ("write it again") never waits; only the routine rewrite does. 0 means every read.
+   */
+  briefEveryMinutes: number;
+  /**
    * Whether a station may look things up before answering (workroom step 3).
    *
    * Off is a real setting, not a panic button: it costs you evidence and saves you calls,
@@ -403,6 +428,7 @@ export const DEFAULT_SETTINGS: Settings = {
   askBranchCap: 60,
   visionAutoDraft: true,
   maxOpenQuestions: 3,
+  briefEveryMinutes: 15,
   toolsEnabled: true,
   toolCallsPerJob: 8,
   toolSeconds: 60,

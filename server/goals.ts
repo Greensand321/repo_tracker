@@ -13,11 +13,11 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { refKey, type BranchRef, type Goal, type Snapshot } from '../shared/types.ts';
-import { DATA_DIR, ensureDirs } from './paths.ts';
+import { readJson, writeJson } from './jsonfile.ts';
+import { DATA_DIR } from './paths.ts';
 
 const FILE = join(DATA_DIR, 'goals.json');
 
@@ -27,12 +27,8 @@ let cache: Goal[] | null = null;
 
 function load(): Goal[] {
   if (cache) return cache;
-  try {
-    const parsed = JSON.parse(readFileSync(FILE, 'utf8')) as GoalFile;
-    cache = Array.isArray(parsed.goals) ? parsed.goals.map(normalise) : [];
-  } catch {
-    cache = [];
-  }
+  const parsed = readJson<Partial<GoalFile>>(FILE);
+  cache = Array.isArray(parsed?.goals) ? parsed.goals.map(normalise) : [];
   return cache;
 }
 
@@ -58,8 +54,7 @@ function normalise(raw: Partial<Goal>): Goal {
 }
 
 function persist(goals: Goal[]): Goal[] {
-  ensureDirs();
-  writeFileSync(FILE, JSON.stringify({ goals }, null, 2), 'utf8');
+  writeJson(FILE, { goals });
   cache = goals;
   return goals;
 }
@@ -151,6 +146,44 @@ export function assignBranch(ref: BranchRef, goalId: string | null): Goal[] {
   return goals;
 }
 
+/**
+ * File branches the way a proposal says, in one go.
+ *
+ * Goals are matched by title, case-insensitively, so a proposal that reuses an existing
+ * goal's name moves branches into it rather than making a second one beside it; a title
+ * nobody has used becomes a new goal. A group titled "Unfiled" takes its branches out of
+ * every goal. Branches the proposal does not mention are not touched, and no goal is ever
+ * deleted here — an emptied one is the owner's to remove.
+ *
+ * The advisor proposes this and the owner accepts it with one click (D84). Nothing
+ * reaches this function until they have.
+ */
+export function regroup(groups: { title: string; branches: BranchRef[] }[]): { created: number; moved: number } {
+  let created = 0;
+  let moved = 0;
+  for (const group of groups) {
+    const title = group.title.trim();
+    if (!title) continue;
+    let goalId: string | null;
+    if (title.toLowerCase() === 'unfiled') {
+      goalId = null;
+    } else {
+      const existing = load().find((g) => g.title.toLowerCase() === title.toLowerCase());
+      if (existing) {
+        goalId = existing.id;
+      } else {
+        goalId = createGoal({ title }).id;
+        created++;
+      }
+    }
+    for (const ref of group.branches) {
+      assignBranch(ref, goalId);
+      moved++;
+    }
+  }
+  return { created, moved };
+}
+
 // ---------------------------------------------------------------------------
 // Merging Plane B into the snapshot
 // ---------------------------------------------------------------------------
@@ -177,13 +210,19 @@ export function applyGoals(snapshot: Snapshot, goals: Goal[] = listGoals()): voi
  * Drops assignments for branches that no longer exist, so a deleted branch does not sit
  * in a goal forever counting toward its progress. The goal itself is kept — it is the
  * owner's, not GitHub's.
+ *
+ * Only within repos this read reached. A repo GitHub would not serve just now is missing
+ * from the snapshot, not deleted — and unfiling every branch in it on that evidence is the
+ * owner's own work thrown away by a bad connection.
  */
-export function pruneGoals(liveKeys: Set<string>): number {
+export function pruneGoals(liveKeys: Set<string>, reachedRepos: Set<string>): number {
   const goals = load();
   let removed = 0;
   for (const goal of goals) {
     const before = goal.branches.length;
-    goal.branches = goal.branches.filter((b) => liveKeys.has(refKey(b.repoKey, b.branch)));
+    goal.branches = goal.branches.filter(
+      (b) => !reachedRepos.has(b.repoKey) || liveKeys.has(refKey(b.repoKey, b.branch)),
+    );
     removed += before - goal.branches.length;
   }
   if (removed > 0) persist(goals);

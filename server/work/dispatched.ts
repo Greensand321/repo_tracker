@@ -12,11 +12,11 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { JobKind, JobSubject } from '../../shared/types.ts';
-import { DATA_DIR, ensureDirs } from '../paths.ts';
+import { readJson, writeJson } from '../jsonfile.ts';
+import { DATA_DIR } from '../paths.ts';
 
 /** Two starts. A third would be a loop rather than a retry. */
 export const MAX_REBOOTS = 2;
@@ -43,18 +43,13 @@ let cache: File | null = null;
 
 function load(): File {
   if (cache) return cache;
-  try {
-    const parsed = JSON.parse(readFileSync(FILE, 'utf8')) as Partial<File>;
-    cache = { jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [] };
-  } catch {
-    cache = { jobs: [] };
-  }
+  const parsed = readJson<Partial<File>>(FILE);
+  cache = { jobs: Array.isArray(parsed?.jobs) ? parsed.jobs : [] };
   return cache;
 }
 
 function persist(file: File): void {
-  ensureDirs();
-  writeFileSync(FILE, JSON.stringify(file, null, 2), 'utf8');
+  writeJson(FILE, file);
   cache = file;
 }
 

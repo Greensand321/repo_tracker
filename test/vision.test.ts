@@ -164,8 +164,16 @@ test('clearing is a real answer and takes the assessment with it', () => {
 
 test('pruning forgets branches that are gone', () => {
   store.setVision(REF, 'A vision', 'yours');
-  assert.ok(store.pruneVisions(new Set()) >= 1);
+  assert.ok(store.pruneVisions(new Set(), new Set([REF.repoKey])) >= 1);
   assert.equal(store.getVision(REF), null);
+});
+
+test('pruning never touches a repo this read did not reach', () => {
+  // A repo GitHub would not serve just now is missing from the snapshot, not deleted. One
+  // bad connection at startup used to take every vision the owner had written for it.
+  store.setVision(REF, 'A vision', 'yours');
+  assert.equal(store.pruneVisions(new Set(), new Set()), 0);
+  assert.equal(store.getVision(REF)?.text, 'A vision');
 });
 
 // ---------------------------------------------------------------------------
@@ -392,4 +400,16 @@ test('one budget for the whole read, and only the dispatcher may spend it', asyn
 
   const dispatcher = fs.readFileSync(new URL('../server/work/run.ts', import.meta.url), 'utf8');
   assert.match(dispatcher, /let budget = settings\.llmMaxPerRun/, 'one budget, in the dispatcher');
+});
+
+test('the brief key knows which branches are under a goal, not only how many', () => {
+  // Moving one branch between two goals of equal size changes what every judgement rests
+  // on, and used to leave the key exactly as it was.
+  const goal = (id: string, names: string[]) => ({
+    id, title: id, note: '', milestone: '', done: false, judgement: null, createdAt: 'x', updatedAt: 'x',
+    branches: names.map((n) => ({ repoKey: 'o/r', branch: n })),
+  });
+  const before = briefKey({ ...snap([branch('a'), branch('b')]), goals: [goal('g1', ['a']), goal('g2', ['b'])] }, settings);
+  const after = briefKey({ ...snap([branch('a'), branch('b')]), goals: [goal('g1', ['b']), goal('g2', ['a'])] }, settings);
+  assert.notEqual(before, after);
 });

@@ -27,5 +27,7 @@ export function contextFor(
     // No token is a real state — the advisor can be configured before the repos are. It
     // reads as "cannot reach GitHub", which a worker can say, rather than as a crash.
     github: settings.token ? readerFor(settings.token) : null,
+    // A station never starts work. The desk adds its own door on top of this.
+    dispatch: null,
   };
 }
