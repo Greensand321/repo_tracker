@@ -18,10 +18,13 @@ import {
   headline,
   jobKindLabel,
   matches,
+  nowLine,
   nowThread,
   questions,
+  siblingsLeft,
   tallies,
   threads,
+  trimTo,
 } from '../web/derive.ts';
 import { elapsed } from '../web/format.ts';
 
@@ -330,4 +333,107 @@ test('elapsed counts up from when a job was claimed', () => {
   assert.equal(elapsed(null, now), '');
   // A clock that disagrees with the server must not render "-1:-3".
   assert.equal(elapsed('2026-09-17T13:42:20Z', now), '0:00');
+});
+
+// ---------------------------------------------------------------------------
+// The line — D91. "Done" means done, and nothing is said twice.
+// ---------------------------------------------------------------------------
+
+const NOW = new Date('2026-09-21T10:00:00Z');
+const recap = (next: string | null) => ({ last: 'L.', done: 'D.', next });
+const assess = (verdict: 'done' | 'drifted' | 'on-track', because = 'B.') => ({
+  verdict, because, evidence: [], overtakenBy: null, looked: [],
+  model: 'm', promptVersion: 'v3', generatedAt: '2026-09-21T09:00:00Z',
+  headSha: 'aaaaaaa', visionText: 'V',
+});
+
+test('done, and nothing else is true, is one word', () => {
+  const b = branch('finished', { progress: 'done', recap: recap(null), vision: null });
+  const line = nowLine(snap([b]), b, NOW);
+  assert.equal(line.lead, 'Done.');
+  assert.equal(line.rest, '', 'nothing follows it');
+  assert.equal(line.ask, false, 'a finished branch is not asked what it was for');
+});
+
+test('done with a loose end names the exception in the same breath', () => {
+  const b = branch('finished', { progress: 'done', recap: recap('the tooltip shows the raw number') });
+  const line = nowLine(snap([b]), b, NOW);
+  assert.equal(line.lead, 'Done,');
+  assert.equal(line.rest, 'except the tooltip shows the raw number');
+  assert.equal(line.restIsOpen, true);
+});
+
+test('one piece of a multi-part job says how much of the job is left', () => {
+  const g = goal('g1', { title: 'Financials panel cleanup' });
+  const mine = branch('mine', { goalId: 'g1', progress: 'done', recap: recap(null) });
+  const s = snap(
+    [
+      mine,
+      branch('sib-a', { goalId: 'g1', progress: 'progressing' }),
+      branch('sib-b', { goalId: 'g1', progress: 'progressing' }),
+      branch('sib-done', { goalId: 'g1', progress: 'done' }),
+      branch('sib-quiet', { goalId: 'g1', relevance: 'quiet' }),
+      branch('elsewhere', { goalId: 'g2', progress: 'progressing' }),
+    ],
+    [g],
+  );
+  assert.equal(siblingsLeft(s, mine), 2, 'only siblings still going, and never itself');
+  const line = nowLine(s, mine, NOW);
+  assert.equal(line.rest, '2 left in Financials panel cleanup');
+  assert.equal(line.namesGoal, true, 'so the byline does not name the goal a second time');
+});
+
+test('an unfiled branch that is done says only Done — nothing counts it as part of anything', () => {
+  const b = branch('lone', { progress: 'done', recap: recap(null) });
+  assert.equal(nowLine(snap([b]), b, NOW).rest, '');
+});
+
+test('drift leads, because it is the most expensive thing on the page', () => {
+  const b = branch('adrift', {
+    progress: 'done',
+    assessment: assess('drifted'),
+    recap: recap('the wrapping bug is untouched'),
+    vision: null,
+  });
+  const line = nowLine(snap([b]), b, NOW);
+  assert.equal(line.lead, 'Not what it was for:', 'drift outranks even a done progress');
+  assert.equal(line.rest, 'the wrapping bug is untouched');
+});
+
+test('work in flight leads with what is left, and never says "still going"', () => {
+  const open = branch('a', { progress: 'progressing', recap: recap('the drain worker never re-sends') });
+  assert.deepEqual(
+    [nowLine(snap([open]), open, NOW).lead, nowLine(snap([open]), open, NOW).rest],
+    ['Left:', 'the drain worker never re-sends'],
+  );
+
+  const moving = branch('b', { progress: 'progressing', recap: recap(null), vision: null });
+  const line = nowLine(snap([moving]), moving, NOW);
+  assert.equal(line.lead, 'Going.');
+  assert.equal(line.rest, '', 'the headline already says what it is');
+});
+
+test('a quiet branch says how long it has been quiet, and offers the one thing that would help', () => {
+  const b = branch('cold', {
+    relevance: 'quiet',
+    lastActivity: '2026-09-15T10:00:00Z',
+    recap: recap(null),
+    vision: null,
+  });
+  const line = nowLine(snap([b]), b, NOW);
+  assert.equal(line.lead, 'Quiet 6 days.');
+  assert.equal(line.ask, true, 'nobody has said what it is for');
+});
+
+test('a quiet branch that finished still says Done', () => {
+  const b = branch('cold', { relevance: 'quiet', progress: 'done', recap: recap(null) });
+  assert.equal(nowLine(snap([b]), b, NOW).lead, 'Done.');
+});
+
+test('the budget trims the tail and never the lead', () => {
+  const line = { lead: 'Left:', tone: 'left' as const, rest: 'one two three four five six', restIsOpen: true, ask: false, namesGoal: false };
+  assert.deepEqual(trimTo(line, 12), { rest: 'one two three four five six', clipped: false });
+  assert.deepEqual(trimTo(line, 4), { rest: 'one two three…', clipped: true });
+  assert.deepEqual(trimTo({ ...line, rest: '' }, 4), { rest: '', clipped: false });
+  assert.equal(trimTo(line, 1).rest, '', 'no room after the lead is no tail, not a broken one');
 });

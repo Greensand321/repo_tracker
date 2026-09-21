@@ -28,7 +28,7 @@ import { contextFor } from '../tools/context.ts';
 import { LlmError } from './client.ts';
 import { recall, remember, threadId, transcript } from './conversation.ts';
 import { converse } from './converse.ts';
-import { NOTHING_OPEN, extractJson } from './prompt.ts';
+import { extractJson } from './prompt.ts';
 
 export type Ranked = { ref: BranchRef; why: string };
 export type ProposedGroup = { title: string; branches: BranchRef[] };
@@ -169,7 +169,7 @@ function describeBranch(branch: Branch, goal: Goal | null): string {
   if (branch.recap) {
     out.push(`    LAST: ${branch.recap.last}`);
     if (branch.recap.done) out.push(`    DONE: ${branch.recap.done}`);
-    if (branch.recap.open && !NOTHING_OPEN.test(branch.recap.open)) out.push(`    OPEN: ${branch.recap.open}`);
+    if (branch.recap.next) out.push(`    LEFT: ${branch.recap.next}`);
   } else if (branch.summary) {
     out.push(`    DID: ${branch.summary}`);
   }
@@ -199,7 +199,7 @@ export async function ask(
   const threads = snapshot.branches.filter((b) => !b.isBase);
   const started = Date.now();
 
-  // What was said, if the thread is still warm (D92). The state is re-read fresh below it
+  // What was said, if the thread is still warm (D93). The state is re-read fresh below it
   // either way — the transcript carries the conversation, never the facts.
   const earlier = recall(settings.advisorMemoryMinutes);
   const preamble = transcript(earlier);

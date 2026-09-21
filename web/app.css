@@ -378,13 +378,13 @@ a:hover { color: var(--text-hi); }
    inside its own cell — they were running into the one beside them. */
 .field.nums label { font-size: 9px; letter-spacing: .07em; gap: 4px; }
 .field.nums.four { grid-template-columns: repeat(4, 1fr); }
-.field.nums.five { grid-template-columns: repeat(5, 1fr); }
 .model-row { display: flex; gap: 8px; align-items: center; }
 .model-row .picker { flex: 1; min-width: 0; }
 .check { display: flex; align-items: center; gap: 8px; margin-top: 11px; }
 .check input { width: auto; accent-color: var(--now); }
 .check label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 12.5px; color: var(--body); font-weight: 400; white-space: normal; }
-@media (max-width: 760px) { .settings-grid { grid-template-columns: 1fr; } .field.nums.four, .field.nums.five { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 760px) { .settings-grid { grid-template-columns: 1fr; }
+  .field.nums.four { grid-template-columns: repeat(2, 1fr); } }
 
 /* The "i": a small ring that opens its note on hover or focus. Pure CSS; no JS, no clicks. */
 .info { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none;
@@ -457,9 +457,30 @@ a:hover { color: var(--text-hi); }
 .brief-prov { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 11px; }
 .waiting { font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--muted); margin-top: 8px; }
 
-/* ---- For / Now: the yardstick and the reality, side by side ------------- */
+/* ---- the line: what "happening now" says (D91) --------------------------
+   One line, and as few words as are true. "Done." on its own when it is done; where
+   something is left, or the branch is one piece of a larger job, that too — and never a
+   word more. It is the loudest thing under the headline because it is the only thing
+   here that changes what you do. The lead carries the state and is the one place colour
+   is spent; the tail is the thing in the way, in amber, or nothing at all. */
 
-.fornow { margin-top: 11px; max-width: 76ch; }
+.nowline {
+  font-family: var(--serif); font-size: 19px; line-height: 1.45; color: var(--text-hi);
+  margin-top: 14px; max-width: 58ch;
+}
+.nowline .lead { font-weight: 600; }
+.nowline .lead.t-done   { color: var(--done); }
+.nowline .lead.t-going  { color: var(--good); }
+.nowline .lead.t-left   { color: #e8c98a; }
+.nowline .lead.t-adrift { color: var(--warn); }
+.nowline .lead.t-quiet  { color: var(--muted); }
+.nowline .rest.open { color: #e8c98a; }
+/* Said plainly rather than guessed at: a branch nothing has read yet is not "Going." */
+.nowline .unread, .nowline .unsaid {
+  font-family: var(--serif); font-style: italic; font-size: 15px; color: var(--muted);
+}
+.nowline .link { font-size: 12.5px; }
+
 .fn { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; }
 .fn .k {
   flex: none; width: 34px; font-size: 9px; letter-spacing: .18em; text-transform: uppercase;
@@ -467,7 +488,6 @@ a:hover { color: var(--text-hi); }
 }
 .fn .v { font-size: 13.5px; line-height: 1.55; color: var(--body); min-width: 0; }
 .fn .v.unsaid { color: var(--muted); font-style: italic; }
-.fn .v.open { color: #d8a54a; }
 .mrow .tt.open { font-family: var(--sans); font-size: 12px; color: #d8a54a; opacity: .85; margin-top: 3px; }
 .brief-parts { margin-top: 6px; max-width: 80ch; }
 .brief-parts .fn .v { font-family: var(--serif); font-size: 15px; line-height: 1.55; color: var(--text-hi); }
@@ -481,13 +501,6 @@ a:hover { color: var(--text-hi); }
 }
 .link { font-size: 12px; color: var(--now); border-bottom: 1px solid #62c9c044; padding: 0; font-style: normal; }
 .link:hover { color: var(--text-hi); border-bottom-color: var(--now); }
-
-.verdict { font-family: var(--mono); font-size: 10.5px; margin-right: 8px; }
-.verdict.v-on-track { color: var(--good); }
-.verdict.v-drifted  { color: var(--warn); }
-.verdict.v-done     { color: var(--done); }
-.verdict.v-overtaken { color: var(--bad); }
-.verdict.v-unclear  { color: var(--muted); }
 
 .chip.verd-on-track  { color: var(--good); border-color: #63c08a2e; }
 .chip.verd-drifted   { color: var(--warn); border-color: #f2c9763a; }

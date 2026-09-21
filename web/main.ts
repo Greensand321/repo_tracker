@@ -35,6 +35,8 @@ const state = {
   asked: [] as Asked[],
   /** How many questions the assistant may have waiting. Read from settings. */
   maxQuestions: 3,
+  /** The word budget for the "happening now" line. Read from settings (D91). */
+  lineWords: 12,
   /** Proposals from a paragraph, awaiting confirmation. Nothing is written until then. */
   proposals: [] as { ref: BranchRef; vision: string; suggest: 'done' | 'close' | null }[],
   describing: false,
@@ -173,9 +175,9 @@ function draw(): void {
     .join('');
 
   $('#brief').innerHTML = renderBrief(snapshot);
-  $('#nowBand').innerHTML = renderNow(snapshot);
+  $('#nowBand').innerHTML = renderNow(snapshot, state.lineWords);
   renderLeaderHead(snapshot);
-  $('#leaderList').innerHTML = renderLeaderList(snapshot, state.grouping, state.search);
+  $('#leaderList').innerHTML = renderLeaderList(snapshot, state.grouping, state.search, state.lineWords);
 
   const board = floor(snapshot);
   $('#floor').innerHTML = renderFloor(snapshot);
@@ -375,7 +377,7 @@ function renderStarted(answer: Answer): string {
 function renderProv(answer: Answer): string {
   const looked = answer.looked.length > 0 ? ` · after ${[...new Set(answer.looked)].map(toolLabel).join(' and ')}` : '';
   // Whether it had the earlier turns in front of it. Worth showing: an answer that
-  // followed on from what you said is a different thing from one that started cold (D92).
+  // followed on from what you said is a different thing from one that started cold (D93).
   const thread = answer.inThread > 0 ? ` · following on from ${plural(answer.inThread, 'question')}` : '';
   return `<div class="prov">${esc(answer.model)} · saw ${answer.sawBranches} branches,
     ${answer.sawGoals} goals${esc(looked)}${esc(thread)} · ${(answer.ms / 1000).toFixed(1)}s</div>`;
@@ -823,6 +825,7 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#llmReplyTokens').value = String(settings.llmReplyTokens);
     $<HTMLInputElement>('#askBranchCap').value = String(settings.askBranchCap);
     $<HTMLInputElement>('#maxOpenQuestions').value = String(settings.maxOpenQuestions);
+    $<HTMLInputElement>('#nowLineWords').value = String(settings.nowLineWords);
     $<HTMLInputElement>('#briefEveryMinutes').value = String(settings.briefEveryMinutes);
     $<HTMLInputElement>('#advisorMemoryMinutes').value = String(settings.advisorMemoryMinutes);
     $<HTMLInputElement>('#workers').value = String(settings.workers);
@@ -831,6 +834,7 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#toolsEnabled').checked = settings.toolsEnabled;
     $<HTMLInputElement>('#visionAutoDraft').checked = settings.visionAutoDraft;
     state.maxQuestions = settings.maxOpenQuestions;
+    state.lineWords = settings.nowLineWords;
     $<HTMLInputElement>('#token').value = '';
     $<HTMLInputElement>('#token').placeholder = settings.hasToken
       ? 'a token is set — leave blank to keep it'
@@ -877,6 +881,7 @@ async function saveSettings(): Promise<void> {
       llmReplyTokens: Number($<HTMLInputElement>('#llmReplyTokens').value),
       askBranchCap: Number($<HTMLInputElement>('#askBranchCap').value),
       maxOpenQuestions: Number($<HTMLInputElement>('#maxOpenQuestions').value),
+      nowLineWords: Number($<HTMLInputElement>('#nowLineWords').value),
       briefEveryMinutes: Number($<HTMLInputElement>('#briefEveryMinutes').value),
       advisorMemoryMinutes: Number($<HTMLInputElement>('#advisorMemoryMinutes').value),
       workers: Number($<HTMLInputElement>('#workers').value),
@@ -1106,6 +1111,7 @@ void fetch('/api/settings')
   .then((res) => res.json())
   .then((settings: SafeSettings) => {
     state.maxQuestions = settings.maxOpenQuestions;
+    state.lineWords = settings.nowLineWords;
   })
   .catch(() => {
     /* the default stands; the snapshot load will report if the program is not running */

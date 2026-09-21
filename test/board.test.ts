@@ -112,7 +112,7 @@ const BRIEF_OK = {
 /** Already summarised at its head, so a combined job has only the later steps left to do. */
 function summarised(name: string, config: Settings): void {
   store.putInsight('o/r', name, {
-    title: 'T', summary: 'S', recap: { last: 'S', done: '', open: 'Nothing looks unfinished.' }, progress: 'progressing',
+    title: 'T', summary: 'S', recap: { last: 'S', done: '', next: null }, progress: 'progressing',
     meta: { evidence: [], model: config.llmModel, promptVersion: enrich.summariseVersion(config), generatedAt: '2026-09-16T00:00:00Z', headSha: `sha-${name}` },
   });
 }
@@ -618,7 +618,7 @@ test('two workers really do work at once', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// One job per branch (D91)
+// One job per branch (D92)
 // ---------------------------------------------------------------------------
 
 /** A stub that speaks every station: summary, draft, verdict — by the prompt it is sent. */

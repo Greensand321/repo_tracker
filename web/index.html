@@ -197,7 +197,7 @@
           </div>
         </div>
 
-        <div class="field nums five">
+        <div class="field nums">
           <div>
             <label for="advisorMemoryMinutes">Memory
               <span class="info" tabindex="0" role="img" aria-label="about the advisor's memory" data-tip="Minutes of quiet before the advisor forgets the conversation, so a follow-up like “and that one?” still means something. Nothing is held open between questions — this only decides how much of what was said is sent again, a few hundred tokens a turn. 0 starts every question clean.">i</span>
@@ -210,6 +210,15 @@
             </label>
             <input id="briefEveryMinutes" type="number" min="0" max="1440">
           </div>
+          <div>
+            <label for="nowLineWords">Line words
+              <span class="info" tabindex="0" role="img" aria-label="about the line" data-tip="The most words “happening now” may use — it says “Done.” in one. The assistant is told the number, and a longer tail is trimmed rather than wrapped. Shorten it and the summaries are rewritten to fit.">i</span>
+            </label>
+            <input id="nowLineWords" type="number" min="5" max="20">
+          </div>
+        </div>
+
+        <div class="field nums">
           <div>
             <label for="workers">Jobs
               <span class="info" tabindex="0" role="img" aria-label="about workers" data-tip="How many background jobs run at once. Watch them on The floor.">i</span>

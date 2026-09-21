@@ -327,7 +327,7 @@ api.post('/ask', async (c) => {
 
 /**
  * Start a new conversation. The advisor's memory is what was *said* — the state and Plane B
- * are untouched by this, and nothing on the page changes (D92).
+ * are untouched by this, and nothing on the page changes (D93).
  */
 api.delete('/ask', (c) => {
   forget();

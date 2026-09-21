@@ -3,7 +3,7 @@
  *
  * There is no process being kept alive between questions — every one is a stateless
  * request — so all "context" means here is a bounded transcript we send again, and the
- * idle timer is on what we remember (D92). The state is always the current one.
+ * idle timer is on what we remember (D93). The state is always the current one.
  */
 
 import { test, before, afterEach } from 'node:test';

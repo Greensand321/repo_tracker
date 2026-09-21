@@ -34,7 +34,7 @@ afterEach(() => {
   globalThis.fetch = realFetch;
   for (const file of readdirSync(TEMP)) rmSync(join(TEMP, file), { recursive: true, force: true });
   goals.resetGoalCache();
-  // The advisor now remembers between questions (D92); each test starts a fresh thread.
+  // The advisor now remembers between questions (D93); each test starts a fresh thread.
   thread.forget();
 });
 

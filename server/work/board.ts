@@ -127,7 +127,7 @@ export function deriveBoard(snapshot: Snapshot, settings: Settings, now = new Da
     (a, b) => Date.parse(b.lastActivity ?? '0') - Date.parse(a.lastActivity ?? '0'),
   );
 
-  // One job per branch, one worker, one session (D91): read it, say what it is for, judge
+  // One job per branch, one worker, one session (D92): read it, say what it is for, judge
   // it, in that order, and write all three before the card changes. Three separate jobs
   // used to fill the card in pieces across passes — and judged a branch against a guess
   // drafted at an older head. The steps inside are the same stations as before; only

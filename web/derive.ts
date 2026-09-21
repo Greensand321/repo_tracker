@@ -299,3 +299,106 @@ export function visionLine(branch: Branch): { text: string; proposed: boolean; k
   if (!branch.vision) return { text: 'nobody has said what this is for', proposed: false, known: false };
   return { text: branch.vision.text, proposed: branch.vision.state === 'proposed', known: true };
 }
+
+// ---------------------------------------------------------------------------
+// The line — what "happening now" says (D91)
+// ---------------------------------------------------------------------------
+
+/**
+ * One line, and as few words as are true.
+ *
+ * `Done.` on its own when it is done. Where something is left, or where the branch is one
+ * piece of a larger job, that is said too — and nothing else ever is. The headline above
+ * already says what the work IS, so this only says where it stands; saying both was the
+ * bug the five labelled rows had.
+ *
+ * Derived rather than stored, because every part of it already exists: the verdict, the
+ * recap's `next`, the branch's own quietness, and — for "3 left" — the goal it is filed
+ * under. Nothing here is a fact the model was asked for twice.
+ */
+export type NowLine = {
+  /** The first words, and the only coloured thing in the band. */
+  lead: string;
+  tone: 'done' | 'going' | 'left' | 'adrift' | 'quiet';
+  /** What follows the lead, or '' when the lead is the whole truth. */
+  rest: string;
+  /** True when `rest` is the thing standing in the way, and should read as such. */
+  restIsOpen: boolean;
+  /** Set when nobody has said what the branch is for, so the band can offer to ask. */
+  ask: boolean;
+  /** True when `rest` names the goal, so the byline does not name it a second time. */
+  namesGoal: boolean;
+};
+
+const isDone = (branch: Branch): boolean =>
+  branch.assessment?.verdict === 'done' || branch.progress === 'done';
+
+/**
+ * Branches under the same goal that are still going. The count is COUNTED, never written:
+ * a model asked "is this part of something bigger" will always find a way to say yes.
+ */
+export function siblingsLeft(snapshot: Snapshot, branch: Branch): number {
+  if (!branch.goalId) return 0;
+  return threads(snapshot).filter(
+    (b) => b.goalId === branch.goalId && b !== branch && b.relevance === 'active' && !isDone(b),
+  ).length;
+}
+
+export function nowLine(snapshot: Snapshot, branch: Branch, now = new Date()): NowLine {
+  const next = branch.recap?.next ?? '';
+  const ask = !branch.vision;
+
+  // Drift first: a branch doing the wrong thing well is the most expensive thing on the
+  // page, and it is only legible against what it was for.
+  if (branch.assessment?.verdict === 'drifted') {
+    return { lead: 'Not what it was for:', tone: 'adrift', rest: next, restIsOpen: true, ask: false, namesGoal: false };
+  }
+
+  if (isDone(branch)) {
+    // "Done" keeps its meaning by naming the exception in the same breath.
+    if (next) return { lead: 'Done,', tone: 'done', rest: `except ${next}`, restIsOpen: true, ask: false, namesGoal: false };
+    const left = siblingsLeft(snapshot, branch);
+    const goal = snapshot.goals.find((g) => g.id === branch.goalId);
+    return left > 0 && goal
+      ? { lead: 'Done.', tone: 'done', rest: `${left} left in ${goal.title}`, restIsOpen: false, ask: false, namesGoal: true }
+      : { lead: 'Done.', tone: 'done', rest: '', restIsOpen: false, ask: false, namesGoal: false };
+  }
+
+  if (branch.relevance === 'quiet') {
+    const days = daysSince(branch.lastActivity, now);
+    const lead = days === null ? 'Quiet.' : `Quiet ${days} ${days === 1 ? 'day' : 'days'}.`;
+    return { lead, tone: 'quiet', rest: next, restIsOpen: Boolean(next), ask, namesGoal: false };
+  }
+
+  if (next) return { lead: 'Left:', tone: 'left', rest: next, restIsOpen: true, ask: false, namesGoal: false };
+  // Moving, with nothing identifiably open. One word — "still going" is not worth saying,
+  // since a branch that is not done is of course going.
+  return {
+    lead: branch.progress === 'blocked' ? 'Blocked.' : 'Going.',
+    tone: 'going', rest: '', restIsOpen: false, ask, namesGoal: false,
+  };
+}
+
+const daysSince = (iso: string | null, now: Date): number | null => {
+  if (!iso) return null;
+  const ms = now.getTime() - Date.parse(iso);
+  return Number.isFinite(ms) ? Math.max(0, Math.floor(ms / 86_400_000)) : null;
+};
+
+/**
+ * The line trimmed to the owner's word budget (rule 7 — the number is a setting).
+ *
+ * Only `rest` is ever cut, and only at a word boundary: the lead is the part that carries
+ * the state, so a line clipped to "Done," would be worse than one clipped to nothing. The
+ * full text goes to the caller for the title attribute, so nothing is lost, only folded.
+ */
+export function trimTo(line: NowLine, words: number): { rest: string; clipped: boolean } {
+  if (!line.rest) return { rest: '', clipped: false };
+  const budget = words - countWords(line.lead);
+  if (budget <= 0) return { rest: '', clipped: true };
+  const parts = line.rest.split(/\s+/);
+  if (parts.length <= budget) return { rest: line.rest, clipped: false };
+  return { rest: `${parts.slice(0, budget).join(' ')}…`, clipped: true };
+}
+
+const countWords = (text: string): number => (text.trim() ? text.trim().split(/\s+/).length : 0);
