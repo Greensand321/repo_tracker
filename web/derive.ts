@@ -211,7 +211,8 @@ export const toolLabel = (name: string): string =>
     what_changed: 'reading what changed lately',
     repo_readme: 'reading what the repo is for',
     commit_files: 'reading what a commit touched',
-    dispatch: 'starting work',
+    queue: 'starting work',
+    branch: 'reading a branch in full',
   })[name] ?? `using ${name}`;
 
 /**

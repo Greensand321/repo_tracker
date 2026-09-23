@@ -1,47 +1,54 @@
 /**
- * The desk: one question, one answer, and the advisor may set work going.
+ * The agent: one question, one answer, and whatever changes the owner asked for (D94).
  *
- * It answers in seconds from the snapshot already on screen — every branch, its vision,
- * its verdict, every goal — written into the prompt. Two things it cannot know from that
- * it may look up or do (D84): how the fleet moved over the last days (`what_changed`, free,
- * from the dated history), and putting a job on the board (`dispatch`, free, and the only
- * write any tool has). It queues; it does not do. The result lands on the page, and the
- * advisor is told to say so rather than to describe a result it cannot have seen.
+ * It answers from the snapshot already on screen — every goal, the most recent branches in
+ * full and every other branch in one line — and it may look further and change things with
+ * its tools. Everything it changes is Plane B, through one action door built for this
+ * answer; nothing it can reach writes to GitHub.
  *
- * Two kinds of ask come back as something the page can act on rather than prose:
+ * **It must not be able to say it did something it did not do** (audit finding 1). So the
+ * page's list of what changed comes from the action door, never from the model's words;
+ * the prompt says exactly what it can and cannot do; and an answer that claims a change
+ * with none recorded is flagged.
  *
- *   a **ranking** — "which of these matter most, by X" — is an ordered list of real
- *   branches with one reason each. It is an answer, not a change; nothing is written.
- *
- *   a **regrouping** — "organise the register by Y" — is a proposal: goals by title, the
- *   branches under each. Nothing is filed until the owner accepts it, in one click. Goals
- *   are Plane B and reversible, but "file everything differently" is the largest write in
- *   the program, and D64's rule holds for it too: the assistant proposes, the owner decides.
- *
- * Everything the model returns is untrusted: branch names are checked against the fleet
- * and an invented one is dropped, not shown.
+ * Two kinds of ask come back as something the page can act on rather than prose: a
+ * **ranking** (an answer; nothing is written) and a **regrouping** proposal, for when the
+ * owner asked to see it first.
  */
 
-import { refKey, type Branch, type BranchRef, type Goal, type JobKind, type JobSubject, type Settings, type Snapshot } from '../../shared/types.ts';
-import { deskTools } from '../tools/catalog.ts';
+import { randomUUID } from 'node:crypto';
+
+import { refKey, type BranchRef, type Settings, type Snapshot } from '../../shared/types.ts';
+import { agentTools } from '../tools/catalog.ts';
 import { contextFor } from '../tools/context.ts';
+import type { AgentActions } from '../tools/types.ts';
 import { LlmError } from './client.ts';
 import { recall, remember, threadId, transcript } from './conversation.ts';
 import { converse } from './converse.ts';
+import { describeGoal, register } from './describe.ts';
 import { extractJson } from './prompt.ts';
 
 export type Ranked = { ref: BranchRef; why: string };
 export type ProposedGroup = { title: string; branches: BranchRef[] };
 
+/** One thing an answer changed. `id` is its entry in the record, when it has one. */
+export type AnswerChange = { id: string | null; text: string };
+
 export type Answer = {
   question: string;
   text: string;
+  /** Which answer this was. Every change it made carries the same id, so they undo together. */
+  turn: string;
   /** In order, when the question asked for one. Real branches only. */
   ranking: Ranked[];
-  /** A regrouping of the register, when asked for. Nothing is filed until accepted. */
+  /** A regrouping, when the owner asked to see it first. Nothing is filed until accepted. */
   groups: ProposedGroup[];
-  /** Work it set going, in plain English. It lands on the floor, not here. */
-  started: string[];
+  /** What it changed, from the action door — never from its own words. */
+  changes: AnswerChange[];
+  /** It claims a change and none was made. Shown on the page as a warning. */
+  unbacked: boolean;
+  /** It ran out of calls or time before it finished; `text` says what it did and what is left. */
+  unfinished: boolean;
   /** What it looked up before answering, by tool name. */
   looked: string[];
   /** How many earlier exchanges it had in front of it. 0 means this began a new thread. */
@@ -54,53 +61,66 @@ export type Answer = {
   ms: number;
 };
 
-const SYSTEM = `You are the advisor inside Bearing, a dashboard the owner uses to see what
-every branch across their GitHub repos is doing. The branches are pushed by AI coding
+/**
+ * What it is told about itself. Built per answer because what it may do depends on the
+ * owner's settings — and an agent told it can do something it cannot is the one that
+ * says it did.
+ */
+export function systemFor(canAct: boolean): string {
+  return `You are the agent inside Bearing, a dashboard the owner uses to see and organise
+what every branch across their GitHub repos is doing. The branches are pushed by AI coding
 agents and are never checked out locally, so commits, pull requests and CI are the only
 evidence that exists.
 
-You will be given the current state of every branch: what it is FOR (where anyone has
-said), what it DID, how the two COMPARE, and the goals the owner filed them under. Answer
-the question from that state and nothing else.
+You will be given the goals the owner filed branches under, and every branch: the most
+recent in full — what it is FOR, what it DID, how the two COMPARE — and the rest one line
+each. Use the "branch" tool to read any of those in full. You may also be given what was
+said earlier in this conversation: use it to understand what the owner means ("that one",
+"do it then"), and nothing more. The state is the current one; where the two disagree, the
+state is right. Answer the LATEST message only.
 
-You may also be given what was said earlier in this conversation. Use it to understand what
-the owner means — "that one", "the other two", "do it then" — and nothing more. The state
-below it is the current one; anything said earlier describes how things were then, and
-where the two disagree the state is right. Answer the LATEST question only; do not answer
-an earlier one again.
+WHAT YOU MAY DO
+${
+  canAct
+    ? `- Read anything in the state, and use your tools to read further.
+- Make the changes the owner asks for, with your tools. They take effect at once and the
+  owner can undo any of them, so do it rather than describing it — never ask first.
+- Queue slow work (re-reading or re-checking branches, rewriting the brief) with "queue".
+  It runs in the background and lands on the page later: say it is queued, never describe
+  its result.`
+    : `- Read anything in the state, and use your tools to read further.
+- Changing things is switched off in the owner's settings. If you are asked to change
+  something, say that it is switched off — do not describe it as done.`
+}
 
-Rules:
-- Answer in plain English, in at most four sentences. No headings, no markdown.
+WHAT YOU MUST NEVER DO
+- Change anything on GitHub. You can only read it, and must never say you changed it.
+- Change a setting.
+- Do anything the owner did not ask for in their latest message.
+- Say you changed, filed, queued, created, deleted or marked anything unless a tool result
+  above confirmed it. If you have no tool for what was asked, say so plainly.
+
+Rules for the answer:
+- Plain English, at most four sentences. No headings, no markdown.
 - Refer to branches by their literal git branch name, exactly as given. Never invent one.
 - If the state does not contain the answer, say exactly what is missing. Do not guess.
-- Lead with the answer, not with a restatement of the question.
-- If you started work with the dispatch tool, say so and say it will land on the page.
-  You have NOT seen its result. Never describe one.
+- Lead with what you did, or with the answer — not with a restatement of the question.
 
 Two kinds of question get an extra field alongside the sentences:
 - Asked to RANK or pick the most important/urgent/risky branches by some criteria: put
   the order in "ranking", best first, one short reason each. Only real branch names.
-- Asked to GROUP, ORGANISE, REORGANISE or FILE branches: put your proposal in "groups" —
-  a short title for each group and the branches under it. A group titled "Unfiled" means
-  leave those out of any goal. Existing goal titles may be reused. The owner will accept
-  or refuse the whole proposal; nothing is filed until they do.
+- Asked to GROUP, ORGANISE, REORGANISE or FILE branches and to SHOW it first: put your
+  proposal in "groups" — a short title for each group and the branches under it. A group
+  titled "Unfiled" means leave those out of any goal. Existing goal titles may be reused.
 
 Reply with ONLY a JSON object, no prose around it, no markdown fence:
 {"answer": "...", "ranking": [{"repo": "owner/name", "branch": "...", "why": "..."}], "groups": [{"title": "...", "branches": [{"repo": "owner/name", "branch": "..."}]}]}
 Leave "ranking" and "groups" out, or empty, when the question did not ask for them.`;
+}
 
 /** Everything the model is allowed to see, in the fewest tokens that stay unambiguous. */
 export function buildAskPrompt(snapshot: Snapshot, question: string, cap: number): string {
-  const goalOf = new Map(snapshot.goals.map((g) => [g.id, g] as const));
-
-  const threads = snapshot.branches
-    .filter((b) => !b.isBase)
-    .sort((a, b) => Date.parse(b.lastActivity ?? '') - Date.parse(a.lastActivity ?? ''))
-    .slice(0, cap);
-
-  const lines = threads.map((b) => describeBranch(b, goalOf.get(b.goalId ?? '') ?? null));
-  const omitted = snapshot.branches.filter((b) => !b.isBase).length - threads.length;
-
+  const { full, index, total } = register(snapshot, cap);
   return [
     `Today is ${snapshot.generatedAt.slice(0, 10)}. This state was read at ${snapshot.generatedAt}.`,
     '',
@@ -109,8 +129,9 @@ export function buildAskPrompt(snapshot: Snapshot, question: string, cap: number
       ? snapshot.goals.map((g) => describeGoal(g)).join('\n')
       : '  (none yet — every branch is unfiled)',
     '',
-    `BRANCHES (${threads.length} shown${omitted > 0 ? `, ${omitted} older ones omitted` : ''}):`,
-    ...lines,
+    `BRANCHES — all ${total}: ${full.length} most recent in full${index.length > 0 ? `, ${index.length} more one line each` : ''}:`,
+    ...full,
+    ...(index.length > 0 ? ['', 'THE REST, ONE LINE EACH (use the "branch" tool for any of them in full):', ...index] : []),
     '',
     ...inFlight(snapshot),
     `LATEST QUESTION: ${question}`,
@@ -118,11 +139,8 @@ export function buildAskPrompt(snapshot: Snapshot, question: string, cap: number
 }
 
 /**
- * What the owner asked for that is still running, or has just landed.
- *
- * Without it, "did that finish?" one turn after the advisor dispatched something is
- * unanswerable — it cannot see its own work, and the transcript only says it started
- * something. Two lines, from the board that is already on the snapshot.
+ * What the owner asked for that is still running, or has just landed. Without it, "did
+ * that finish?" one turn after the agent queued something is unanswerable.
  */
 function inFlight(snapshot: Snapshot): string[] {
   const jobs = snapshot.work?.jobs ?? [];
@@ -130,59 +148,30 @@ function inFlight(snapshot: Snapshot): string[] {
   const landed = snapshot.work?.finished ?? [];
   if (mine.length === 0 && landed.length === 0) return [];
   return [
-    '',
     'WORK THE OWNER ASKED FOR:',
     ...mine.map((job) => `  still running: ${job.title}`),
     ...landed.map((job) => `  just finished: ${job.title}`),
+    '',
   ];
 }
 
-function describeGoal(goal: Goal): string {
-  const bits = [`  "${goal.title}"`, `${goal.branches.length} branches`];
-  if (goal.milestone) bits.push(`milestone ${goal.milestone}`);
-  if (goal.done) bits.push('marked done');
-  if (goal.judgement) bits.push(`looks ${goal.judgement.state}: ${goal.judgement.because}`);
-  if (goal.note) bits.push(`the owner's note: "${goal.note}"`);
-  return bits.join(' · ');
-}
-
-function describeBranch(branch: Branch, goal: Goal | null): string {
-  const bits = [
-    `- ${branch.repoKey} ${branch.name}`,
-    `${branch.ahead} ahead / ${branch.behind} behind`,
-    branch.lastActivity ? `last commit ${branch.lastActivity.slice(0, 10)}` : 'no commits of its own',
-  ];
-  if (branch.relevance === 'quiet') bits.push('gone quiet');
-  if (branch.ci.state !== 'none') bits.push(`CI ${branch.ci.state}`);
-  if (branch.pr) bits.push(`PR #${branch.pr.number} ${branch.pr.state}${branch.pr.draft ? ' draft' : ''}`);
-  if (goal) bits.push(`goal "${goal.title}"`);
-  else bits.push('unfiled');
-
-  const head = bits.join(' · ');
-  const out = [head];
-  // The vision and the verdict are what "does this matter" and "where does this belong"
-  // actually turn on — a ranking or a regrouping drawn from commit subjects alone would be
-  // the advisor guessing at what the owner has already written down.
-  if (branch.vision) {
-    out.push(`    FOR: ${branch.vision.text}${branch.vision.state === 'proposed' ? ' (my guess — not confirmed)' : ''}`);
-  }
-  if (branch.recap) {
-    out.push(`    LAST: ${branch.recap.last}`);
-    if (branch.recap.done) out.push(`    DONE: ${branch.recap.done}`);
-    if (branch.recap.next) out.push(`    LEFT: ${branch.recap.next}`);
-  } else if (branch.summary) {
-    out.push(`    DID: ${branch.summary}`);
-  }
-  if (branch.assessment) out.push(`    COMPARED: ${branch.assessment.verdict} — ${branch.assessment.because}`);
-  // Three messages is enough to tell what a branch is doing without paying for fifty.
-  for (const commit of branch.commits.slice(0, 3)) out.push(`    commit: ${commit.message}`);
-  return out.join('\n');
-}
-
+/**
+ * The door the route hands in, bound to this answer. `did` reads back what it changed —
+ * the only source the page's list is built from.
+ */
 export type Doors = {
-  /** The one write the desk has. Absent means it may answer but not start anything. */
-  dispatch?: (kind: JobKind, subject: JobSubject) => void;
+  act?: (turn: string, words: string) => AgentActions & { did(): AnswerChange[] };
 };
+
+/**
+ * First-person claims of a change: "I've filed", "I have marked", "Done — …". Descriptions
+ * of state ("a is filed under Webhooks") are deliberately not matched: a false alarm on
+ * every answer about filing would teach the owner to ignore the flag.
+ */
+const CLAIM =
+  /\bI(?:'ve| have| just| also)?\s+(?:just\s+|now\s+|also\s+|gone ahead and\s+)?(?:filed|moved|renamed|created|deleted|removed|marked|set|cleared|confirmed|queued|started|updated|changed|rewrote|rewritten|reorganised|reorganized|regrouped|grouped|added|unfiled|retried|made)\b|^\s*done\b/i;
+
+export const claimsChange = (text: string): boolean => CLAIM.test(text);
 
 export async function ask(
   snapshot: Snapshot,
@@ -198,41 +187,68 @@ export async function ask(
 
   const threads = snapshot.branches.filter((b) => !b.isBase);
   const started = Date.now();
+  const turn = randomUUID();
+
+  // The door exists only when changes are allowed — so a model told it cannot change
+  // anything also has no way to, whatever it says.
+  const act = settings.agentEnabled && doors.act ? doors.act(turn, text) : null;
 
   // What was said, if the thread is still warm (D93). The state is re-read fresh below it
   // either way — the transcript carries the conversation, never the facts.
   const earlier = recall(settings.advisorMemoryMinutes);
   const preamble = transcript(earlier);
+  const body = buildAskPrompt(snapshot, text, settings.askBranchCap);
 
   const result = await converse(settings, {
-    system: SYSTEM,
-    user: preamble
-      ? `${preamble}\n\n---\n\n${buildAskPrompt(snapshot, text, settings.askBranchCap)}`
-      : buildAskPrompt(snapshot, text, settings.askBranchCap),
-    tools: deskTools(settings),
-    ctx: { ...contextFor(snapshot, settings, null), dispatch: doors.dispatch ?? null },
-    // One id for the whole conversation, first turn included: every turn shares the
-    // register as its prefix, and routing them together is what keeps it cached (D66).
-    // A fresh thread — asked for, or gone cold — has a fresh id by then.
+    system: systemFor(act !== null),
+    user: preamble ? `${preamble}\n\n---\n\n${body}` : body,
+    tools: act ? agentTools(settings) : agentTools({ ...settings, agentEnabled: false }),
+    ctx: { ...contextFor(snapshot, settings, null), act },
+    // One id for the whole conversation: every turn shares the register as its prefix,
+    // and routing them together is what keeps it cached (D66).
     sessionId: threadId(),
+    limits: { calls: settings.agentCallsPerQuestion, seconds: settings.agentSeconds },
+    // Its tool calls may already have changed things; an error would hide that (finding 3).
+    onExhausted: 'return',
   });
 
-  const parsed = parseAnswer(result.text, snapshot);
-  // Remembered only when it answered. A failed turn leaves no trace to be confused by.
-  remember(text, parsed.text);
+  const changes = act?.did() ?? [];
+  const parsed = result.unfinished
+    ? { text: unfinishedText(changes.length), ranking: [], groups: [] }
+    : parseAnswer(result.text, snapshot);
 
-  return {
+  const answer: Answer = {
     question: text,
     ...parsed,
-    started: result.uses.filter((use) => use.name === 'dispatch' && !use.failed).map((use) => use.result),
-    looked: result.uses.filter((use) => use.name !== 'dispatch').map((use) => use.name),
+    turn,
+    changes,
+    unbacked: changes.length === 0 && claimsChange(parsed.text),
+    unfinished: result.unfinished,
+    looked: result.uses.filter((use) => use.name === 'branch' || use.name === 'what_changed').map((use) => use.name),
     inThread: earlier.length,
     askedAt: new Date().toISOString(),
-    sawBranches: Math.min(threads.length, settings.askBranchCap),
+    sawBranches: threads.length,
     sawGoals: snapshot.goals.length,
     model: settings.llmModel,
     ms: Date.now() - started,
   };
+
+  // Remembered with what it changed and what it proposed, so "yes, do that" and "undo the
+  // second one" have something to refer to (finding 2).
+  remember(text, parsed.text, { answer, did: changes.map((c) => c.text), proposed: describeProposal(parsed.groups) });
+  return answer;
+}
+
+/** It stopped before answering. Say so, and say what it got done, rather than failing. */
+function unfinishedText(changed: number): string {
+  return changed > 0
+    ? `I ran out of steps before I finished. ${changed === 1 ? 'One change is' : `${changed} changes are`} listed below; ask me to carry on for the rest.`
+    : 'I ran out of steps before I finished, and changed nothing. Ask again, or more narrowly.';
+}
+
+function describeProposal(groups: ProposedGroup[]): string | null {
+  if (groups.length === 0) return null;
+  return groups.map((g) => `${g.title} (${g.branches.map((b) => b.branch).join(', ')})`).join('; ');
 }
 
 const MAX_RANKED = 20;

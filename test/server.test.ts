@@ -45,7 +45,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   const body = String(init?.body ?? '');
   let content: string;
   if (body.includes('You are a personal assistant')) content = JSON.stringify({ brief: 'All quiet.', goals: [], overtaken: [] });
-  else if (body.includes('You are the advisor')) content = provider.deskReplies.shift() ?? JSON.stringify({ answer: 'Nothing to say.' });
+  else if (body.includes('You are the agent inside Bearing')) content = provider.deskReplies.shift() ?? JSON.stringify({ answer: 'Nothing to say.' });
   else if (body.includes('propose what it is FOR')) content = JSON.stringify({ vision: null, why: 'too thin' });
   else content = JSON.stringify({ title: 'Retrying webhooks', summary: `Summary ${provider.calls}.`, progress: 'progressing', evidence: [] });
   return json({ choices: [{ message: { content } }] });
@@ -83,14 +83,14 @@ test('first read: the branch is summarised and the summary is on disk', async ()
 
 test('the desk can start work and propose a regrouping; the work lands and the proposal files on acceptance', async () => {
   provider.deskReplies = [
-    JSON.stringify({ tool: 'dispatch', args: { kind: 'summarise', repo: 'greensand321/harbor-api', branch: 'feat/retry' } }),
+    JSON.stringify({ tool: 'queue', args: { kind: 'summarise', branches: ['greensand321/harbor-api feat/retry'] } }),
     JSON.stringify({ answer: 'Started re-reading feat/retry; it lands on the page. I would file it under Webhooks.',
       groups: [{ title: 'Webhooks', branches: [{ repo: 'greensand321/harbor-api', branch: 'feat/retry' }] }] }),
   ];
   const res = await routes.api.request('/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: 'read feat/retry again and file it' }) });
-  const payload = await res.json() as { answer: { started: string[]; groups: { title: string; branches: { repoKey: string; branch: string }[] }[]; text: string } };
+  const payload = await res.json() as { answer: { changes: { text: string }[]; groups: { title: string; branches: { repoKey: string; branch: string }[] }[]; text: string } };
   assert.equal(res.status, 200, JSON.stringify(payload));
-  assert.equal(payload.answer.started.length, 1);
+  assert.equal(payload.answer.changes.length, 1);
   assert.equal(payload.answer.groups.length, 1);
 
   await until(() => state.currentResponse().snapshot!.work.finished.length === 1 && idle(), 'the dispatched summary to land');

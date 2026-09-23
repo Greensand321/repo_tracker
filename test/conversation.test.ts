@@ -99,17 +99,17 @@ test('every turn is answered from the state as it is now, not as it was said to 
 
 test('it forgets after the quiet window, and 0 keeps nothing at all', async () => {
   const minute = 60_000;
-  thread.remember('q', 'a', 0);
+  thread.remember('q', 'a', {}, 0);
   assert.equal(thread.recall(30, 29 * minute).length, 1, 'still warm');
   assert.equal(thread.recall(30, 31 * minute).length, 0, 'gone cold');
   assert.equal(thread.recall(30, 31 * minute + 1).length, 0, 'and stays gone');
 
-  thread.remember('q', 'a', 0);
+  thread.remember('q', 'a', {}, 0);
   assert.equal(thread.recall(0, 0).length, 0, 'memory off');
 });
 
 test('the transcript is bounded, oldest first out', async () => {
-  for (let i = 0; i < 9; i++) thread.remember(`q${i}`, `a${i}`, 1000);
+  for (let i = 0; i < 9; i++) thread.remember(`q${i}`, `a${i}`, {}, 1000);
   const kept = thread.recall(30, 1000);
   assert.equal(kept.length, 6);
   assert.equal(kept[0]!.question, 'q3', 'the oldest three were dropped');
@@ -117,7 +117,7 @@ test('the transcript is bounded, oldest first out', async () => {
 });
 
 test('a long answer is trimmed rather than carried whole', () => {
-  thread.remember('q', 'x'.repeat(5000), 1000);
+  thread.remember('q', 'x'.repeat(5000), {}, 1000);
   assert.ok(thread.recall(30, 1000)[0]!.answer.length <= 700);
 });
 

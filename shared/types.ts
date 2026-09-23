@@ -451,6 +451,22 @@ export type Settings = {
    */
   advisorMemoryMinutes: number;
   /**
+   * Whether the advisor may **change** things when asked (D94). Off, it still answers and
+   * reads; on, it may file branches, edit goals and visions, steer the brief and queue work.
+   * Its own switch, independent of the stations' `toolsEnabled` — turning off the stations'
+   * lookups used to quietly take the advisor's ability to act with it.
+   */
+  agentEnabled: boolean;
+  /**
+   * Model calls one answer may make: each lookup or change is one, and the answer is one
+   * more. Batch tools do many changes in one call, so this is rarely what runs out.
+   */
+  agentCallsPerQuestion: number;
+  /** And a clock for one answer, because a slow model can use a few calls for a long time. */
+  agentSeconds: number;
+  /** How many of the agent's changes are kept to look back on and undo (Q80). */
+  agentHistory: number;
+  /**
    * How long a routine rewrite of the brief waits after the last one, in minutes.
    *
    * The brief reads the whole fleet and its key moves whenever any branch does. With agents
@@ -510,6 +526,10 @@ export const DEFAULT_SETTINGS: Settings = {
   maxOpenQuestions: 3,
   nowLineWords: 12,
   advisorMemoryMinutes: 30,
+  agentEnabled: true,
+  agentCallsPerQuestion: 12,
+  agentSeconds: 120,
+  agentHistory: 500,
   briefEveryMinutes: 15,
   toolsEnabled: true,
   toolCallsPerJob: 8,

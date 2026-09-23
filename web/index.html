@@ -197,7 +197,7 @@
           </div>
         </div>
 
-        <div class="field nums">
+        <div class="field nums four">
           <div>
             <label for="advisorMemoryMinutes">Memory
               <span class="info" tabindex="0" role="img" aria-label="about the advisor's memory" data-tip="Minutes of quiet before the advisor forgets the conversation, so a follow-up like “and that one?” still means something. Nothing is held open between questions — this only decides how much of what was said is sent again, a few hundred tokens a turn. 0 starts every question clean.">i</span>
@@ -215,6 +215,12 @@
               <span class="info" tabindex="0" role="img" aria-label="about the line" data-tip="The most words “happening now” may use — it says “Done.” in one. The assistant is told the number, and a longer tail is trimmed rather than wrapped. Shorten it and the summaries are rewritten to fit.">i</span>
             </label>
             <input id="nowLineWords" type="number" min="5" max="20">
+          </div>
+          <div>
+            <label for="agentCallsPerQuestion">Steps
+              <span class="info" tabindex="0" role="img" aria-label="about the advisor's steps" data-tip="Model calls one answer may make — each lookup or change is one, and the answer is one more. Changes to many branches happen in one step, so this is rarely what runs out. When it does, the answer says what it did and what is left.">i</span>
+            </label>
+            <input id="agentCallsPerQuestion" type="number" min="0" max="40">
           </div>
         </div>
 
@@ -243,6 +249,11 @@
           <input id="visionAutoDraft" type="checkbox">
           <label for="visionAutoDraft">Propose what each branch is for</label>
           <span class="info" tabindex="0" role="img" aria-label="about proposals" data-tip="Only where it can be specific — a purpose nothing could contradict is worthless as a yardstick, so it says nothing rather than padding. Proposals stay marked until you confirm them.">i</span>
+        </div>
+        <div class="check">
+          <input id="agentEnabled" type="checkbox">
+          <label for="agentEnabled">Let the advisor make the changes I ask for</label>
+          <span class="info" tabindex="0" role="img" aria-label="about the agent" data-tip="When you ask, it may file branches, edit goals and visions, steer the brief and queue work — every change listed under its answer, and never anything on GitHub. It never acts unless asked, and never changes a setting. Off, it still answers and reads.">i</span>
         </div>
         <div class="check">
           <input id="toolsEnabled" type="checkbox">

@@ -35,6 +35,8 @@ const state = {
   asked: [] as Asked[],
   /** How many questions the assistant may have waiting. Read from settings. */
   maxQuestions: 3,
+  /** Whether the advisor may change things. Read from settings, for the hint under the box. */
+  agentEnabled: true,
   /** The word budget for the "happening now" line. Read from settings (D91). */
   lineWords: 12,
   /** Proposals from a paragraph, awaiting confirmation. Nothing is written until then. */
@@ -189,12 +191,18 @@ function draw(): void {
   $('#conditions').innerHTML = renderConditions(snapshot);
   $('#notices').innerHTML = renderNotices(snapshot, { error: data?.error ?? null });
 
-  $('#askHint').textContent = snapshot.llm.enabled
-    ? `sees ${t.branches} branches · can start work`
-    : 'advisor off — see settings';
-  $('#askHint').title = snapshot.llm.enabled
-    ? 'One question, one answer, over the snapshot on screen. It can read how things moved lately and put work on the board — which lands on the floor, not here. Ask it to rank branches by your criteria, or to regroup the register: it proposes, you accept.'
-    : 'Turn the advisor on in settings to ask questions.';
+  // Says what it can actually do, from the setting that decides it — it used to promise
+  // "can start work" with changes switched off (audit finding 5).
+  $('#askHint').textContent = !snapshot.llm.enabled
+    ? 'advisor off — see settings'
+    : state.agentEnabled
+      ? `sees all ${t.branches} branches · makes changes you ask for`
+      : `sees all ${t.branches} branches · read only`;
+  $('#askHint').title = !snapshot.llm.enabled
+    ? 'Turn the advisor on in settings to ask questions.'
+    : state.agentEnabled
+      ? 'Ask it anything about the register, or tell it what to change. Every change it makes is listed under its answer, and never touches your repos.'
+      : 'It answers and reads, but changing things is switched off in settings.';
 
   renderAnswers();
   renderFiling();
@@ -369,9 +377,20 @@ function renderGroups(answer: Answer, item: Asked, index: number): string {
 }
 
 /** Work it set going. It lands on the floor and on the page, not in this answer. */
+/**
+ * What it changed, from the action door — never from its words (audit finding 1). And the
+ * two things the owner must not miss: it claimed a change that was not made, or it ran out
+ * of steps part-way.
+ */
 function renderStarted(answer: Answer): string {
-  if (answer.started.length === 0) return '';
-  return `<div class="started">${answer.started.map((line) => `<div>&#9670; ${esc(line)}</div>`).join('')}</div>`;
+  const out: string[] = [];
+  if (answer.unbacked) {
+    out.push(`<div class="a-warn">It says it changed something, but nothing was changed.</div>`);
+  }
+  if (answer.changes.length > 0) {
+    out.push(`<div class="started">${answer.changes.map((c) => `<div>&#9670; ${esc(c.text)}</div>`).join('')}</div>`);
+  }
+  return out.join('');
 }
 
 function renderProv(answer: Answer): string {
@@ -418,6 +437,29 @@ async function acceptGroups(index: number): Promise<void> {
     item.filed = 'offered';
     showFailure('Could not file them:', err);
     renderAnswers();
+  }
+}
+
+/**
+ * The conversation the server is still carrying, drawn again after a reload. The page used
+ * to forget it while the server remembered, so the next question quietly followed on from
+ * context nobody could see (audit finding 6).
+ */
+async function restoreThread(): Promise<void> {
+  try {
+    const payload = (await (await fetch('/api/ask')).json()) as { answers?: Answer[] };
+    if (!payload.answers || payload.answers.length === 0 || state.asked.length > 0) return;
+    state.asked = payload.answers.map((answer) => ({
+      question: answer.question,
+      answer,
+      error: null,
+      pending: false,
+      filed: 'offered' as const,
+    }));
+    renderAnswers();
+    $('#newThread').classList.remove('hidden');
+  } catch {
+    // Nothing to restore is the common case, and a failure here costs only the history.
   }
 }
 
@@ -835,6 +877,9 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#visionAutoDraft').checked = settings.visionAutoDraft;
     state.maxQuestions = settings.maxOpenQuestions;
     state.lineWords = settings.nowLineWords;
+    state.agentEnabled = settings.agentEnabled;
+    $<HTMLInputElement>('#agentEnabled').checked = settings.agentEnabled;
+    $<HTMLInputElement>('#agentCallsPerQuestion').value = String(settings.agentCallsPerQuestion);
     $<HTMLInputElement>('#token').value = '';
     $<HTMLInputElement>('#token').placeholder = settings.hasToken
       ? 'a token is set — leave blank to keep it'
@@ -884,6 +929,8 @@ async function saveSettings(): Promise<void> {
       nowLineWords: Number($<HTMLInputElement>('#nowLineWords').value),
       briefEveryMinutes: Number($<HTMLInputElement>('#briefEveryMinutes').value),
       advisorMemoryMinutes: Number($<HTMLInputElement>('#advisorMemoryMinutes').value),
+      agentEnabled: $<HTMLInputElement>('#agentEnabled').checked,
+      agentCallsPerQuestion: Number($<HTMLInputElement>('#agentCallsPerQuestion').value),
       workers: Number($<HTMLInputElement>('#workers').value),
       dispatchWorkers: Number($<HTMLInputElement>('#dispatchWorkers').value),
       toolCallsPerJob: Number($<HTMLInputElement>('#toolCallsPerJob').value),
@@ -1112,10 +1159,12 @@ void fetch('/api/settings')
   .then((settings: SafeSettings) => {
     state.maxQuestions = settings.maxOpenQuestions;
     state.lineWords = settings.nowLineWords;
+    state.agentEnabled = settings.agentEnabled;
   })
   .catch(() => {
     /* the default stands; the snapshot load will report if the program is not running */
   })
   .finally(() => void loadSnapshot());
+void restoreThread();
 tick();
 listen();

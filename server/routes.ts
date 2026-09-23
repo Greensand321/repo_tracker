@@ -5,7 +5,8 @@ import { streamSSE } from 'hono/streaming';
 
 import { refKey, type JobKind, type Settings } from '../shared/types.ts';
 import { ask } from './advise/ask.ts';
-import { forget } from './advise/conversation.ts';
+import { forget, thread } from './advise/conversation.ts';
+import { actionsFor } from './agent/actions.ts';
 import { cannotAsk } from './work/asks.ts';
 import { distributeVisions } from './advise/vision.ts';
 import { LlmError, fetchModelsRaw, listModels } from './advise/client.ts';
@@ -84,6 +85,9 @@ api.put('/settings', async (c) => {
     'maxOpenQuestions',
     'briefEveryMinutes',
     'advisorMemoryMinutes',
+    'agentCallsPerQuestion',
+    'agentSeconds',
+    'agentHistory',
     'workers',
     'dispatchWorkers',
     'toolCallsPerJob',
@@ -97,6 +101,7 @@ api.put('/settings', async (c) => {
   if (typeof body.llmEnabled === 'boolean') patch.llmEnabled = body.llmEnabled;
   if (typeof body.visionAutoDraft === 'boolean') patch.visionAutoDraft = body.visionAutoDraft;
   if (typeof body.toolsEnabled === 'boolean') patch.toolsEnabled = body.toolsEnabled;
+  if (typeof body.agentEnabled === 'boolean') patch.agentEnabled = body.agentEnabled;
   if (typeof body.llmApiKey === 'string' && body.llmApiKey.trim()) {
     patch.llmApiKey = body.llmApiKey.trim();
   }
@@ -318,7 +323,10 @@ api.post('/ask', async (c) => {
   if (!snapshot) return c.json({ error: 'nothing has been read from GitHub yet' }, 400);
   try {
     const body = (await c.req.json()) as { question?: unknown };
-    const answer = await ask(snapshot, String(body.question ?? ''), loadSettings(), { dispatch: dispatchWork });
+    const answer = await ask(snapshot, String(body.question ?? ''), loadSettings(), {
+      // Built per answer, around the snapshot on screen — the only door to a change (D94).
+      act: () => actionsFor({ snapshot, dispatch: dispatchWork }),
+    });
     return c.json({ answer });
   } catch (err) {
     return c.json({ error: describe(err) }, 400);
@@ -329,6 +337,9 @@ api.post('/ask', async (c) => {
  * Start a new conversation. The advisor's memory is what was *said* — the state and Plane B
  * are untouched by this, and nothing on the page changes (D93).
  */
+/** The conversation the server is still carrying, so a reload can show it (finding 6). */
+api.get('/ask', (c) => c.json({ answers: thread(loadSettings().advisorMemoryMinutes) }));
+
 api.delete('/ask', (c) => {
   forget();
   return c.json({ ok: true });

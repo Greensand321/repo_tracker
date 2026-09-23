@@ -20,8 +20,29 @@
  *   **A tool never sees a secret.** Its context carries `SafeSettings`, not `Settings`.
  */
 
-import type { Branch, JobKind, JobSubject, SafeSettings, Snapshot } from '../../shared/types.ts';
+import type { Branch, SafeSettings, Snapshot } from '../../shared/types.ts';
 import type { GitHubReader } from './evidence.ts';
+
+/**
+ * What a write hands back: what it did and what it would not, both in plain English. The
+ * tool passes these to the model as its result; the page shows the record, not these.
+ */
+export type ActResult = { done: string[]; refused: string[] };
+
+/**
+ * The advisor's one door to changing anything (D94). Built for one answer — so every change
+ * it makes carries that answer's id and the owner's words — and handed to the advisor only:
+ * a station's context has none, so no background job can change anything but its own output.
+ *
+ * Every method is a change to Plane B. There is no method, here or anywhere a tool can
+ * reach, that writes to GitHub.
+ */
+export type AgentActions = {
+  /** Put work on the board for these branches. Slow work goes here rather than blocking. */
+  queue(kind: 'summarise' | 'assess' | 'draft-vision', branches: Branch[]): ActResult;
+  /** Rewrite the brief now, whatever its interval says. */
+  queueBrief(): ActResult;
+};
 
 /**
  * A failure the model is meant to see and recover from — "no such branch", "that is not a
@@ -58,16 +79,15 @@ export type ToolContext = {
    */
   github: GitHubReader | null;
   /**
-   * The one write any tool may make, and only the desk is handed it: put a job on the
-   * board. Null at every station — a worker judging one branch has no business starting
-   * work on another. It queues; it never does the work itself (D84).
+   * The advisor's action door (D94), or null. Null at every station, and null for the
+   * advisor too when the owner has switched changes off (`agentEnabled`).
    */
-  dispatch: ((kind: JobKind, subject: JobSubject) => void) | null;
+  act: AgentActions | null;
 };
 
 export type ToolArg = {
   name: string;
-  type: 'string' | 'number';
+  type: 'string' | 'number' | 'boolean' | 'list';
   required: boolean;
   about: string;
 };

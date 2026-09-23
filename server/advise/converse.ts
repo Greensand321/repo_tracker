@@ -47,6 +47,11 @@ export type ConverseResult = {
   uses: ToolUse[];
   /** True when it was cut off and told to answer with what it had. */
   hitBudget: boolean;
+  /**
+   * True when it ran out still asking for tools, with `onExhausted: 'return'`. `text` is
+   * empty then: the caller says what was done from `uses`, rather than losing it all.
+   */
+  unfinished: boolean;
 };
 
 /**
@@ -75,6 +80,18 @@ export type ConverseRequest = {
   onTool?: (name: string | null) => void;
   /** Permission for one more provider call. Absent means unmetered (tests, one-offs). */
   spend?: () => boolean;
+  /**
+   * Calls and seconds for this conversation, when they are not the stations'. The advisor
+   * has its own (D94): the stations' lookup budget has nothing to do with how many things
+   * the owner asked it to do.
+   */
+  limits?: { calls: number; seconds: number };
+  /**
+   * What to do when it is still asking for tools on its last call. A station throws —
+   * a job that did not answer did not answer. The advisor returns: its tool calls may
+   * already have changed things, and an error would hide that they did (audit finding 3).
+   */
+  onExhausted?: 'throw' | 'return';
 };
 
 export async function converse(settings: Settings, request: ConverseRequest): Promise<ConverseResult> {
@@ -84,19 +101,20 @@ export async function converse(settings: Settings, request: ConverseRequest): Pr
   // worth branching on elsewhere: it is one plain call, identical to what every station
   // did before this file existed. Advertising tools that cannot be used would be worse
   // than not having them: the model would spend its one reply asking for one.
-  if (request.tools.length === 0 || settings.toolCallsPerJob <= 0) {
+  const callLimit = request.limits?.calls ?? settings.toolCallsPerJob;
+  if (request.tools.length === 0 || callLimit <= 0) {
     const text = await complete(settings, {
       system: request.system,
       user: request.user,
       sessionId: request.sessionId,
       ...(request.maxTokens ? { maxTokens: request.maxTokens } : {}),
     });
-    return { text, uses, hitBudget: false };
+    return { text, uses, hitBudget: false, unfinished: false };
   }
 
   const byName = new Map(request.tools.map((tool) => [tool.name, tool] as const));
-  const maxCalls = Math.max(0, settings.toolCallsPerJob);
-  const deadline = Date.now() + Math.max(1, settings.toolSeconds) * 1000;
+  const maxCalls = Math.max(0, callLimit);
+  const deadline = Date.now() + Math.max(1, request.limits?.seconds ?? settings.toolSeconds) * 1000;
 
   // Identical calls are answered from what we already have. A model that loops is a real
   // failure mode, and this makes the loop cheap and — because the repeat still costs
@@ -130,9 +148,10 @@ export async function converse(settings: Settings, request: ConverseRequest): Pr
 
     hitBudget = hitBudget || last;
     const wanted = readToolCall(raw);
-    if (!wanted) return { text: raw, uses, hitBudget };
+    if (!wanted) return { text: raw, uses, hitBudget, unfinished: false };
 
     if (last) {
+      if (request.onExhausted === 'return') return { text: '', uses, hitBudget: true, unfinished: true };
       // Told to answer, and it asked for another lookup instead. Handing this back would
       // have the station parse a tool call as a verdict: "unclear", with no reason, cached
       // and shown as though it were a judgement. A job that did not answer did not answer.

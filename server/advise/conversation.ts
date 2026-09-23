@@ -25,8 +25,23 @@
 
 import { randomUUID } from 'node:crypto';
 
-/** Kept per turn. The answer is the text only — proposals and rankings are on the page. */
-export type Turn = { question: string; answer: string; at: number };
+import type { Answer } from './ask.ts';
+
+/**
+ * Kept per turn: what was asked, what was said, and — so a follow-up can act on them —
+ * what it changed and what it proposed (audit finding 2). `shown` is the whole answer as
+ * the page drew it, so a reload can draw it again (finding 6).
+ */
+export type Turn = {
+  question: string;
+  answer: string;
+  at: number;
+  did: string[];
+  proposed: string | null;
+  shown: Answer | null;
+};
+
+export type TurnExtras = { answer?: Answer; did?: string[]; proposed?: string | null };
 
 /**
  * How many exchanges are carried. Six is enough for a real back-and-forth and still small
@@ -66,8 +81,15 @@ export function recall(memoryMinutes: number, now = Date.now()): Turn[] {
   return [...turns];
 }
 
-export function remember(question: string, answer: string, now = Date.now()): void {
-  turns.push({ question, answer: answer.slice(0, MAX_ANSWER_CHARS), at: now });
+export function remember(question: string, answer: string, extras: TurnExtras = {}, now = Date.now()): void {
+  turns.push({
+    question,
+    answer: answer.slice(0, MAX_ANSWER_CHARS),
+    at: now,
+    did: (extras.did ?? []).slice(0, 40),
+    proposed: extras.proposed ?? null,
+    shown: extras.answer ?? null,
+  });
   if (turns.length > MAX_TURNS) turns = turns.slice(-MAX_TURNS);
   lastAt = now;
 }
@@ -77,6 +99,17 @@ export function forget(): void {
   turns = [];
   lastAt = 0;
   sessionId = randomUUID();
+}
+
+/**
+ * The answers still in the thread, newest first, as the page drew them — so a reload shows
+ * the conversation the server is still carrying, instead of hiding it (audit finding 6).
+ */
+export function thread(memoryMinutes: number, now = Date.now()): Answer[] {
+  return recall(memoryMinutes, now)
+    .map((turn) => turn.shown)
+    .filter((answer): answer is Answer => answer !== null)
+    .reverse();
 }
 
 /** The batch this conversation belongs to. Stable while it lives (D66). */
@@ -89,7 +122,14 @@ export const threadId = (): string => sessionId;
  */
 export function transcript(list: Turn[]): string {
   if (list.length === 0) return '';
-  const lines = list.map((turn) => `You were asked: ${turn.question}\nYou answered: ${turn.answer}`);
+  const lines = list.map((turn) =>
+    [
+      `You were asked: ${turn.question}`,
+      `You answered: ${turn.answer}`,
+      ...(turn.did.length > 0 ? [`You changed: ${turn.did.join('; ')}`] : []),
+      ...(turn.proposed ? [`You proposed filing, not yet done: ${turn.proposed}`] : []),
+    ].join('\n'),
+  );
   return [
     'EARLIER IN THIS CONVERSATION (oldest first). This is only what was said — the state',
     'below is current and is what you must answer from.',

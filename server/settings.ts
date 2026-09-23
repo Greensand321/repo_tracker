@@ -47,6 +47,10 @@ function sanitise(settings: Settings): Settings {
     nowLineWords: clamp(settings.nowLineWords, 5, 20, DEFAULT_SETTINGS.nowLineWords),
     briefEveryMinutes: clamp(settings.briefEveryMinutes, 0, 1440, DEFAULT_SETTINGS.briefEveryMinutes),
     advisorMemoryMinutes: clamp(settings.advisorMemoryMinutes, 0, 1440, DEFAULT_SETTINGS.advisorMemoryMinutes),
+    agentEnabled: settings.agentEnabled !== false,
+    agentCallsPerQuestion: clamp(settings.agentCallsPerQuestion, 0, 40, DEFAULT_SETTINGS.agentCallsPerQuestion),
+    agentSeconds: clamp(settings.agentSeconds, 15, 600, DEFAULT_SETTINGS.agentSeconds),
+    agentHistory: clamp(settings.agentHistory, 50, 5000, DEFAULT_SETTINGS.agentHistory),
     toolsEnabled: settings.toolsEnabled !== false,
     // The worst case for a read is llmMaxPerRun jobs times this plus one, so it is capped
     // well below anything that could run away quietly.
