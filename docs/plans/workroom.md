@@ -288,6 +288,11 @@ Each step is useful alone and leaves the program working.
 | **5** ✅ | **Dispatch** | asking from the page, the second lane with its own purse (D82), `data/dispatched.json` and reboot-on-start (D72, D83), "you asked for this" and the finished notice on the floor | 1, 2 |
 | **6** ✅ | **The desk** | The advisor may look at what moved and may put work on the board (D84); a ranking is an answer, a regrouping is a proposal accepted in one click; "started" is said, never "done" | 3, 4, 5 |
 
+**Step 6's limits are superseded** (23 Sep, D94). The owner wants the advisor to change
+anything the program owns when asked — reads only on GitHub, every change recorded and
+undoable. The plan for that is [`agent-autonomy.md`](agent-autonomy.md), awaiting
+confirmation. Everything above it in this table stands.
+
 Steps 1 and 2 need no tool calling and no probe, and they are what makes everything after
 them safe to let loose: **tools without a predicate is just a longer guess.**
 

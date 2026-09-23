@@ -701,6 +701,35 @@ One conversation is one provider session, which keeps the shared register prefix
 write to is in the prompt too, so "did that finish?" is answerable from the state rather
 than from memory. This supersedes the no-memory half of D60.
 
+### D94 — The agent may change anything the program owns, and nothing on GitHub
+
+The owner, 23 Sep: *"I want to give the agent almost full autonomy as it pertains to the
+program. However, I do not want it making any edits whatsoever to the repo. Just reads."*
+Pushing, merging and branching are done with other tools and are not wanted here.
+
+This reverses the posture of D84, where the advisor queued work but never did it and a
+regrouping was only a proposal. That posture was a choice made while Q76 — propose or act —
+was unanswered, and the audit of 23 Sep showed what it cost: the advisor could not act on
+anything the owner asked, and could *claim* it had with nothing to check the claim.
+
+So the line moves to where the data planes already put it (`requirements.md` §4). **Plane B
+is the agent's to change when the owner asks; Plane A is read-only, and that is enforced by
+structure rather than by the prompt:** every GitHub request goes through one module that
+only ever issues GETs, tools get a bound reader and never a credential (D77), and a test
+fails the build if anything sends a non-GET to GitHub, imports a git library, or spawns a
+process other than the browser opener. A prompt is a request, not a guarantee.
+
+What replaces ask-first is **act, show, undo**: every write goes through one action layer
+that records it with its before and after and the words that asked for it; the page lists
+what was done from that record, never from the model's prose; and every action can be
+undone. Two limits stay by design: it cannot see or change credentials, and it may lower its
+spending limits but never raise them.
+
+The mechanics — phases, the notebook of standing instructions, which settings it may touch —
+are in [`../plans/agent-autonomy.md`](../plans/agent-autonomy.md), **awaiting the owner's
+confirmation.** This entry records the direction, which is the owner's; the plan's details
+are not yet agreed.
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

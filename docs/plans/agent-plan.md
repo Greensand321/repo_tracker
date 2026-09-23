@@ -1,6 +1,8 @@
 # Making Bearing agent-native — a plan to argue with
 
-**Drafted:** 16 Sep 2026 · **Status:** draft, not agreed. Open questions at the end.
+**Drafted:** 16 Sep 2026 · **Status:** ⛔ **superseded 23 Sep 2026** by
+[`agent-autonomy.md`](agent-autonomy.md) (D94). It was never agreed; its jobs J1–J5 are
+covered there. Kept as reasoning, not instructions.
 
 Today the LLM is a **summariser**: one fixed prompt, context we assemble for it, one reply,
 no ability to ask for anything. Agent-native means inverting that — the model decides what

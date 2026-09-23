@@ -1,10 +1,23 @@
 # Status — where the project stands
 
-**Updated:** 21 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant · the workroom** · **Branch:** `claude/funny-heisenberg-rrawhz`
+**Updated:** 23 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant · the workroom** · **Branch:** `claude/kind-meitner-cpis9v`
 
 > Keep this short and current. It is the first thing to read after any time away.
 
 ---
+
+## The agent is planned, and waiting on you
+
+An audit of the advisor on 23 Sep found it is not the agent you want. It answers, queues
+re-reads and proposes regroupings, but cannot file a branch, touch a goal, set a vision or
+steer the brief — and it can *say* it did any of those with nothing to check the claim.
+
+You settled the direction the same day (D94): **anything the program owns is the agent's
+to change when you ask; nothing on GitHub is, ever.** The plan is
+[`plans/agent-autonomy.md`](plans/agent-autonomy.md): the read-only line enforced by
+structure rather than by prompt, *act, show, undo* in place of ask-first, a notebook of
+standing instructions and standing orders, and seven phases — the first of which gives it
+no new powers and only makes it honest. **Nothing is built until you confirm the plan.**
 
 ## "Happening now" is one line
 
@@ -218,7 +231,11 @@ would fail at the worst moment.
 
 ## The next concrete action
 
-**Run it for real.** Every station, the desk and the tools have only ever answered a stub.
+**Confirm, change or reject [`plans/agent-autonomy.md`](plans/agent-autonomy.md)** — in
+particular its five open questions, Q77–Q81, each of which has a default. Phase 1 starts on
+your word.
+
+Alongside that: **run it for real.** Every station, the desk and the tools have only ever answered a stub.
 Open it, watch the first read on the floor, ask the desk to rank something and to regroup
 something, and read `data/*.json` afterwards. `npm run probe` (two provider calls) says
 whether native tool calling is available; the JSON protocol is the floor either way.
@@ -319,6 +336,7 @@ Then, in whatever order they earn it:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 23 Sep 2026 | **Audit of the advisor**: it cannot act on anything asked of it, can claim edits it never made, sees 60 of ~100 branches, fails bulk requests part-way. Direction settled — full autonomy over the program, reads only on GitHub (D94). Plan written, **awaiting confirmation** |
 | 21 Sep 2026 | **The advisor holds a conversation**: recent turns resent, bounded and expiring after 30 quiet minutes, with the state always read fresh. There is no process kept alive — a chatbot is a transcript. D93 |
 | 21 Sep 2026 | **One job per branch**: read, describe, judge in one pair of hands, so the card fills in at once; a guess drafted at an older head is redrafted before it is judged. D92 |
 | 21 Sep 2026 | **"Happening now" is one line.** Five labelled rows, four saying one fact, replaced by *Done.* — and, where something is left or the branch is one piece of a larger job, that in the fewest true words. `recap.open` became `recap.next` (a fragment or null), the width is a setting, the "n left" is counted from the goal, and the PR number left the band. Prompts at v3. D91 |

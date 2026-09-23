@@ -72,7 +72,11 @@ runs in its own lane and is the only kind written to disk (D72). The advisor is 
 (D84): it may read how the fleet moved and may put work on the board through the same door
 the page's buttons use — never do it, never write a goal; a regrouping it proposes is filed
 only when the owner accepts it. It **remembers the last few exchanges** (D93), in memory,
-expiring; the state is re-read every turn and the transcript is never a source of facts. Adding a station is adding a row in `board.ts`, not a stage
+expiring; the state is re-read every turn and the transcript is never a source of facts.
+**This is changing** (D94): the owner wants it to change anything in Plane B when asked,
+every change recorded and undoable, with Plane A read-only enforced by structure. Planned in
+[`docs/plans/agent-autonomy.md`](docs/plans/agent-autonomy.md), **awaiting confirmation** —
+do not build from it until the owner has agreed. Adding a station is adding a row in `board.ts`, not a stage
 in a pipeline. Plan: [`docs/plans/workroom.md`](docs/plans/workroom.md).
 
 **Every file the program keeps goes through `server/jsonfile.ts`** (D85): atomic writes, and

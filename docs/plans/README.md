@@ -2,7 +2,9 @@
 
 | File | Scope | Status |
 |---|---|---|
-| **`agent-plan.md`** | **Making the advisor agent-native** — tools, context, the loop | 📝 **Draft, not agreed.** Open questions Q50–Q55. |
+| **`agent-autonomy.md`** | **The agent** — the advisor may change anything the program owns when asked, reads only on GitHub, every change recorded and undoable | 📝 **Awaiting the owner's confirmation** (23 Sep). Open questions Q77–Q81. D94. |
+| `workroom.md` | The board, the floor, tools at the stations, dispatch, the desk | ✅ Steps 1–6 built. Step 6's limits superseded by `agent-autonomy.md`. |
+| `agent-plan.md` | Making the advisor agent-native — tools, context, the loop | ⛔ Superseded 23 Sep by `agent-autonomy.md`. Never agreed; kept as reasoning. |
 | `stage-1-plan.md` | Stage 1 — the git history on screen | ✅ Built |
 | `phase-0-plan.md` | A local-first CLI "Brief engine" | ⛔ Superseded 15 Sep 2026. Do not implement from it. |
 | `build-plan-v0.2.md` | Whole-product architecture and milestones M0–M7 | ⛔ Largely superseded. Mine it for patterns, not for plans. |

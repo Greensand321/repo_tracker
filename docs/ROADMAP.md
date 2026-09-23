@@ -113,6 +113,28 @@ nothing it starts is lost when you close the program.
 
 ---
 
+## The agent — acting on the program by being talked to  **planned, awaiting confirmation**
+
+The advisor becomes an agent: it may change anything the program owns when you ask — goals,
+filing, visions, the brief, the board, settings within limits — and nothing on GitHub, ever,
+which is enforced by structure rather than by prompt (D94). Every change is recorded and
+undoable. Planned in [`plans/agent-autonomy.md`](plans/agent-autonomy.md).
+
+| | Phase | Status |
+|---|---|---|
+| 1 | **Honest and whole** — cannot claim what it did not do, sees every branch, batch actions, its own switch and budget | planned |
+| 2 | **The record and undo** | planned |
+| 3 | **Goals and filing** — "organise the register" acts | planned |
+| 4 | **Visions, the brief, the board** — "update the brief" means something | planned |
+| 5 | **The notebook, standing orders, settings** | planned |
+| 6 | **Stage 3 stores** — notes, tags, milestones, written by the agent from day one | planned |
+| 7 | **Native tool calling** — once `npm run probe` confirms it | planned |
+
+**Exit:** you can run the program by talking to it, see everything it changed, and undo any
+of it — and it has never written to a repo.
+
+---
+
 ## Stage 3 — The organizing layer
 
 **What you get:** your structure over their work. Branches become threads under goals,
