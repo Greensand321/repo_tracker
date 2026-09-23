@@ -305,3 +305,84 @@ test('accepting a regrouping reuses goals by title, creates the rest, and unfile
   assert.deepEqual(result, { created: 1, moved: 3 });
   assert.deepEqual(goals.listGoals().map((g) => g.title).sort(), ['Search', 'Webhooks']);
 });
+
+// ---------------------------------------------------------------------------
+// Phases 3 and 4 — it acts, through the door, and it all undoes
+// ---------------------------------------------------------------------------
+
+test('"organise the register" files everything in one answer, and undo all reverts it', async () => {
+  const snap = snapshot([branch('a'), branch('b'), branch('c')]);
+  scripted([
+    JSON.stringify({ tool: 'file', args: { goal: 'Webhooks', branches: ['a', 'o/r b'] } }),
+    JSON.stringify({ tool: 'file', args: { goal: 'Search', branches: ['c'] } }),
+    JSON.stringify({ answer: 'I filed a and b under Webhooks and c under Search.' }),
+  ]);
+  const d = door(snap);
+  const answer = await desk.ask(snap, 'organise the register by theme', settings(), { act: d.act });
+
+  assert.equal(answer.unbacked, false);
+  assert.deepEqual(answer.changes.map((c) => c.text), [
+    'Goal "Webhooks" created', 'a: filed under "Webhooks"', 'b: filed under "Webhooks"',
+    'Goal "Search" created', 'c: filed under "Search"',
+  ]);
+  assert.deepEqual(goals.listGoals().map((g) => g.title).sort(), ['Search', 'Webhooks']);
+
+  const undo = await import('../server/agent/undo.ts');
+  assert.ok(undo.undoTurn(answer.turn).every((r) => r.ok));
+  assert.deepEqual(goals.listGoals(), [], 'everything that one prompt did, taken back');
+});
+
+test('it can mark a goal done on its own, and that is flagged for the owner (Q78)', async () => {
+  goals.createGoal({ title: 'Webhooks' });
+  const snap = snapshot([branch('a')]);
+  scripted([
+    JSON.stringify({ tool: 'update_goal', args: { goal: 'Webhooks', done: true } }),
+    JSON.stringify({ answer: 'I marked Webhooks done — every branch under it has merged.' }),
+  ]);
+  const answer = await desk.ask(snap, 'tidy up the goals', settings(), { act: door(snap).act });
+  assert.equal(goals.listGoals()[0]!.done, true);
+  assert.equal(record.feed().goalsDone, 1);
+  assert.equal(record.feed().recent[0]!.words, 'tidy up the goals');
+  assert.equal(answer.unbacked, false);
+});
+
+test('purposes: a guess is marked as one, the owner\'s words are kept, and names resolve', () => {
+  visions.setVision({ repoKey: 'o/r', branch: 'a' }, 'My own words', 'yours');
+  const snap = snapshot([branch('a'), branch('b')]);
+  const out = String(tools.setVision.run(
+    { items: [{ branch: 'o/r a', purpose: 'A guess' }, { branch: 'b', purpose: 'Ship the search box' }] },
+    ctxFor(snap, door(snap).act()),
+  ));
+  assert.match(out, /Done \(1\)/);
+  assert.match(out, /owner already said/);
+  assert.equal(visions.getVision({ repoKey: 'o/r', branch: 'b' })?.state, 'proposed');
+
+  String(tools.setVision.run({ items: [{ branch: 'a', purpose: 'What they told me' }], yours: true }, ctxFor(snap, door(snap).act())));
+  assert.equal(visions.getVision({ repoKey: 'o/r', branch: 'a' })?.text, 'What they told me', 'yours=true is the owner speaking');
+});
+
+test('a batch with an unknown name does the rest and names what it could not find', () => {
+  const snap = snapshot([branch('a')]);
+  const out = String(tools.fileBranches.run({ goal: 'Webhooks', branches: ['a', 'ghost'] }, ctxFor(snap, door(snap).act())));
+  assert.match(out, /a: filed under "Webhooks"/);
+  assert.match(out, /Not found \(1\): ghost/);
+});
+
+test('deleting a goal leaves its branches unfiled and says how many', () => {
+  const g = goals.createGoal({ title: 'Old' });
+  goals.assignBranch({ repoKey: 'o/r', branch: 'a' }, g.id);
+  const snap = snapshot([branch('a')]);
+  const out = String(tools.deleteGoal.run({ goal: 'old' }, ctxFor(snap, door(snap).act())));
+  assert.match(out, /Goal "Old" deleted \(1 branch now unfiled\)/);
+  assert.equal(goals.goalOf({ repoKey: 'o/r', branch: 'a' }), null);
+});
+
+test('with changes off, no change tool is even offered', () => {
+  const { asks } = scripted([JSON.stringify({ answer: 'ok' })]);
+  const snap = snapshot([branch('a')]);
+  return desk.ask(snap, 'file a under X', settings({ agentEnabled: false }), { act: door(snap).act }).then(() => {
+    for (const name of ['file(', 'update_goal(', 'delete_goal(', 'set_purpose(', 'queue(']) {
+      assert.ok(!asks[0]!.includes(name), `${name} should not be offered`);
+    }
+  });
+});

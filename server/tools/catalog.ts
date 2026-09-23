@@ -15,7 +15,18 @@
 import { createHash } from 'node:crypto';
 
 import type { JobKind, Settings } from '../../shared/types.ts';
-import { branchDetail, queueWork } from './agent.ts';
+import {
+  branchDetail,
+  clearVision,
+  confirmVision,
+  createGoal,
+  deleteGoal,
+  fileBranches,
+  queueWork,
+  setVision,
+  unfileBranches,
+  updateGoal,
+} from './agent.ts';
 import { siblingBranches, whatChanged } from './free.ts';
 import { commitFiles, repoReadme } from './github.ts';
 import type { Tool } from './types.ts';
@@ -61,7 +72,19 @@ export function toolsFor(kind: JobKind, settings: Settings): Tool[] {
 export function agentTools(settings: Settings): Tool[] {
   if (settings.agentCallsPerQuestion <= 0) return [];
   const reads = [branchDetail, whatChanged];
-  return settings.agentEnabled ? [...reads, queueWork] : reads;
+  if (!settings.agentEnabled) return reads;
+  return [
+    ...reads,
+    fileBranches,
+    unfileBranches,
+    createGoal,
+    updateGoal,
+    deleteGoal,
+    setVision,
+    confirmVision,
+    clearVision,
+    queueWork,
+  ];
 }
 
 /**
