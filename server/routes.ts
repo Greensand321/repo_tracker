@@ -354,6 +354,8 @@ api.get('/ask', (c) => c.json({ answers: thread(loadSettings().advisorMemoryMinu
 api.post('/changes/:id/undo', (c) => {
   const result = undoChange(c.req.param('id'));
   if (result.ok) reapplyAll();
+  // An instruction for the brief taken back: the brief should stop following it now.
+  if (result.brief) dispatchWork('brief', { kind: 'fleet' });
   return c.json(result, result.ok ? 200 : 409);
 });
 
@@ -363,6 +365,7 @@ api.post('/changes/undo-turn', async (c) => {
   if (typeof body.turn !== 'string') return c.json({ error: 'which answer?' }, 400);
   const results = undoTurn(body.turn);
   if (results.some((r) => r.ok)) reapplyAll();
+  if (results.some((r) => r.ok && r.brief)) dispatchWork('brief', { kind: 'fleet' });
   return c.json({ results });
 });
 
@@ -475,7 +478,7 @@ api.get('/events', (c) =>
 
 /** The agent's door for one answer, around the snapshot on screen. */
 function doorFor(snapshot: Snapshot, turn: string, words: string, keep: number) {
-  return actionsFor({ snapshot, dispatch: dispatchWork, turn, words, keep, refresh: reapplyAll });
+  return actionsFor({ snapshot, dispatch: dispatchWork, retry: retryJob, turn, words, keep, refresh: reapplyAll });
 }
 
 function describe(err: unknown): string {

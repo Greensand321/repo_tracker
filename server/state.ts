@@ -11,6 +11,7 @@ import { applyAssist } from './advise/assist.ts';
 import { applyCached, llmReady } from './advise/enrich.ts';
 import { applyWork, resumeDispatched, runBoard, unpark } from './work/run.ts';
 import { feed } from './agent/record.ts';
+import { listNotes } from './notebook.ts';
 import { dispatch } from './work/dispatched.ts';
 import type { JobKind, JobSubject } from '../shared/types.ts';
 import { collect } from './collect.ts';
@@ -116,6 +117,7 @@ export async function refresh(): Promise<void> {
     // done before anyone sees the snapshot so the floor is populated from the first frame.
     applyWork(next, settings);
     next.changes = feed();
+    next.notes = listNotes();
 
     snapshot = next;
     lastError = null;
@@ -198,6 +200,7 @@ function carryOver(target: Snapshot): void {
   applyAssist(target, settings);
   applyWork(target, settings);
   target.changes = feed();
+  target.notes = listNotes();
   announce('snapshot');
 }
 
@@ -215,6 +218,7 @@ export function reapplyGoals(): void {
   applyAssist(snapshot, settings);
   applyWork(snapshot, settings);
   snapshot.changes = feed();
+  snapshot.notes = listNotes();
   announce('snapshot');
 }
 
@@ -233,6 +237,7 @@ export function reapplyVisions(): void {
   // takes one off. The floor should show that the moment you type it, not a minute later.
   applyWork(snapshot, settings);
   snapshot.changes = feed();
+  snapshot.notes = listNotes();
   announce('snapshot');
 }
 
@@ -248,6 +253,7 @@ export function dispatchWork(kind: JobKind, subject: JobSubject): void {
   if (!snapshot) return;
   applyWork(snapshot, loadSettings());
   snapshot.changes = feed();
+  snapshot.notes = listNotes();
   announce('snapshot');
   if (llmReady(loadSettings())) void dispatchInBackground(snapshot);
 }
@@ -305,6 +311,7 @@ export function retryJob(id: string): boolean {
   }
   applyWork(snapshot, loadSettings());
   snapshot.changes = feed();
+  snapshot.notes = listNotes();
   announce('snapshot');
   if (llmReady(loadSettings())) void workInBackground(snapshot);
   return true;
@@ -346,5 +353,6 @@ export function reapplyAll(): void {
   applyAssist(snapshot, settings);
   applyWork(snapshot, settings);
   snapshot.changes = feed();
+  snapshot.notes = listNotes();
   announceSnapshot();
 }

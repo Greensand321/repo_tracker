@@ -24,6 +24,7 @@ import {
   type Snapshot,
 } from '../../shared/types.ts';
 import { complete } from './client.ts';
+import { listNotes } from '../notebook.ts';
 import { extractJson } from './prompt.ts';
 
 /** v2: three parts — done, next, now (D89). v4: no branch names in the prose; they sit beside it (D90). */
@@ -93,6 +94,9 @@ export function briefKey(snapshot: Snapshot, settings: Settings): string {
     const members = goal.branches.map((b) => refKey(b.repoKey, b.branch)).sort().join(',');
     parts.push(`goal:${goal.id}:${goal.title}:${goal.done}:${members}`);
   }
+  // The owner's instructions for the brief are part of what it is written from: change
+  // one and the brief on disk describes the fleet the old way, so it is rewritten.
+  for (const note of listNotes('brief')) parts.push(`instruction:${note.text}`);
   parts.push(BRIEF_PROMPT_VERSION, settings.llmModel);
   return createHash('sha256').update(parts.join('\n')).digest('hex').slice(0, 16);
 }
@@ -139,6 +143,15 @@ export function buildBriefPrompt(snapshot: Snapshot, cap: number): string {
       if (goal.note) lines.push(`    the owner's note: ${goal.note}`);
       lines.push(`    branches: ${members}`);
     }
+  }
+
+  // Standing instructions the owner gave through the agent (plans/agent-autonomy.md §5).
+  // They shape how the brief reads; they never override the rules above — a brief told
+  // to "be upbeat" still may not call a goal done that is not.
+  const instructions = listNotes('brief');
+  if (instructions.length > 0) {
+    lines.push('', "THE OWNER'S INSTRUCTIONS FOR THE BRIEF — follow them:");
+    for (const note of instructions) lines.push(`- ${note.text}`);
   }
 
   return lines.join('\n');

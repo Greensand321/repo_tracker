@@ -64,6 +64,15 @@ export type AgentActions = {
   confirmVision(branches: Branch[]): ActResult;
   /** "Nobody has said" — a real answer, and better than a vision nobody believes. */
   clearVision(branches: Branch[]): ActResult;
+  /**
+   * Write something in the notebook: to remember in every conversation, or an instruction
+   * every brief follows — which also rewrites the brief at once.
+   */
+  remember(kind: 'remember' | 'brief', text: string): ActResult;
+  /** Take a note out, by its id or its exact words. */
+  forget(note: string): ActResult;
+  /** Try parked work again — by job id, or every parked job. */
+  retry(jobs: string[] | 'all'): ActResult;
 };
 
 /**

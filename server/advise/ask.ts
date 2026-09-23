@@ -25,6 +25,7 @@ import type { AgentActions } from '../tools/types.ts';
 import { LlmError } from './client.ts';
 import { recall, remember, threadId, transcript } from './conversation.ts';
 import { converse } from './converse.ts';
+import { listNotes } from '../notebook.ts';
 import { describeGoal, register } from './describe.ts';
 import { extractJson } from './prompt.ts';
 
@@ -87,7 +88,11 @@ ${
   owner can undo any of them, so do it rather than describing it — never ask first.
 - Queue slow work (re-reading or re-checking branches, rewriting the brief) with "queue".
   It runs in the background and lands on the page later: say it is queued, never describe
-  its result.`
+  its result.
+- Asked to change how the brief reads ("lead with what's red", "leave X out"): write it in
+  the notebook with remember, for "brief". Every brief follows it from then on, and the
+  brief is rewritten with it at once.
+- Asked to remember something: remember it, for "conversation".`
     : `- Read anything in the state, and use your tools to read further.
 - Changing things is switched off in the owner's settings. If you are asked to change
   something, say that it is switched off — do not describe it as done.`
@@ -134,8 +139,23 @@ export function buildAskPrompt(snapshot: Snapshot, question: string, cap: number
     ...(index.length > 0 ? ['', 'THE REST, ONE LINE EACH (use the "branch" tool for any of them in full):', ...index] : []),
     '',
     ...inFlight(snapshot),
+    ...notebookLines(),
     `LATEST QUESTION: ${question}`,
   ].join('\n');
+}
+
+/**
+ * The notebook: what the owner told it to remember, and the brief's instructions — with
+ * ids, so "forget the second one" can be done.
+ */
+function notebookLines(): string[] {
+  const notes = listNotes();
+  if (notes.length === 0) return [];
+  return [
+    'THE NOTEBOOK (what the owner told you; remove one only when asked):',
+    ...notes.map((n) => `  id ${n.id} · ${n.kind === 'brief' ? 'for the brief' : 'remember'} · ${n.text}`),
+    '',
+  ];
 }
 
 /**

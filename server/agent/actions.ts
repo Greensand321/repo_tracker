@@ -18,6 +18,7 @@ import { randomUUID } from 'node:crypto';
 import { refKey, type Branch, type Goal, type JobKind, type JobSubject, type Snapshot, type Vision } from '../../shared/types.ts';
 import type { AnswerChange } from '../advise/ask.ts';
 import * as goals from '../goals.ts';
+import * as notebook from '../notebook.ts';
 import type { ActResult, AgentActions, GoalPatch } from '../tools/types.ts';
 import * as visions from '../vision.ts';
 import { cannotAsk } from '../work/asks.ts';
@@ -34,6 +35,8 @@ export type ActionDeps = {
   keep: number;
   /** Re-merge Plane B into the snapshot on screen and tell the page. */
   refresh: () => void;
+  /** Take a parked job off the shelf — the page's own "try again". */
+  retry?: (id: string) => boolean;
 };
 
 export type BoundActions = AgentActions & {
@@ -257,6 +260,54 @@ export function actionsFor(deps: ActionDeps): BoundActions {
         visions.clearVision(ref(branch));
         entries.push(entry('vision', refKey(branch.repoKey, branch.name), `${branch.name}: purpose cleared`, before, null));
       }
+      return finish(entries, refused);
+    },
+
+    // -------------------------------------------------------------- the notebook
+
+    remember(kind, text) {
+      const clean = text.trim();
+      if (!clean) return finish([], ['nothing to write down']);
+      if (notebook.listNotes(kind).some((n) => n.text.toLowerCase() === clean.toLowerCase())) {
+        return finish([], ['that is already in the notebook']);
+      }
+      const note = notebook.addNote(kind, clean);
+      const entries = [entry('note', note.id, `${kind === 'brief' ? 'For the brief' : 'Remembered'}: ${q(clean)}`, null, note)];
+      if (kind === 'brief') {
+        // An instruction for the brief means little until the brief follows it.
+        deps.dispatch('brief', { kind: 'fleet' });
+        entries.push(entry('queue', 'brief', 'The brief: queued to be written again with it', null, 'brief', { undoable: false }));
+      }
+      return finish(entries, []);
+    },
+
+    forget(ref) {
+      const all = notebook.listNotes();
+      const note = all.find((n) => n.id === ref.trim()) ?? all.find((n) => n.text.toLowerCase() === ref.trim().toLowerCase());
+      if (!note) return finish([], [`no note ${q(ref)} — the notebook lists each with its id`]);
+      notebook.removeNote(note.id);
+      const entries = [entry('note', note.id, `${note.kind === 'brief' ? 'Brief instruction' : 'Note'} removed: ${q(note.text)}`, note, null)];
+      if (note.kind === 'brief') {
+        deps.dispatch('brief', { kind: 'fleet' });
+        entries.push(entry('queue', 'brief', 'The brief: queued to be written again without it', null, 'brief', { undoable: false }));
+      }
+      return finish(entries, []);
+    },
+
+    // -------------------------------------------------------------- the board
+
+    retry(jobs) {
+      const parked = deps.snapshot.work.jobs.filter((j) => j.state === 'parked');
+      const wanted = jobs === 'all' ? parked : parked.filter((j) => jobs.includes(j.id));
+      const refused = jobs === 'all' ? [] : jobs.filter((id) => !parked.some((j) => j.id === id)).map((id) => `${id} is not parked`);
+      if (!deps.retry) return finish([], ['retrying is not available here']);
+      const entries: Entry[] = [];
+      for (const job of wanted) {
+        if (deps.retry(job.id)) {
+          entries.push(entry('queue', job.id, `Tried again: ${job.title}`, null, 'retry', { undoable: false }));
+        }
+      }
+      if (wanted.length === 0 && refused.length === 0) refused.push('nothing is parked');
       return finish(entries, refused);
     },
   };

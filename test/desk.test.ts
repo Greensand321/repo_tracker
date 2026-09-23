@@ -26,6 +26,9 @@ let thread: typeof import('../server/advise/conversation.ts');
 let types: typeof import('../server/tools/types.ts');
 let record: typeof import('../server/agent/record.ts');
 let visions: typeof import('../server/vision.ts');
+let notebook: typeof import('../server/notebook.ts');
+let brief: typeof import('../server/advise/brief.ts');
+let undo: typeof import('../server/agent/undo.ts');
 
 before(async () => {
   desk = await import('../server/advise/ask.ts');
@@ -36,6 +39,9 @@ before(async () => {
   types = await import('../server/tools/types.ts');
   record = await import('../server/agent/record.ts');
   visions = await import('../server/vision.ts');
+  notebook = await import('../server/notebook.ts');
+  brief = await import('../server/advise/brief.ts');
+  undo = await import('../server/agent/undo.ts');
 });
 
 const realFetch = globalThis.fetch;
@@ -45,6 +51,7 @@ afterEach(() => {
   goals.resetGoalCache();
   record.resetRecordCache();
   visions.resetVisionCache();
+  notebook.resetNotebookCache();
   // The advisor remembers between questions (D93); each test starts a fresh thread.
   thread.forget();
 });
@@ -90,13 +97,15 @@ function scripted(replies: string[]): { asks: string[] } {
 /** The action door as the route builds it, with the board replaced by a list. */
 function door(snap: Snapshot) {
   const queued: { kind: JobKind; subject: JobSubject }[] = [];
+  const retried: string[] = [];
   const act = (turn = 'turn-1', words = 'test') =>
     actions.actionsFor({
       snapshot: snap, turn, words, keep: 500,
       dispatch: (kind, subject) => void queued.push({ kind, subject }),
+      retry: (id) => { retried.push(id); return true; },
       refresh: () => goals.applyGoals(snap),
     });
-  return { queued, act };
+  return { queued, retried, act };
 }
 
 const ctxFor = (snap: Snapshot, act: ReturnType<typeof actions.actionsFor> | null) => {
@@ -385,4 +394,97 @@ test('with changes off, no change tool is even offered', () => {
       assert.ok(!asks[0]!.includes(name), `${name} should not be offered`);
     }
   });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 4 — the notebook, the brief, the board
+// ---------------------------------------------------------------------------
+
+test('"from now on, lead the brief with anything red" is kept, followed, and rewrites the brief', () => {
+  const snap = snapshot([branch('a')]);
+  const s = settings();
+  const keyBefore = brief.briefKey(snap, s);
+  const d = door(snap);
+  const out = String(tools.rememberNote.run({ text: 'Lead with anything red', for: 'brief' }, ctxFor(snap, d.act())));
+
+  assert.match(out, /For the brief: "Lead with anything red"/);
+  assert.deepEqual(d.queued, [{ kind: 'brief', subject: { kind: 'fleet' } }], 'the brief is rewritten with it at once');
+  assert.notEqual(brief.briefKey(snap, s), keyBefore, 'a cached brief no longer counts as current');
+  assert.match(brief.buildBriefPrompt(snap, 10), /THE OWNER'S INSTRUCTIONS FOR THE BRIEF[^\n]*\n- Lead with anything red/);
+});
+
+test('a note for the conversation is in every prompt, with its id, and leaves the brief alone', () => {
+  const snap = snapshot([branch('a')]);
+  const d = door(snap);
+  tools.rememberNote.run({ text: 'Payments work ships before search', for: 'conversation' }, ctxFor(snap, d.act()));
+  const [note] = notebook.listNotes();
+
+  assert.equal(d.queued.length, 0);
+  assert.doesNotMatch(brief.buildBriefPrompt(snap, 10), /Payments work/);
+  assert.match(desk.buildAskPrompt(snap, 'what next?', 60), new RegExp(`id ${note!.id} · remember · Payments work ships before search`));
+});
+
+test('the same note twice is refused, and a note is forgotten by id or by its words', () => {
+  const snap = snapshot([branch('a')]);
+  const act = door(snap).act();
+  act.remember('remember', 'Search is paused');
+  assert.deepEqual(act.remember('remember', 'search is paused').refused, ['that is already in the notebook']);
+
+  const [note] = notebook.listNotes();
+  assert.match(String(tools.forgetNote.run({ note: note!.id }, ctxFor(snap, act))), /Note removed: "Search is paused"/);
+  assert.deepEqual(notebook.listNotes(), []);
+
+  act.remember('remember', 'Webhooks first');
+  assert.equal(act.forget('Webhooks first').done.length, 1, 'by its exact words');
+  assert.match(act.forget('nothing like this').refused[0]!, /no note/);
+});
+
+test('forgetting a brief instruction undoes, and the undo says the brief needs writing again', () => {
+  const snap = snapshot([branch('a')]);
+  const d = door(snap);
+  d.act('t1').remember('brief', 'Keep it to three lines');
+  const [note] = notebook.listNotes('brief');
+  d.act('t2').forget(note!.id);
+  assert.deepEqual(notebook.listNotes(), []);
+
+  const removed = record.turnEntries('t2').find((e) => e.kind === 'note')!;
+  const result = undo.undoChange(removed.id);
+  assert.equal(result.ok, true);
+  assert.equal(result.brief, true, 'the route rewrites the brief on this');
+  assert.deepEqual(notebook.listNotes(), [note], 'the same note, same id, back');
+});
+
+test('undo all takes a note back out, and queuing work is never offered as undoable', () => {
+  const snap = snapshot([branch('a')]);
+  door(snap).act('p').remember('brief', 'Lead with red');
+  const entries = record.turnEntries('p');
+  assert.deepEqual(entries.map((e) => [e.kind, e.undoable]), [['note', true], ['queue', false]]);
+  const results = undo.undoTurn('p');
+  assert.ok(results.find((r) => r.id === entries[0]!.id)?.ok);
+  assert.deepEqual(notebook.listNotes(), []);
+});
+
+test('the board reads the floor in words, and parked work can be retried by id or all at once', () => {
+  const job = (id: string, state: 'working' | 'waiting' | 'parked', error: string | null = null) => ({
+    id, kind: 'summarise' as const, title: `Reading ${id}`, subject: { kind: 'fleet' as const }, origin: 'routine' as const,
+    state, startedAt: null, attempts: state === 'parked' ? 2 : 0, toolCalls: 0, doing: null, error,
+  });
+  const snap = snapshot([branch('a')]);
+  snap.work.jobs = [job('j1', 'working'), job('j2', 'waiting'), job('j3', 'parked', 'the reply was empty'), job('j4', 'parked')];
+
+  const board = String(tools.readBoard.run({}, ctxFor(snap, null)));
+  assert.match(board, /Running \(1\): Reading j1/);
+  assert.match(board, /Waiting \(1\): Reading j2/);
+  assert.match(board, /id j3 · Reading j3 · the reply was empty/);
+  assert.match(board, /id j4 · Reading j4 · failed twice/);
+
+  const d = door(snap);
+  const one = String(tools.retryParked.run({ jobs: ['j3', 'j1'] }, ctxFor(snap, d.act())));
+  assert.deepEqual(d.retried, ['j3']);
+  assert.match(one, /Tried again: Reading j3/);
+  assert.match(one, /j1 is not parked/);
+
+  tools.retryParked.run({ jobs: ['all'] }, ctxFor(snap, d.act()));
+  assert.deepEqual(d.retried, ['j3', 'j3', 'j4']);
+  assert.throws(() => tools.retryParked.run({ jobs: [] }, ctxFor(snap, d.act())), types.ToolError);
 });

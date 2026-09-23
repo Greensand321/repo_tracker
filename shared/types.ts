@@ -26,6 +26,8 @@ export type Snapshot = {
    * edge ran, which every surface treats as "nothing yet".
    */
   changes?: ChangeFeed;
+  /** The notebook: what the agent was told to remember, and the brief's instructions. */
+  notes?: Note[];
   warnings: string[]; // one unreachable repo must never cost you the others
   rateLimit: RateLimit | null;
   llm: LlmStatus;
@@ -326,6 +328,17 @@ export type Change = {
    * the feed makes hardest to miss (Q78).
    */
   flag: 'goal-done' | null;
+};
+
+/** What the owner told the agent: something to remember, or an instruction for every brief. */
+export type NoteKind = 'remember' | 'brief';
+
+export type Note = {
+  /** Short, so the agent can name one to forget. */
+  id: string;
+  kind: NoteKind;
+  text: string;
+  at: string;
 };
 
 export type ChangeFeed = {

@@ -22,7 +22,11 @@ import {
   createGoal,
   deleteGoal,
   fileBranches,
+  forgetNote,
   queueWork,
+  readBoard,
+  rememberNote,
+  retryParked,
   setVision,
   unfileBranches,
   updateGoal,
@@ -71,7 +75,7 @@ export function toolsFor(kind: JobKind, settings: Settings): Tool[] {
  */
 export function agentTools(settings: Settings): Tool[] {
   if (settings.agentCallsPerQuestion <= 0) return [];
-  const reads = [branchDetail, whatChanged];
+  const reads = [branchDetail, whatChanged, readBoard];
   if (!settings.agentEnabled) return reads;
   return [
     ...reads,
@@ -83,7 +87,10 @@ export function agentTools(settings: Settings): Tool[] {
     setVision,
     confirmVision,
     clearVision,
+    rememberNote,
+    forgetNote,
     queueWork,
+    retryParked,
   ];
 }
 

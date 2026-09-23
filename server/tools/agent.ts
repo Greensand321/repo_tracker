@@ -232,3 +232,67 @@ export const clearVision: Tool = {
     return report(act.clearVision(found), missing);
   },
 };
+
+// ---------------------------------------------------------------------------
+// The notebook and the board (phase 4)
+// ---------------------------------------------------------------------------
+
+export const rememberNote: Tool = {
+  name: 'remember',
+  description:
+    'Write in the notebook, when the owner says "remember…" or "from now on…". for="brief" is an instruction every brief follows ("lead with anything red") — the brief is rewritten with it at once; for="conversation" is something to know in every conversation. Free; undoable.',
+  cost: 'free',
+  args: [
+    { name: 'text', type: 'string', required: true, about: "the owner's instruction or fact, in a sentence" },
+    { name: 'for', type: 'string', required: true, about: 'brief | conversation' },
+  ],
+  run(args, ctx) {
+    const kind = str(args, 'for').toLowerCase();
+    if (kind !== 'brief' && kind !== 'conversation') throw new ToolError('for must be "brief" or "conversation"');
+    return report(door(ctx).remember(kind === 'brief' ? 'brief' : 'remember', str(args, 'text')), []);
+  },
+};
+
+export const forgetNote: Tool = {
+  name: 'forget',
+  description: 'Take a note out of the notebook, by its id (shown beside each) or its exact words. Free; undoable.',
+  cost: 'free',
+  args: [{ name: 'note', type: 'string', required: true, about: 'the note id, or its exact words' }],
+  run(args, ctx) {
+    return report(door(ctx).forget(str(args, 'note')), []);
+  },
+};
+
+/** What is running, queued and parked — the floor, in words. */
+export const readBoard: Tool = {
+  name: 'board',
+  description: 'The work the program is doing: what is running, what is waiting, and what is parked after failing twice, with why. Free.',
+  cost: 'free',
+  args: [],
+  run(_args, ctx) {
+    const jobs = ctx.snapshot.work.jobs;
+    const lines = (state: string) => jobs.filter((j) => j.state === state);
+    const running = lines('working');
+    const waiting = lines('waiting');
+    const parked = lines('parked');
+    return [
+      `Running (${running.length}): ${running.map((j) => j.title).join('; ') || 'nothing'}`,
+      `Waiting (${waiting.length})${waiting.length > 0 ? `: ${waiting.slice(0, 12).map((j) => j.title).join('; ')}${waiting.length > 12 ? '; …' : ''}` : ''}`,
+      `Parked (${parked.length})${parked.length > 0 ? ':' : ''}`,
+      ...parked.map((j) => `  id ${j.id} · ${j.title} · ${j.error ?? 'failed twice'}`),
+    ].join('\n');
+  },
+};
+
+export const retryParked: Tool = {
+  name: 'retry',
+  description: 'Try parked work again — by job id from the board, or "all". Free.',
+  cost: 'free',
+  args: [{ name: 'jobs', type: 'list', required: true, about: 'job ids from the board, or ["all"]' }],
+  run(args, ctx) {
+    const raw = args['jobs'];
+    const list = Array.isArray(raw) ? raw.filter((j): j is string => typeof j === 'string') : typeof raw === 'string' ? [raw] : [];
+    if (list.length === 0) throw new ToolError('name the parked jobs by id, or say ["all"]');
+    return report(door(ctx).retry(list.some((j) => j.toLowerCase() === 'all') ? 'all' : list), []);
+  },
+};

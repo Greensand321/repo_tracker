@@ -6,13 +6,15 @@
  * work away — so it says what moved instead, and leaves it alone.
  */
 
-import { refKey, type Goal, type Vision } from '../../shared/types.ts';
+import { refKey, type Goal, type Note, type Vision } from '../../shared/types.ts';
 import * as goals from '../goals.ts';
+import * as notebook from '../notebook.ts';
 import type { GoalPatch } from '../tools/types.ts';
 import * as visions from '../vision.ts';
 import { findEntry, markUndone, turnEntries, type Entry } from './record.ts';
 
-export type Undone = { id: string; ok: boolean; text: string };
+/** `brief` when the change was one of the brief's instructions — the brief should be rewritten. */
+export type Undone = { id: string; ok: boolean; text: string; brief?: boolean };
 
 const q = (text: string): string => `"${text}"`;
 
@@ -32,7 +34,7 @@ export function undoTurn(turn: string): Undone[] {
     .map((e) => undoChange(e.id));
 }
 
-function revert(entry: Entry): { ok: boolean; text: string } {
+function revert(entry: Entry): { ok: boolean; text: string; brief?: boolean } {
   if (entry.undone) return { ok: false, text: 'already undone' };
   if (!entry.undoable) return { ok: false, text: 'queued work runs whatever happens next, so it cannot be taken back' };
 
@@ -84,6 +86,23 @@ function revert(entry: Entry): { ok: boolean; text: string } {
       if (before) visions.setVision(ref, before.text, before.state, { from: before.from, draftedAt: before.draftedAt });
       else visions.clearVision(ref);
       return { ok: true, text: `${branch}: purpose put back` };
+    }
+
+    case 'note': {
+      const added = entry.after as Note | null;
+      const removed = entry.before as Note | null;
+      if (added) {
+        const now = notebook.listNotes().find((n) => n.id === added.id);
+        if (!now) return { ok: true, text: `${q(added.text)} was already gone` };
+        if (now.text !== added.text) return { ok: false, text: 'that note has been changed since' };
+        notebook.removeNote(added.id);
+        return { ok: true, text: `${q(added.text)} taken out of the notebook`, brief: added.kind === 'brief' };
+      }
+      if (removed) {
+        notebook.restoreNote(removed);
+        return { ok: true, text: `${q(removed.text)} put back in the notebook`, brief: removed.kind === 'brief' };
+      }
+      return { ok: false, text: 'nothing to undo' };
     }
 
     default:
