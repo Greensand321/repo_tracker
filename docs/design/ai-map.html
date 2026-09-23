@@ -110,8 +110,9 @@
   <p class="lede">
     The assistant is <b>six separate prompts</b>, fired at different moments. Four run on their
     own in the background; two run because you pressed something. Four of the six may look
-    things up before they answer (steps 3–6 of the workroom), one of those — the advisor, ⑤ —
-    may put work on the board, and none of them may write a goal or a vision as your own.
+    things up before they answer (steps 3–6 of the workroom). One of those — the advisor, ⑤ —
+    is an <b>agent</b>: when you ask, it changes anything the program owns, every change recorded
+    and undoable (D94). None of the background ones writes a goal or a vision as your own.
     Everything any of them writes goes to Plane B — never to a repo.
   </p>
 
@@ -235,8 +236,8 @@
     <rect class="n-you" x="150" y="906" width="380" height="60" rx="9"/>
     <text class="n-num" x="168" y="928" fill="#f2c976">⑤</text>
     <text class="n-t" x="196" y="928">Ask the advisor</text>
-    <text class="n-s" x="196" y="945">one question, one answer, over the snapshot</text>
-    <text class="n-s" x="196" y="958">writes nothing at all</text>
+    <text class="n-s" x="196" y="945">acts on Plane B when you ask — never GitHub</text>
+    <text class="n-s" x="196" y="958">every change recorded, listed, undoable</text>
 
     <rect class="n-you" x="150" y="982" width="380" height="74" rx="9"/>
     <text class="n-num" x="168" y="1004" fill="#f2c976">⑥</text>
@@ -299,15 +300,17 @@
   </div>
 
   <div class="call">
-    <div class="top"><span class="num">⑤</span><h4>Ask the advisor — the desk</h4><span class="when">you pressed Ask</span></div>
+    <div class="top"><span class="num">⑤</span><h4>Ask the advisor — the agent</h4><span class="when">you pressed Ask</span></div>
     <dl class="grid">
-      <dt>Sees</dt><dd>A compact block per branch — what it is FOR, what it DID, how they COMPARE, its goal — plus every goal and its judgement. The same shape as ④, plus the verdicts.</dd>
-      <dt>May look up</dt><dd><code>what_changed</code> (free, the dated history) and <code>dispatch</code> — the one write any tool has: put a job on the board, through the same door the page's buttons use. It queues; it does not do. Off with the other lookups (<code>toolsEnabled</code>), when it is one turn as before.</dd>
-      <dt>Decides</dt><dd>Four sentences of plain English. Asked to rank: an ordered list of real branches, one reason each — an answer, nothing written. Asked to regroup: a <i>proposal</i> of goals by title and branches under each, filed only when you press <b>file them like this</b>.</dd>
-      <dt>May not</dt><dd class="never">File anything itself, start work the page could not ask for, or describe the result of work it started — it says "started", never "done" (D84).</dd>
-      <dt>Remembers</dt><dd>The last few exchanges, resent ahead of the state and dropped after <code>advisorMemoryMinutes</code> of quiet (D93). Nothing is held open between questions — there is no process to keep alive. The state is re-read fresh every turn and wins wherever the two disagree.</dd>
+      <dt>Sees</dt><dd>Every goal, and <b>every branch</b>: the <code>askBranchCap</code> most recent in full — what it is FOR, what it DID, how they COMPARE — and the rest one line each. Plus what you asked for that is still running, and the notebook.</dd>
+      <dt>May read</dt><dd><code>branch</code> (any branch in full), <code>what_changed</code>, <code>board</code> (what is running and parked), <code>settings</code> (every setting, never a secret). Budget: <code>agentCallsPerQuestion</code> steps and <code>agentSeconds</code> — its own, not the stations'.</dd>
+      <dt>May change</dt><dd>Only when you ask, and only when <code>agentEnabled</code> is on: file and unfile branches, create, edit, mark done and delete goals, set, confirm and clear purposes, write and remove notebook entries (a brief instruction rewrites the brief), queue work, retry parked jobs. All of it through <b>one action door</b> (<code>server/agent/actions.ts</code>) that records each change with its before and after. The answer lists what changed <b>from that record, never from its words</b>.</dd>
+      <dt>Decides</dt><dd>Four sentences of plain English. Asked to rank: an ordered list of real branches. Asked to <i>show</i> a regrouping first: a proposal, filed only when you press <b>file them like this</b>. A setting it thinks is holding you back: up to three <b>suggestions</b>, each checked against the settings table and applied only by your click (D95).</dd>
+      <dt>May not</dt><dd class="never">Write anything to GitHub. Change a setting. Act on anything you did not ask in your latest message. Claim a change the record does not hold — an answer that does is flagged in red. Replace your words for what a branch is for with its guess.</dd>
+      <dt>Undo</dt><dd>Any change, or <b>undo all</b> for everything one question did. An undo that would overwrite something changed since is refused and says why. The last <code>agentHistory</code> (500) changes are kept in <code>data/actions.json</code>, shown in the Changes panel; a goal it marked done is flagged there for you to check (Q78).</dd>
+      <dt>Remembers</dt><dd>The last few exchanges — with what each changed, proposed and suggested — resent ahead of the state and dropped after <code>advisorMemoryMinutes</code> of quiet (D93). Durable things live in the notebook, never the transcript. The state is re-read fresh every turn and wins wherever the two disagree.</dd>
       <dt>Cached on</dt><dd class="where">nothing — you asked, so you get a fresh answer</dd>
-      <dt>Prompt</dt><dd class="where">server/advise/ask.ts → SYSTEM · the tool in server/tools/desk.ts · the transcript in server/advise/conversation.ts</dd>
+      <dt>Prompt</dt><dd class="where">server/advise/ask.ts → systemFor · its tools in server/tools/agent.ts, listed in catalog.ts → agentTools · the door in server/agent/ · the transcript in server/advise/conversation.ts</dd>
     </dl>
   </div>
 
@@ -324,9 +327,11 @@
 
   <h2>What it can never do</h2>
   <ul class="never">
-    <li><b>Touch a repo.</b> No prompt has a write tool, and no code path from any of the six reaches git. Plane A is read-only forever.</li>
-    <li><b>Mark a goal done.</b> It writes a <i>judgement</i>; <code>Goal.done</code> stays your boolean and only an <b>accept</b> click flips it.</li>
-    <li><b>Confirm its own vision.</b> A draft is <code>proposed</code> until you say otherwise, and a proposed vision is marked everywhere it appears.</li>
+    <li><b>Touch a repo.</b> No tool writes to GitHub and no code path reaches git: every GitHub call is a GET from <code>server/github.ts</code>, and <code>test/readonly.test.ts</code> fails the build otherwise. Plane A is read-only forever.</li>
+    <li><b>Change a setting.</b> The agent reads them and suggests; only your click applies one (D95).</li>
+    <li><b>Act unprompted.</b> The background stations judge and draft; only the agent changes things, and only what your latest message asked for (Q77).</li>
+    <li><b>Mark a goal done unseen.</b> The stations write a <i>judgement</i>. The agent may mark a goal done when you ask, and that change is flagged in the Changes panel until you look (Q78).</li>
+    <li><b>Pass off its guess as your words.</b> A draft is <code>proposed</code> until you confirm it, and a proposed vision is marked everywhere it appears.</li>
     <li><b>Decide a drift is your fault or its own.</b> It reports the drift and offers you both answers.</li>
     <li><b>Invent evidence.</b> Every SHA, branch name and goal id it returns is checked against the snapshot and dropped if it does not exist.</li>
   </ul>

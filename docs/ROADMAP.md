@@ -1,6 +1,6 @@
 # Roadmap
 
-**Updated:** 15 Sep 2026 · **Status:** planning · **Requirements:** [`requirements.md`](requirements.md)
+**Updated:** 23 Sep 2026 · **Status:** building · **Requirements:** [`requirements.md`](requirements.md)
 
 Ordered by the owner's stated priorities: **git history on screen in plain English first**,
 **LLM insight over it second**, everything else after.
@@ -113,20 +113,21 @@ nothing it starts is lost when you close the program.
 
 ---
 
-## The agent — acting on the program by being talked to  **planned, awaiting confirmation**
+## The agent — acting on the program by being talked to  **phases 1–5 built**
 
 The advisor becomes an agent: it may change anything the program owns when you ask — goals,
-filing, visions, the brief, the board, settings within limits — and nothing on GitHub, ever,
-which is enforced by structure rather than by prompt (D94). Every change is recorded and
+filing, visions, the brief, the board, its notebook — and nothing on GitHub, ever, which is
+enforced by structure rather than by prompt (D94). It never acts unprompted and changes no
+setting: it reads them and suggests, and you apply (D95). Every change is recorded and
 undoable. Planned in [`plans/agent-autonomy.md`](plans/agent-autonomy.md).
 
 | | Phase | Status |
 |---|---|---|
-| 1 | **Honest and whole** — cannot claim what it did not do, sees every branch, batch actions, its own switch and budget | planned |
-| 2 | **The record and undo** | planned |
-| 3 | **Goals and filing** — "organise the register" acts | planned |
-| 4 | **Visions, the brief, the board** — "update the brief" means something | planned |
-| 5 | **The notebook, standing orders, settings** | planned |
+| 1 | **Honest and whole** — cannot claim what it did not do, sees every branch, batch actions, its own switch and budget | ✅ built |
+| 2 | **The record and undo** — one change or everything one prompt did; the changes feed, goal-done flagged | ✅ built |
+| 3 | **Goals and filing** — "organise the register" acts | ✅ built |
+| 4 | **Visions, the brief, the board** — "update the brief" means something | ✅ built |
+| 5 | **The notebook, settings** — suggestions you apply, reset to defaults (no standing orders: Q77) | ✅ built |
 | 6 | **Stage 3 stores** — notes, tags, milestones, written by the agent from day one | planned |
 | 7 | **Native tool calling** — once `npm run probe` confirms it | planned |
 

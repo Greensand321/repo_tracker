@@ -1,23 +1,49 @@
 # Status — where the project stands
 
-**Updated:** 23 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant · the workroom** · **Branch:** `claude/kind-meitner-cpis9v`
+**Updated:** 23 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant · the workroom · the agent** · **Branch:** `claude/kind-meitner-cpis9v`
 
 > Keep this short and current. It is the first thing to read after any time away.
 
 ---
 
-## The agent is planned, and waiting on you
+## The advisor is an agent now — it runs the program when you ask, and never touches GitHub
 
-An audit of the advisor on 23 Sep found it is not the agent you want. It answers, queues
-re-reads and proposes regroupings, but cannot file a branch, touch a goal, set a vision or
-steer the brief — and it can *say* it did any of those with nothing to check the claim.
+Built 23 Sep, phases 1–5 of [`plans/agent-autonomy.md`](plans/agent-autonomy.md) (D94, D95).
+Talk to it and it acts:
 
-You settled the direction the same day (D94): **anything the program owns is the agent's
-to change when you ask; nothing on GitHub is, ever.** The plan is
-[`plans/agent-autonomy.md`](plans/agent-autonomy.md): the read-only line enforced by
-structure rather than by prompt, *act, show, undo* in place of ask-first, a notebook of
-standing instructions and standing orders, and seven phases — the first of which gives it
-no new powers and only makes it honest. **Nothing is built until you confirm the plan.**
+| Say | It does |
+|---|---|
+| "organise the register by theme" | creates the goals and files every branch, in one answer |
+| "mark Webhooks done" · "rename that goal" · "delete Old" | edits goals; a goal it marks done is **flagged** in the feed for you to check (Q78) |
+| "these are for …" | sets, confirms or clears what branches are for; a guess stays marked as one and never replaces your words |
+| "from now on the brief should lead with anything red" | writes it in the **notebook**; every brief follows it, and the brief is rewritten at once |
+| "remember Project_Management is the CRM rewrite" | keeps it in the notebook for every conversation |
+| "re-read these" · "retry what's parked" | queues work and retries parked jobs |
+| "why do you keep stopping?" | reads the settings and **suggests** a change with an *apply* button; it cannot change one itself |
+
+**How you keep it honest.** What it changed is listed under its answer **from the record,
+never from its words**, and an answer that claims a change with none behind it is flagged
+in red. Every change is kept in `data/actions.json` (the last 500) and in the **Changes**
+panel, with the unseen count in the dateline. Any change undoes, one at a time or **undo
+all** for everything one prompt did. An undo that would overwrite something changed since is
+refused and says why. It never acts unprompted, never changes a setting, and cannot write to
+GitHub: every GitHub call is a GET from one module, and `test/readonly.test.ts` fails the
+build if that stops being true or if anything the agent runs can save a setting.
+
+**Also on the page:** the **Notebook** panel (remove any note; removing a brief instruction
+rewrites the brief), and **Reset to defaults** in settings. Reset covers every number and
+switch and leaves the token, key, repos, provider and model alone; nothing changes until you
+save.
+
+**A bug found on the way:** the *Line words* setting never saved. The form sent it, but the
+server's list of accepted settings did not include it. Settings are now one table
+(`shared/settings.ts`) that the store, the route, the agent, the suggestions and reset all
+read, so they cannot drift apart again.
+
+**Next:** use it on the real fleet. The stub runs show the mechanics work. What they cannot
+show is how well your model picks the right tool from a real, messy request. If it
+struggles, the fixes are phase 7 (native tool calling, once `npm run probe` says your
+provider supports it) or a larger *Steps* budget. Phase 6 waits on Stage 3's stores.
 
 ## "Happening now" is one line
 
@@ -336,7 +362,8 @@ Then, in whatever order they earn it:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
-| 23 Sep 2026 | **Audit of the advisor**: it cannot act on anything asked of it, can claim edits it never made, sees 60 of ~100 branches, fails bulk requests part-way. Direction settled — full autonomy over the program, reads only on GitHub (D94). Plan written, **awaiting confirmation** |
+| 23 Sep 2026 | **The advisor becomes an agent** (phases 1–5): it files, edits goals and purposes, keeps a notebook the brief follows, queues and retries work — through one door that records every change, lists it from the record, and undoes one or everything one prompt did. Settings: read and suggested, applied by you; reset to defaults. Settings became one table, which fixed *Line words* never saving. D94, D95 |
+| 23 Sep 2026 | **Audit of the advisor**: it cannot act on anything asked of it, can claim edits it never made, sees 60 of ~100 branches, fails bulk requests part-way. Direction settled — full autonomy over the program, reads only on GitHub (D94). Plan written and confirmed with the owner's answers |
 | 21 Sep 2026 | **The advisor holds a conversation**: recent turns resent, bounded and expiring after 30 quiet minutes, with the state always read fresh. There is no process kept alive — a chatbot is a transcript. D93 |
 | 21 Sep 2026 | **One job per branch**: read, describe, judge in one pair of hands, so the card fills in at once; a guess drafted at an older head is redrafted before it is judged. D92 |
 | 21 Sep 2026 | **"Happening now" is one line.** Five labelled rows, four saying one fact, replaced by *Done.* — and, where something is left or the branch is one piece of a larger job, that in the fewest true words. `recap.open` became `recap.next` (a fragment or null), the width is a setting, the "n left" is counted from the goal, and the PR number left the band. Prompts at v3. D91 |

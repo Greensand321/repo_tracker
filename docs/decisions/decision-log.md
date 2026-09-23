@@ -733,6 +733,34 @@ click). **It changes no settings**: it reads them and suggests, and the owner ap
 settings screen gains reset-to-defaults. Undo history is the last 500 changes, and it never
 asks before a large change. Plan: [`../plans/agent-autonomy.md`](../plans/agent-autonomy.md).
 
+### D95 — Settings are one table; the agent reads it and suggests, the owner applies
+
+Every setting the owner tunes — each number and switch — is one row in
+`shared/settings.ts`: its range, its label and what it does. The store clamps to it, the
+settings route accepts exactly its keys, the agent's `settings` tool reads it, the agent's
+suggestions are checked against it, and **reset to defaults** fills it.
+
+**Why one table:** five places each held their own list, and they had already drifted. The
+route's list had no `nowLineWords`: the form sent it and the server silently dropped it, so
+the setting never saved. A setting added in one place and forgotten in another fails
+quietly. A test now fails if a number or switch in the defaults is missing from the table.
+
+**The agent may only suggest** (Q79). An answer may carry up to three suggestions, each
+checked against the table. A made-up name, a secret, the model or the repos is dropped; a
+value is clamped into range; setting what is already set is no suggestion. Each shows
+under the answer with an *apply* button, and pressing it is the owner making the change
+through the same route as the settings screen. A test fails if any module the agent runs
+imports `saveSettings`.
+
+**Reset leaves alone what is not tuning.** The token, the key, the repos, the provider and
+the model say who you are and what you pay for; resetting them would lock the program out
+of GitHub or the model. Every tunable is reset, including those with no field on the
+screen, and nothing changes until Save.
+
+**The owner's own edits are not in the agent's record.** Removing a note from the notebook
+panel is like editing a goal by hand: the owner did it, so there is nothing to catch or
+undo. The record exists to answer "what did the agent change?".
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.

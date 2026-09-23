@@ -1,7 +1,7 @@
 # The agent — the advisor that runs the program for you
 
 **Drafted:** 23 Sep 2026 · **Status:** ✅ **confirmed 23 Sep with the owner's answers (§10);
-phases 1–5 being built.** · Decision: D94 · Supersedes the limits in D84, and
+phases 1–5 built 23 Sep** (6 and 7 wait on Stage 3 and a probe) · Decisions: D94, D95 · Supersedes the limits in D84, and
 [`agent-plan.md`](agent-plan.md) (a draft that was never agreed).
 
 ---
@@ -195,11 +195,11 @@ Each phase is useful alone and leaves the program working.
 
 | | Phase | What lands | Done when |
 |---|---|---|---|
-| **1** | **Honest and whole** — no new powers | capability list · claimed-but-not-done flag · every branch in the prompt + `branch` tool · batch `queue` · partial runs reported · `agentEnabled` and its own budget · thread restored on reload · transcript remembers proposals and actions · the read-only test across all of `server/` | every audit finding except "cannot edit" is closed, each with a test |
-| **2** | **The record, undo, the changes feed** | the action layer · `data/actions.json` (500) · "what it did" from the record · undo one, undo all from one prompt, conflict-checked · the changes panel, goal-done flagged, unseen count in the dateline | a change made by talking can be seen, found later in the feed, and undone |
-| **3** | **Goals and filing** | create, rename, note, delete, done / not done · file, unfile, move many · "organise the register" acts · accepting a proposal is recorded | "organise the register by theme" files everything in one answer, and *undo all* reverts it |
-| **4** | **Visions, the brief, the board** | set, confirm, clear visions in bulk · brief instructions · retry parked · read the board | "have the brief lead with what's red" changes every brief after it |
-| **5** | **The notebook, settings** | the notebook panel · settings readable, suggestions you apply · **reset to defaults** on the settings screen | a suggestion appears with an *apply* button, and the agent has changed no setting |
+| ✅ **1** | **Honest and whole** — no new powers | capability list · claimed-but-not-done flag · every branch in the prompt + `branch` tool · batch `queue` · partial runs reported · `agentEnabled` and its own budget · thread restored on reload · transcript remembers proposals and actions · the read-only test across all of `server/` | every audit finding except "cannot edit" is closed, each with a test |
+| ✅ **2** | **The record, undo, the changes feed** | the action layer · `data/actions.json` (500) · "what it did" from the record · undo one, undo all from one prompt, conflict-checked · the changes panel, goal-done flagged, unseen count in the dateline | a change made by talking can be seen, found later in the feed, and undone |
+| ✅ **3** | **Goals and filing** | create, rename, note, delete, done / not done · file, unfile, move many · "organise the register" acts · accepting a proposal is recorded | "organise the register by theme" files everything in one answer, and *undo all* reverts it |
+| ✅ **4** | **Visions, the brief, the board** | set, confirm, clear visions in bulk · brief instructions · retry parked · read the board | "have the brief lead with what's red" changes every brief after it |
+| ✅ **5** | **The notebook, settings** | the notebook panel · settings readable, suggestions you apply · **reset to defaults** on the settings screen | a suggestion appears with an *apply* button, and the agent has changed no setting |
 | **6** | **Stage 3 stores** | notes, tags, milestones — written by the agent from day one | per Stage 3 in the roadmap |
 | **7** | **Native tool calling** | provider-native tools where `npm run probe` says they work; the JSON protocol stays the floor (D32) | fewer, cheaper round trips on the owner's model |
 
