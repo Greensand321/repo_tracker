@@ -62,7 +62,16 @@ test('the advisor\'s changes go through one door, and no tool can reach a store 
     if (boundary.has(path.split('/').pop()!)) continue;
     const src = code(path);
     const rel = path.slice(ROOT.length);
-    assert.doesNotMatch(src, /from '\.\.\/(goals|vision|settings)\.ts'/, `${rel} imports a store; tools change things only through ctx.act`);
+    assert.doesNotMatch(src, /from '\.\.\/(goals|vision|settings|notebook)\.ts'/, `${rel} imports a store; tools change things only through ctx.act`);
     assert.doesNotMatch(src, /saveSettings|writeJson|writeFileSync/, `${rel} writes directly`);
+  }
+});
+
+test('nothing the agent runs can change a setting — it may only suggest one (Q79)', () => {
+  // The settings route is the owner's; the agent's modules may read settings, never save.
+  for (const dir of ['server/tools', 'server/agent', 'server/advise', 'server/work']) {
+    for (const path of sources(join(ROOT, dir))) {
+      assert.doesNotMatch(code(path), /saveSettings/, `${path.slice(ROOT.length)} saves settings`);
+    }
   }
 });

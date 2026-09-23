@@ -18,6 +18,7 @@
 
 import { randomUUID } from 'node:crypto';
 
+import { coerceTunable, tunable, type TunableKey } from '../../shared/settings.ts';
 import { refKey, type BranchRef, type Settings, type Snapshot } from '../../shared/types.ts';
 import { agentTools } from '../tools/catalog.ts';
 import { contextFor } from '../tools/context.ts';
@@ -35,6 +36,12 @@ export type ProposedGroup = { title: string; branches: BranchRef[] };
 /** One thing an answer changed. `id` is its entry in the record, when it has one. */
 export type AnswerChange = { id: string | null; text: string };
 
+/**
+ * A setting it thinks should change (Q79). Never applied by the agent: the page shows it
+ * with an apply button, and pressing it is the owner changing the setting.
+ */
+export type SettingSuggestion = { setting: TunableKey; label: string; from: number | boolean; to: number | boolean; why: string };
+
 export type Answer = {
   question: string;
   text: string;
@@ -44,6 +51,8 @@ export type Answer = {
   ranking: Ranked[];
   /** A regrouping, when the owner asked to see it first. Nothing is filed until accepted. */
   groups: ProposedGroup[];
+  /** Settings it suggests. Only the owner applies them. */
+  suggestions: SettingSuggestion[];
   /** What it changed, from the action door — never from its own words. */
   changes: AnswerChange[];
   /** It claims a change and none was made. Shown on the page as a warning. */
@@ -92,15 +101,19 @@ ${
 - Asked to change how the brief reads ("lead with what's red", "leave X out"): write it in
   the notebook with remember, for "brief". Every brief follows it from then on, and the
   brief is rewritten with it at once.
-- Asked to remember something: remember it, for "conversation".`
+- Asked to remember something: remember it, for "conversation".
+- Read the settings with the "settings" tool. You cannot change one. If one is holding the
+  owner back, or they ask for one to change, suggest it in "settings" — they apply it.`
     : `- Read anything in the state, and use your tools to read further.
 - Changing things is switched off in the owner's settings. If you are asked to change
-  something, say that it is switched off — do not describe it as done.`
+  something, say that it is switched off — do not describe it as done.
+- Read the settings with the "settings" tool, and suggest a change in "settings" if one
+  is holding the owner back — they apply it.`
 }
 
 WHAT YOU MUST NEVER DO
 - Change anything on GitHub. You can only read it, and must never say you changed it.
-- Change a setting.
+- Change a setting. You may only suggest one, in "settings"; say it is a suggestion.
 - Do anything the owner did not ask for in their latest message.
 - Say you changed, filed, queued, created, deleted or marked anything unless a tool result
   above confirmed it. If you have no tool for what was asked, say so plainly.
@@ -119,8 +132,9 @@ Two kinds of question get an extra field alongside the sentences:
   titled "Unfiled" means leave those out of any goal. Existing goal titles may be reused.
 
 Reply with ONLY a JSON object, no prose around it, no markdown fence:
-{"answer": "...", "ranking": [{"repo": "owner/name", "branch": "...", "why": "..."}], "groups": [{"title": "...", "branches": [{"repo": "owner/name", "branch": "..."}]}]}
-Leave "ranking" and "groups" out, or empty, when the question did not ask for them.`;
+{"answer": "...", "ranking": [{"repo": "owner/name", "branch": "...", "why": "..."}], "groups": [{"title": "...", "branches": [{"repo": "owner/name", "branch": "..."}]}], "settings": [{"setting": "askBranchCap", "to": 120, "why": "..."}]}
+Leave "ranking", "groups" and "settings" out, or empty, when they are not called for.
+"settings" uses the names the settings tool lists, at most three.`;
 }
 
 /** Everything the model is allowed to see, in the fewest tokens that stay unambiguous. */
@@ -234,8 +248,8 @@ export async function ask(
 
   const changes = act?.did() ?? [];
   const parsed = result.unfinished
-    ? { text: unfinishedText(changes.length), ranking: [], groups: [] }
-    : parseAnswer(result.text, snapshot);
+    ? { text: unfinishedText(changes.length), ranking: [], groups: [], suggestions: [] }
+    : parseAnswer(result.text, snapshot, settings);
 
   const answer: Answer = {
     question: text,
@@ -244,7 +258,7 @@ export async function ask(
     changes,
     unbacked: changes.length === 0 && claimsChange(parsed.text),
     unfinished: result.unfinished,
-    looked: result.uses.filter((use) => use.name === 'branch' || use.name === 'what_changed').map((use) => use.name),
+    looked: result.uses.filter((use) => READS.has(use.name)).map((use) => use.name),
     inThread: earlier.length,
     askedAt: new Date().toISOString(),
     sawBranches: threads.length,
@@ -255,7 +269,12 @@ export async function ask(
 
   // Remembered with what it changed and what it proposed, so "yes, do that" and "undo the
   // second one" have something to refer to (finding 2).
-  remember(text, parsed.text, { answer, did: changes.map((c) => c.text), proposed: describeProposal(parsed.groups) });
+  remember(text, parsed.text, {
+    answer,
+    did: changes.map((c) => c.text),
+    proposed: describeProposal(parsed.groups),
+    suggested: parsed.suggestions.map((x) => `${x.label} ${String(x.from)} → ${String(x.to)}`),
+  });
   return answer;
 }
 
@@ -273,18 +292,25 @@ function describeProposal(groups: ProposedGroup[]): string | null {
 
 const MAX_RANKED = 20;
 const MAX_GROUPS = 20;
+const MAX_SUGGESTIONS = 3;
+/** The tools that only read. What it looked at goes under the answer; what it changed is listed apart. */
+const READS = new Set(['branch', 'what_changed', 'board', 'settings']);
 
 /**
  * Reads the reply. Lenient about the wrapper, strict about the contents — and a reply
  * that is not JSON at all is still an answer: a model that ignores the shape has usually
  * still answered the question, and that is worth more than an error.
  */
-export function parseAnswer(raw: string, snapshot: Snapshot): Pick<Answer, 'text' | 'ranking' | 'groups'> {
-  const plain = { text: raw.trim(), ranking: [], groups: [] };
+export function parseAnswer(
+  raw: string,
+  snapshot: Snapshot,
+  current: Settings | null = null,
+): Pick<Answer, 'text' | 'ranking' | 'groups' | 'suggestions'> {
+  const plain = { text: raw.trim(), ranking: [], groups: [], suggestions: [] };
   const json = extractJson(raw);
   if (!json) return plain;
 
-  let parsed: { answer?: unknown; ranking?: unknown; groups?: unknown };
+  let parsed: { answer?: unknown; ranking?: unknown; groups?: unknown; settings?: unknown };
   try {
     parsed = JSON.parse(json) as typeof parsed;
   } catch {
@@ -333,5 +359,25 @@ export function parseAnswer(raw: string, snapshot: Snapshot): Pick<Answer, 'text
     }
   }
 
-  return { text: parsed.answer.trim(), ranking, groups };
+  return { text: parsed.answer.trim(), ranking, groups, suggestions: current ? suggestionsFrom(parsed.settings, current) : [] };
+}
+
+/**
+ * Its suggestions, checked against the one table of tunables: a name it made up, a secret,
+ * the model or the repos are dropped; a value is clamped into range; and a suggestion to
+ * set what is already set is no suggestion.
+ */
+function suggestionsFrom(raw: unknown, current: Settings): SettingSuggestion[] {
+  const out: SettingSuggestion[] = [];
+  for (const row of Array.isArray(raw) ? raw : []) {
+    const item = row as { setting?: unknown; to?: unknown; why?: unknown } | null;
+    const t = typeof item?.setting === 'string' ? tunable(item.setting.trim()) : null;
+    if (!t || out.some((x) => x.setting === t.key)) continue;
+    const to = coerceTunable(t, item?.to);
+    const from = current[t.key];
+    if (to === null || to === from) continue;
+    out.push({ setting: t.key, label: t.label, from, to, why: typeof item?.why === 'string' ? item.why.trim().slice(0, 300) : '' });
+    if (out.length === MAX_SUGGESTIONS) break;
+  }
+  return out;
 }

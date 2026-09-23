@@ -58,6 +58,11 @@
         <div id="changes"></div>
       </div>
 
+      <div class="stand hidden" id="notebookStand">
+        <h3 title="What you told the advisor to keep knowing. It adds only when you say so.">Notebook <span class="n" id="notebookCount"></span></h3>
+        <div id="notebook"></div>
+      </div>
+
       <div class="stand">
         <h3>The floor <span class="n" id="floorCount"></span></h3>
         <div id="floor"></div>
@@ -272,6 +277,8 @@
     <div class="actions">
       <button class="btn primary" id="saveSettings">Save and read again</button>
       <button class="btn" id="closeSettings">Close</button>
+      <button class="btn reset" id="resetSettings" title="Every number and switch back to its default. The token, key, repos, provider and model stay as they are. Nothing changes until you save.">Reset to defaults</button>
+      <span class="settings-note" id="settingsNote"></span>
     </div>
   </div>
 </div>

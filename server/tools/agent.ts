@@ -7,7 +7,8 @@
  * rest and says which were not found, rather than failing the whole call.
  */
 
-import type { Branch } from '../../shared/types.ts';
+import { TUNABLES } from '../../shared/settings.ts';
+import { DEFAULT_SETTINGS, type Branch } from '../../shared/types.ts';
 import { describeBranch } from '../advise/describe.ts';
 import type { ActResult, Tool, ToolContext } from './types.ts';
 import { str, ToolError } from './types.ts';
@@ -294,5 +295,26 @@ export const retryParked: Tool = {
     const list = Array.isArray(raw) ? raw.filter((j): j is string => typeof j === 'string') : typeof raw === 'string' ? [raw] : [];
     if (list.length === 0) throw new ToolError('name the parked jobs by id, or say ["all"]');
     return report(door(ctx).retry(list.some((j) => j.toLowerCase() === 'all') ? 'all' : list), []);
+  },
+};
+
+/**
+ * Every setting, read only (Q79). The context carries SafeSettings, so the token and the
+ * key are not here to leak — only whether each is set.
+ */
+export const readSettings: Tool = {
+  name: 'settings',
+  description:
+    'Every setting: its name, value, default, range and what it does. Read only — you cannot change one; suggest a change in "settings" and the owner applies it. Free.',
+  cost: 'free',
+  args: [],
+  run(_args, ctx) {
+    const s = ctx.settings;
+    return [
+      `Model ${s.llmModel || 'none chosen'} at ${s.llmBaseUrl} · GitHub token ${s.hasToken ? 'set' : 'missing'} · model key ${s.hasLlmKey ? 'set' : 'missing'} (neither can be suggested)`,
+      `Repos (${s.repos.length}): ${s.repos.join(', ') || 'none'}`,
+      ...TUNABLES.map((t) =>
+        `  ${t.key} = ${String(s[t.key])} (default ${String(DEFAULT_SETTINGS[t.key])}${t.type === 'number' ? `, ${t.min}–${t.max}` : ', true or false'}) · ${t.label} · ${t.about}`),
+    ].join('\n');
   },
 };

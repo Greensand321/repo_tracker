@@ -38,10 +38,12 @@ export type Turn = {
   at: number;
   did: string[];
   proposed: string | null;
+  /** Settings it suggested. Only the owner can apply them, so a follow-up is told so. */
+  suggested: string[];
   shown: Answer | null;
 };
 
-export type TurnExtras = { answer?: Answer; did?: string[]; proposed?: string | null };
+export type TurnExtras = { answer?: Answer; did?: string[]; proposed?: string | null; suggested?: string[] };
 
 /**
  * How many exchanges are carried. Six is enough for a real back-and-forth and still small
@@ -88,6 +90,7 @@ export function remember(question: string, answer: string, extras: TurnExtras = 
     at: now,
     did: (extras.did ?? []).slice(0, 40),
     proposed: extras.proposed ?? null,
+    suggested: (extras.suggested ?? []).slice(0, 3),
     shown: extras.answer ?? null,
   });
   if (turns.length > MAX_TURNS) turns = turns.slice(-MAX_TURNS);
@@ -128,6 +131,9 @@ export function transcript(list: Turn[]): string {
       `You answered: ${turn.answer}`,
       ...(turn.did.length > 0 ? [`You changed: ${turn.did.join('; ')}`] : []),
       ...(turn.proposed ? [`You proposed filing, not yet done: ${turn.proposed}`] : []),
+      ...(turn.suggested.length > 0
+        ? [`You suggested settings, which only the owner can apply: ${turn.suggested.join('; ')}`]
+        : []),
     ].join('\n'),
   );
   return [

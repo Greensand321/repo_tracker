@@ -6,7 +6,7 @@
  * summary: literal branch names, ahead/behind, age, nothing else. No diffstats.
  */
 
-import type { Branch, Change, Snapshot } from '../../shared/types.ts';
+import type { Branch, Change, Note, Snapshot } from '../../shared/types.ts';
 import { elapsed, esc, plural, relativeTime } from '../format.ts';
 import {
   dotClass,
@@ -337,5 +337,27 @@ function changeRow(change: Change, now: Date): string {
     </span>
     <span class="cclock">${esc(relativeTime(change.at, now))}</span>
     ${state}
+  </div>`;
+}
+
+/**
+ * The notebook: what the owner told the agent to keep knowing (plans/agent-autonomy.md §5).
+ * It adds only when told to; the owner removes from here. A brief instruction says so,
+ * because removing one rewrites the brief.
+ */
+export function renderNotebook(snapshot: Snapshot, now = new Date()): string {
+  return (snapshot.notes ?? []).map((note) => noteRow(note, now)).join('');
+}
+
+function noteRow(note: Note, now: Date): string {
+  const brief = note.kind === 'brief';
+  return `<div class="crow note">
+    <span class="cglyph">${brief ? '&#9998;' : '&#8226;'}</span>
+    <span class="cbody">
+      <span class="ctext">${esc(note.text)}</span>
+      <span class="cmeta">${brief ? 'every brief follows this' : 'it keeps this in mind'}</span>
+    </span>
+    <span class="cclock">${esc(relativeTime(note.at, now))}</span>
+    <button class="cundo" data-remove-note="${esc(note.id)}" title="${brief ? 'Remove it — the brief is written again without it' : 'Remove it'}">remove</button>
   </div>`;
 }

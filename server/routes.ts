@@ -17,7 +17,9 @@ import { LlmError, fetchModelsRaw, listModels } from './advise/client.ts';
 import { GitHubError, splitRepoKey, verifyToken } from './github.ts';
 import { GoalError, assignBranch, createGoal, deleteGoal, listGoals, updateGoal } from './goals.ts';
 import { VisionError, clearVision, confirmVision, setVision } from './vision.ts';
+import { removeNote } from './notebook.ts';
 import { loadSettings, saveSettings, toSafe } from './settings.ts';
+import { TUNABLES, type TunableKey } from '../shared/settings.ts';
 import { resetBoardState } from './work/run.ts';
 import {
   currentResponse,
@@ -79,34 +81,17 @@ api.put('/settings', async (c) => {
     patch.token = token;
   }
 
-  for (const key of [
-    'refreshSeconds',
-    'quietAfterDays',
-    'commitsPerBranch',
-    'llmMaxPerRun',
-    'llmReplyTokens',
-    'llmTimeoutSeconds',
-    'askBranchCap',
-    'maxOpenQuestions',
-    'briefEveryMinutes',
-    'advisorMemoryMinutes',
-    'agentCallsPerQuestion',
-    'agentSeconds',
-    'agentHistory',
-    'workers',
-    'dispatchWorkers',
-    'toolCallsPerJob',
-    'toolSeconds',
-  ] as const) {
-    if (body[key] !== undefined) patch[key] = Number(body[key]);
+  // Exactly the tunables, typed as the table says: a number where it is a number, and a
+  // switch only when it really is true or false.
+  const tuned = patch as Record<TunableKey, number | boolean>;
+  for (const t of TUNABLES) {
+    const value = (body as Record<string, unknown>)[t.key];
+    if (t.type === 'number' && value !== undefined) tuned[t.key] = Number(value);
+    if (t.type === 'boolean' && typeof value === 'boolean') tuned[t.key] = value;
   }
   for (const key of ['llmBaseUrl', 'llmModel'] as const) {
     if (typeof body[key] === 'string') patch[key] = body[key];
   }
-  if (typeof body.llmEnabled === 'boolean') patch.llmEnabled = body.llmEnabled;
-  if (typeof body.visionAutoDraft === 'boolean') patch.visionAutoDraft = body.visionAutoDraft;
-  if (typeof body.toolsEnabled === 'boolean') patch.toolsEnabled = body.toolsEnabled;
-  if (typeof body.agentEnabled === 'boolean') patch.agentEnabled = body.agentEnabled;
   if (typeof body.llmApiKey === 'string' && body.llmApiKey.trim()) {
     patch.llmApiKey = body.llmApiKey.trim();
   }
@@ -381,6 +366,19 @@ api.post('/changes/seen', async (c) => {
 api.delete('/ask', (c) => {
   forget();
   return c.json({ ok: true });
+});
+
+/**
+ * The owner taking a note out of the notebook from the panel (plans/agent-autonomy.md §5).
+ * The owner's own edit, so it is not in the agent's record — like editing a goal by hand.
+ */
+api.delete('/notes/:id', (c) => {
+  const note = removeNote(c.req.param('id'));
+  if (!note) return c.json({ error: 'no such note' }, 404);
+  reapplyAll();
+  // The brief stops following an instruction the moment it is gone, not on the next cycle.
+  if (note.kind === 'brief') dispatchWork('brief', { kind: 'fleet' });
+  return c.json({ removed: note });
 });
 
 /**

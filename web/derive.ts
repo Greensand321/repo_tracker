@@ -213,6 +213,8 @@ export const toolLabel = (name: string): string =>
     commit_files: 'reading what a commit touched',
     queue: 'starting work',
     branch: 'reading a branch in full',
+    board: 'reading the board',
+    settings: 'reading the settings',
   })[name] ?? `using ${name}`;
 
 /**

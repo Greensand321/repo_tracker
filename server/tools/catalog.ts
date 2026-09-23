@@ -25,6 +25,7 @@ import {
   forgetNote,
   queueWork,
   readBoard,
+  readSettings,
   rememberNote,
   retryParked,
   setVision,
@@ -75,7 +76,7 @@ export function toolsFor(kind: JobKind, settings: Settings): Tool[] {
  */
 export function agentTools(settings: Settings): Tool[] {
   if (settings.agentCallsPerQuestion <= 0) return [];
-  const reads = [branchDetail, whatChanged, readBoard];
+  const reads = [branchDetail, whatChanged, readBoard, readSettings];
   if (!settings.agentEnabled) return reads;
   return [
     ...reads,

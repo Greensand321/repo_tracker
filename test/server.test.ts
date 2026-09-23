@@ -20,7 +20,7 @@ const gh = {
   failRepo: false,
   featureSha: 'bbb1111bbb1111',
 };
-const provider = { slow: 0, deskReplies: [] as string[], calls: 0 };
+const provider = { slow: 0, deskReplies: [] as string[], calls: 0, briefs: 0 };
 let fresh: string | null = null;
 
 const json = (body: unknown, status = 200) =>
@@ -44,6 +44,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   if (provider.slow) await new Promise((r) => setTimeout(r, provider.slow));
   const body = String(init?.body ?? '');
   let content: string;
+  if (body.includes('You are a personal assistant')) provider.briefs++;
   if (body.includes('You are a personal assistant')) content = JSON.stringify({ brief: 'All quiet.', goals: [], overtaken: [] });
   else if (body.includes('You are the agent inside Bearing')) content = provider.deskReplies.shift() ?? JSON.stringify({ answer: 'Nothing to say.' });
   else if (body.includes('propose what it is FOR')) content = JSON.stringify({ vision: null, why: 'too thin' });
@@ -137,4 +138,34 @@ test('a run that outlives its read hands its results to the read on screen', asy
   provider.slow = 0;
   await until(idle, 'quiet');
   state.stopPolling();
+});
+
+test('the settings route takes every tunable in the table, clamped — including the one it used to drop', async () => {
+  const res = await routes.api.request('/settings', {
+    method: 'PUT', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ nowLineWords: 9, askBranchCap: 9999, agentEnabled: false, llmTimeoutSeconds: 90, toolsEnabled: 'yes' }),
+  });
+  const saved = await res.json() as Record<string, unknown>;
+  assert.equal(res.status, 200, JSON.stringify(saved));
+  assert.equal(saved['nowLineWords'], 9, 'the form always sent it; the route used to drop it');
+  assert.equal(saved['askBranchCap'], 400);
+  assert.equal(saved['agentEnabled'], false);
+  assert.equal(saved['llmTimeoutSeconds'], 90);
+  assert.equal(saved['toolsEnabled'], true, 'a switch changes only on a real true or false');
+  assert.ok(!('token' in saved) && !('llmApiKey' in saved), 'no secret crosses to the page');
+  await until(idle, 'the read a save starts');
+  state.stopPolling();
+});
+
+test('the owner removes a note from the panel, and the brief is written again without it', async () => {
+  const notebook = await import('../server/notebook.ts');
+  const note = notebook.addNote('brief', 'Lead with anything red');
+  const before = provider.briefs;
+  const res = await routes.api.request(`/notes/${note.id}`, { method: 'DELETE' });
+  assert.equal(res.status, 200);
+  assert.deepEqual(notebook.listNotes(), []);
+  assert.deepEqual(state.currentResponse().snapshot!.notes, [], 'off the page at once');
+  await until(() => provider.briefs > before, 'the brief rewritten');
+  assert.equal((await routes.api.request(`/notes/${note.id}`, { method: 'DELETE' })).status, 404);
+  await until(idle, 'quiet');
 });

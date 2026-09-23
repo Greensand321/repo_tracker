@@ -8,12 +8,13 @@
  */
 
 import type { Answer } from '../server/advise/ask.ts';
-import type { BranchRef, Goal, SafeSettings, SnapshotResponse } from '../shared/types.ts';
+import { TUNABLES, type TunableKey } from '../shared/settings.ts';
+import { DEFAULT_SETTINGS, type BranchRef, type Goal, type SafeSettings, type SnapshotResponse } from '../shared/types.ts';
 import { createPicker, type Picker } from './components/picker.ts';
 import { floor, tallies, threads, toolLabel } from './derive.ts';
 import { clockTime, countdown, esc, exactTime, plural, relativeTime } from './format.ts';
 import { branchKey, parseBranchKey, renderBrief, renderLeaderList, renderNow, type Grouping } from './views/leader.ts';
-import { renderChanges, renderConditions, renderFloor, renderNotices, renderQuestions, renderRegister } from './views/side.ts';
+import { renderChanges, renderConditions, renderFloor, renderNotebook, renderNotices, renderQuestions, renderRegister } from './views/side.ts';
 
 type Asked = {
   question: string;
@@ -39,6 +40,14 @@ const state = {
   agentEnabled: true,
   /** Changes undone from this page, for answers older than the feed's window. */
   undone: new Set<string>(),
+  /** Setting suggestions the owner applied, as `turn:setting`. */
+  applied: new Set<string>(),
+  /**
+   * Defaults for tunables the settings screen has no field for, filled by "reset to
+   * defaults" and sent with the next save — so reset means every tunable, not just the
+   * ones on screen. Cleared whenever the screen opens.
+   */
+  resetHidden: {} as Partial<Record<TunableKey, number | boolean>>,
   /** The word budget for the "happening now" line. Read from settings (D91). */
   lineWords: 12,
   /** Proposals from a paragraph, awaiting confirmation. Nothing is written until then. */
@@ -197,6 +206,12 @@ function draw(): void {
   $('#changes').innerHTML = renderChanges(snapshot);
   $('#changesCount').textContent = feed && feed.unseen > 0 ? `${feed.unseen} new` : '';
   $('#changesSeen').classList.toggle('hidden', !feed || feed.unseen === 0);
+
+  // What it has been told to keep knowing. Hidden while empty; removable from here (§5).
+  const notes = snapshot.notes ?? [];
+  $('#notebookStand').classList.toggle('hidden', notes.length === 0);
+  $('#notebook').innerHTML = renderNotebook(snapshot);
+  $('#notebookCount').textContent = notes.length > 0 ? String(notes.length) : '';
   $('#conditions').innerHTML = renderConditions(snapshot);
   $('#notices').innerHTML = renderNotices(snapshot, { error: data?.error ?? null });
 
@@ -351,7 +366,9 @@ function renderAnswers(): void {
           : `<div class="a">${esc(item.answer?.text ?? '')}</div>`;
       const answer = !item.pending ? item.answer : null;
       return `<div class="answer"><div class="q">${esc(item.question)}</div>${body}${
-        answer ? renderRanking(answer) + renderGroups(answer, item, index) + renderStarted(answer) + renderProv(answer) : ''
+        answer
+          ? renderRanking(answer) + renderGroups(answer, item, index) + renderStarted(answer) + renderSuggestions(answer) + renderProv(answer)
+          : ''
       }</div>`;
     })
     .join('');
@@ -395,7 +412,6 @@ function renderGroups(answer: Answer, item: Asked, index: number): string {
   return `<div class="groups"><div class="eyebrow">I would file them as</div>${list}${acts}</div>`;
 }
 
-/** Work it set going. It lands on the floor and on the page, not in this answer. */
 /**
  * What it changed, from the action door — never from its words (audit finding 1). And the
  * two things the owner must not miss: it claimed a change that was not made, or it ran out
@@ -428,6 +444,61 @@ function renderStarted(answer: Answer): string {
     out.push(`<div class="started">${rows.join('')}${all}</div>`);
   }
   return out.join('');
+}
+
+/**
+ * Settings it suggests (Q79). It cannot change one; the apply button is the owner changing
+ * it, through the same route as the settings screen.
+ */
+function renderSuggestions(answer: Answer): string {
+  const list = answer.suggestions ?? [];
+  if (list.length === 0) return '';
+  const rows = list.map((x) => {
+    const done = state.applied.has(`${answer.turn}:${x.setting}`);
+    const shown = (v: number | boolean): string => (typeof v === 'boolean' ? (v ? 'on' : 'off') : String(v));
+    return `<div class="suggest-row">
+      <span class="slabel">${esc(x.label)}</span>
+      <span class="mono">${esc(shown(x.from))} → ${esc(shown(x.to))}</span>
+      ${done
+        ? '<span class="cstate">applied</span>'
+        : `<button class="q-btn yes" data-apply="${esc(answer.turn)}" data-setting="${esc(x.setting)}" data-to="${esc(String(x.to))}">apply</button>`}
+      ${x.why ? `<div class="why">${esc(x.why)}</div>` : ''}
+    </div>`;
+  });
+  return `<div class="groups suggest"><div class="eyebrow">It suggests — only you change settings</div>${rows.join('')}</div>`;
+}
+
+/** The owner applying one suggestion. A PUT like the settings screen's, of one key. */
+async function applySuggestion(turn: string, setting: string, raw: string): Promise<void> {
+  const t = TUNABLES.find((x) => x.key === setting);
+  if (!t) return;
+  const value = t.type === 'boolean' ? raw === 'true' : Number(raw);
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ [t.key]: value }),
+    });
+    const payload = (await res.json()) as SafeSettings & { error?: string };
+    if (!res.ok) throw new Error(payload.error ?? 'could not save');
+    state.applied.add(`${turn}:${setting}`);
+    readPageSettings(payload);
+    renderAnswers();
+    await loadSnapshot();
+  } catch (err) {
+    showFailure('Could not apply that setting:', err);
+  }
+}
+
+/** Take a note out of the notebook — the owner's own edit, not the agent's. */
+async function removeNote(id: string): Promise<void> {
+  try {
+    const res = await fetch(`/api/notes/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 404) throw new Error(`the server said ${res.status}`);
+    await loadSnapshot();
+  } catch (err) {
+    showFailure('Could not remove that note:', err);
+  }
 }
 
 /** Take one change back. A refusal says why — usually that it was changed again since. */
@@ -936,6 +1007,30 @@ function applyProviderChoice(): void {
       : 'Pay as you go. Needs a balance on your Zen account.';
 }
 
+/** The settings the page itself draws with. */
+function readPageSettings(settings: SafeSettings): void {
+  state.maxQuestions = settings.maxOpenQuestions;
+  state.lineWords = settings.nowLineWords;
+  state.agentEnabled = settings.agentEnabled;
+}
+
+/**
+ * Every tunable back to its default, on screen only — nothing is saved until Save (Q79).
+ * The token, the key, the repos, the provider and the model are not tunables and are left
+ * exactly as they are.
+ */
+function resetSettingsForm(): void {
+  state.resetHidden = {};
+  for (const t of TUNABLES) {
+    const value = DEFAULT_SETTINGS[t.key];
+    const field = document.getElementById(t.key) as HTMLInputElement | null;
+    if (!field) state.resetHidden[t.key] = value;
+    else if (t.type === 'boolean') field.checked = Boolean(value);
+    else field.value = String(value);
+  }
+  $('#settingsNote').textContent = 'Defaults filled in. Nothing changes until you save.';
+}
+
 async function openSettings(): Promise<void> {
   try {
     const settings = (await (await fetch('/api/settings')).json()) as SafeSettings;
@@ -955,9 +1050,9 @@ async function openSettings(): Promise<void> {
     $<HTMLInputElement>('#toolCallsPerJob').value = String(settings.toolCallsPerJob);
     $<HTMLInputElement>('#toolsEnabled').checked = settings.toolsEnabled;
     $<HTMLInputElement>('#visionAutoDraft').checked = settings.visionAutoDraft;
-    state.maxQuestions = settings.maxOpenQuestions;
-    state.lineWords = settings.nowLineWords;
-    state.agentEnabled = settings.agentEnabled;
+    readPageSettings(settings);
+    state.resetHidden = {};
+    $('#settingsNote').textContent = '';
     $<HTMLInputElement>('#agentEnabled').checked = settings.agentEnabled;
     $<HTMLInputElement>('#agentCallsPerQuestion').value = String(settings.agentCallsPerQuestion);
     $<HTMLInputElement>('#token').value = '';
@@ -1019,6 +1114,8 @@ async function saveSettings(): Promise<void> {
       llmBaseUrl: $<HTMLInputElement>('#llmBaseUrl').value.trim(),
       llmModel: ensureModelPicker().getValue(),
     };
+    // Tunables with no field here, reset to their defaults on this screen.
+    Object.assign(body, state.resetHidden);
     const token = $<HTMLInputElement>('#token').value.trim();
     if (token) body['token'] = token;
     const key = $<HTMLInputElement>('#llmApiKey').value.trim();
@@ -1034,6 +1131,8 @@ async function saveSettings(): Promise<void> {
       errEl.textContent = payload.error ?? 'could not save';
       return;
     }
+    state.resetHidden = {};
+    readPageSettings((await res.json()) as SafeSettings);
     $('#settingsSheet').classList.add('hidden');
     await loadSnapshot();
   } catch (err) {
@@ -1095,6 +1194,13 @@ function wire(): void {
     const undoTurnBtn = target.closest<HTMLElement>('[data-undo-turn]');
     if (undoTurnBtn) { void undoAll(undoTurnBtn.dataset['undoTurn'] ?? ''); return; }
     if (target.closest('#changesSeen')) { void markChangesSeen(); return; }
+    const apply = target.closest<HTMLElement>('[data-apply]');
+    if (apply) {
+      void applySuggestion(apply.dataset['apply'] ?? '', apply.dataset['setting'] ?? '', apply.dataset['to'] ?? '');
+      return;
+    }
+    const noteBtn = target.closest<HTMLElement>('[data-remove-note]');
+    if (noteBtn) { void removeNote(noteBtn.dataset['removeNote'] ?? ''); return; }
     const jump = target.closest<HTMLElement>('[data-jump]');
     if (jump) {
       document.getElementById(jump.dataset['jump'] ?? '')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1228,6 +1334,7 @@ function wire(): void {
   on('#openSettings', 'click', () => void openSettings());
   on('#closeSettings', 'click', () => $('#settingsSheet').classList.add('hidden'));
   on('#saveSettings', 'click', () => void saveSettings());
+  on('#resetSettings', 'click', () => resetSettingsForm());
   on('#llmProvider', 'change', () => applyProviderChoice());
   on('#loadModels', 'click', (event) => {
     event.preventDefault();
@@ -1247,11 +1354,7 @@ wire();
 // never briefly wrong.
 void fetch('/api/settings')
   .then((res) => res.json())
-  .then((settings: SafeSettings) => {
-    state.maxQuestions = settings.maxOpenQuestions;
-    state.lineWords = settings.nowLineWords;
-    state.agentEnabled = settings.agentEnabled;
-  })
+  .then((settings: SafeSettings) => readPageSettings(settings))
   .catch(() => {
     /* the default stands; the snapshot load will report if the program is not running */
   })
