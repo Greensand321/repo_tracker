@@ -37,11 +37,33 @@ export type ActResult = { done: string[]; refused: string[] };
  * Every method is a change to Plane B. There is no method, here or anywhere a tool can
  * reach, that writes to GitHub.
  */
+export type GoalPatch = { title?: string; note?: string; milestone?: string; done?: boolean };
+
 export type AgentActions = {
   /** Put work on the board for these branches. Slow work goes here rather than blocking. */
   queue(kind: 'summarise' | 'assess' | 'draft-vision', branches: Branch[]): ActResult;
   /** Rewrite the brief now, whatever its interval says. */
   queueBrief(): ActResult;
+  /** A new goal. Refused when one of that title already exists. */
+  createGoal(title: string, note?: string, milestone?: string): ActResult;
+  /** Rename, re-note, re-label, or mark done / not done. The goal by id or exact title. */
+  updateGoal(goal: string, patch: GoalPatch): ActResult;
+  /** Delete a goal. Its branches become unfiled; undo puts it all back. */
+  deleteGoal(goal: string): ActResult;
+  /** File branches under a goal, by id or title — a title nobody has used makes a new goal. */
+  file(goal: string, branches: Branch[]): ActResult;
+  /** Take branches out of whatever goal holds them. */
+  unfile(branches: Branch[]): ActResult;
+  /**
+   * Say what branches are for. `yours` only when the owner stated the purpose in this
+   * conversation; otherwise it is written as a guess, marked, never as the owner's intent
+   * (D61) — and a guess never replaces the owner's own words.
+   */
+  setVision(items: { branch: Branch; text: string; yours: boolean }[]): ActResult;
+  /** Accept guesses as they stand. */
+  confirmVision(branches: Branch[]): ActResult;
+  /** "Nobody has said" — a real answer, and better than a vision nobody believes. */
+  clearVision(branches: Branch[]): ActResult;
 };
 
 /**

@@ -146,6 +146,34 @@ export function assignBranch(ref: BranchRef, goalId: string | null): Goal[] {
   return goals;
 }
 
+/** One goal by id, or null. */
+export function getGoal(id: string): Goal | null {
+  const goal = load().find((g) => g.id === id);
+  return goal ? { ...goal, branches: [...goal.branches] } : null;
+}
+
+/** The goal a branch is filed under, or null when it is unfiled. */
+export function goalOf(ref: BranchRef): string | null {
+  const key = refKey(ref.repoKey, ref.branch);
+  return load().find((g) => g.branches.some((b) => refKey(b.repoKey, b.branch) === key))?.id ?? null;
+}
+
+/**
+ * Put a deleted goal back exactly as it was — same id, so everything that referred to it
+ * still does. Only its branches that are still unfiled rejoin it: one filed elsewhere since
+ * stays where the later decision put it. Used by undo, never by the agent directly.
+ */
+export function restoreGoal(goal: Goal): { goal: Goal; skipped: BranchRef[] } {
+  const goals = load();
+  if (goals.some((g) => g.id === goal.id)) throw new GoalError('that goal already exists');
+  const filed = new Set(goals.flatMap((g) => g.branches.map((b) => refKey(b.repoKey, b.branch))));
+  const back = goal.branches.filter((b) => !filed.has(refKey(b.repoKey, b.branch)));
+  const skipped = goal.branches.filter((b) => filed.has(refKey(b.repoKey, b.branch)));
+  const restored: Goal = { ...goal, branches: back, judgement: null, updatedAt: new Date().toISOString() };
+  persist([...goals, restored]);
+  return { goal: restored, skipped };
+}
+
 /**
  * File branches the way a proposal says, in one go.
  *

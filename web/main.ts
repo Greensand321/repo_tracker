@@ -13,7 +13,7 @@ import { createPicker, type Picker } from './components/picker.ts';
 import { floor, tallies, threads, toolLabel } from './derive.ts';
 import { clockTime, countdown, esc, exactTime, plural, relativeTime } from './format.ts';
 import { branchKey, parseBranchKey, renderBrief, renderLeaderList, renderNow, type Grouping } from './views/leader.ts';
-import { renderConditions, renderFloor, renderNotices, renderQuestions, renderRegister } from './views/side.ts';
+import { renderChanges, renderConditions, renderFloor, renderNotices, renderQuestions, renderRegister } from './views/side.ts';
 
 type Asked = {
   question: string;
@@ -37,6 +37,8 @@ const state = {
   maxQuestions: 3,
   /** Whether the advisor may change things. Read from settings, for the hint under the box. */
   agentEnabled: true,
+  /** Changes undone from this page, for answers older than the feed's window. */
+  undone: new Set<string>(),
   /** The word budget for the "happening now" line. Read from settings (D91). */
   lineWords: 12,
   /** Proposals from a paragraph, awaiting confirmation. Nothing is written until then. */
@@ -188,6 +190,13 @@ function draw(): void {
   $('#registerCount').textContent = String(t.branches);
   $('#register').innerHTML = renderRegister(snapshot, state.search, state.filing);
   $('#questions').innerHTML = renderQuestions(snapshot, state.maxQuestions);
+
+  // What the agent changed. Hidden until it has changed something, then always there.
+  const feed = snapshot.changes;
+  $('#changesStand').classList.toggle('hidden', !feed || feed.recent.length === 0);
+  $('#changes').innerHTML = renderChanges(snapshot);
+  $('#changesCount').textContent = feed && feed.unseen > 0 ? `${feed.unseen} new` : '';
+  $('#changesSeen').classList.toggle('hidden', !feed || feed.unseen === 0);
   $('#conditions').innerHTML = renderConditions(snapshot);
   $('#notices').innerHTML = renderNotices(snapshot, { error: data?.error ?? null });
 
@@ -243,6 +252,16 @@ function renderDateline(data: SnapshotResponse | null): void {
       bits.push(
         `<span class="good">${board.finished.length === 1 ? 'what you asked for is done' : `${board.finished.length} things you asked for are done`}</span>`,
       );
+    }
+    // A goal the agent marked done, named on the one line always in view until it is seen
+    // (Q78). Anything else it changed is a quieter count beside it.
+    const feed = snapshot.changes;
+    if (feed && feed.goalsDone > 0) {
+      bits.push(
+        `<button class="flagged" data-jump="changesStand">the agent marked ${feed.goalsDone === 1 ? 'a goal' : `${feed.goalsDone} goals`} done — check</button>`,
+      );
+    } else if (feed && feed.unseen > 0) {
+      bits.push(`<button data-jump="changesStand">${feed.unseen} ${feed.unseen === 1 ? 'change' : 'changes'} by the agent</button>`);
     }
   }
 
@@ -388,9 +407,67 @@ function renderStarted(answer: Answer): string {
     out.push(`<div class="a-warn">It says it changed something, but nothing was changed.</div>`);
   }
   if (answer.changes.length > 0) {
-    out.push(`<div class="started">${answer.changes.map((c) => `<div>&#9670; ${esc(c.text)}</div>`).join('')}</div>`);
+    // The feed on the snapshot knows which have been undone since; an answer older than
+    // the feed's window falls back to what the page itself undid.
+    const known = new Map((state.data?.snapshot?.changes?.recent ?? []).map((c) => [c.id, c] as const));
+    const rows = answer.changes.map((c) => {
+      const live = c.id ? known.get(c.id) : undefined;
+      const undone = Boolean(live?.undone) || (c.id !== null && state.undone.has(c.id));
+      const canUndo = c.id !== null && !undone && (live ? live.undoable : true);
+      const mark = undone ? ' <span class="cstate">undone</span>' : canUndo ? ` <button class="cundo" data-undo="${esc(c.id!)}">undo</button>` : '';
+      return `<div class="${undone ? 'gone' : ''}">&#9670; ${esc(c.text)}${mark}</div>`;
+    });
+    const open = answer.changes.filter((c) => {
+      const live = c.id ? known.get(c.id) : undefined;
+      return c.id !== null && !(live?.undone || state.undone.has(c.id)) && (live ? live.undoable : true);
+    });
+    // Everything this one prompt changed, taken back at once (Q81).
+    const all = open.length > 1
+      ? `<div class="undo-all"><button class="cundo" data-undo-turn="${esc(answer.turn)}">undo all ${open.length}</button></div>`
+      : '';
+    out.push(`<div class="started">${rows.join('')}${all}</div>`);
   }
   return out.join('');
+}
+
+/** Take one change back. A refusal says why — usually that it was changed again since. */
+async function undoOne(id: string): Promise<void> {
+  try {
+    const res = await fetch(`/api/changes/${encodeURIComponent(id)}/undo`, { method: 'POST' });
+    const result = (await res.json()) as { ok: boolean; text: string };
+    if (result.ok) state.undone.add(id);
+    else window.alert(`Not undone: ${result.text}`);
+    await loadSnapshot();
+  } catch (err) {
+    showFailure('Could not undo that:', err);
+  }
+}
+
+/** Everything one prompt changed. What could not be undone is listed, not hidden. */
+async function undoAll(turn: string): Promise<void> {
+  try {
+    const res = await fetch('/api/changes/undo-turn', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ turn }),
+    });
+    const { results } = (await res.json()) as { results: { id: string; ok: boolean; text: string }[] };
+    for (const r of results) if (r.ok) state.undone.add(r.id);
+    const refused = results.filter((r) => !r.ok);
+    if (refused.length > 0) window.alert(`Not undone:\n${refused.map((r) => `· ${r.text}`).join('\n')}`);
+    await loadSnapshot();
+  } catch (err) {
+    showFailure('Could not undo those:', err);
+  }
+}
+
+async function markChangesSeen(): Promise<void> {
+  try {
+    await fetch('/api/changes/seen', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    await loadSnapshot();
+  } catch (err) {
+    showFailure('Could not mark those seen:', err);
+  }
 }
 
 function renderProv(answer: Answer): string {
@@ -428,10 +505,13 @@ async function acceptGroups(index: number): Promise<void> {
     const res = await fetch('/api/goals/regroup', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ groups: item.answer.groups }),
+      // Under the answer that proposed it, so "undo all" on that answer takes it back.
+      body: JSON.stringify({ groups: item.answer.groups, turn: item.answer.turn }),
     });
-    if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'could not file them');
+    const payload = (await res.json()) as { error?: string; changes?: Answer['changes'] };
+    if (!res.ok) throw new Error(payload.error ?? 'could not file them');
     item.filed = 'done';
+    item.answer.changes = [...item.answer.changes, ...(payload.changes ?? [])];
     await loadSnapshot();
   } catch (err) {
     item.filed = 'offered';
@@ -1009,6 +1089,17 @@ function wire(): void {
 
     const retry = target.closest<HTMLElement>('[data-retry]');
     if (retry) { void retryJob(retry.dataset['retry'] ?? ''); return; }
+
+    const undoBtn = target.closest<HTMLElement>('[data-undo]');
+    if (undoBtn) { void undoOne(undoBtn.dataset['undo'] ?? ''); return; }
+    const undoTurnBtn = target.closest<HTMLElement>('[data-undo-turn]');
+    if (undoTurnBtn) { void undoAll(undoTurnBtn.dataset['undoTurn'] ?? ''); return; }
+    if (target.closest('#changesSeen')) { void markChangesSeen(); return; }
+    const jump = target.closest<HTMLElement>('[data-jump]');
+    if (jump) {
+      document.getElementById(jump.dataset['jump'] ?? '')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
 
     const regroup = target.closest<HTMLElement>('[data-regroup]');
     if (regroup) { void acceptGroups(Number(regroup.dataset['regroup'])); return; }

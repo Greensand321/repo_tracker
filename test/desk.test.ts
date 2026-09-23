@@ -24,6 +24,8 @@ let actions: typeof import('../server/agent/actions.ts');
 let goals: typeof import('../server/goals.ts');
 let thread: typeof import('../server/advise/conversation.ts');
 let types: typeof import('../server/tools/types.ts');
+let record: typeof import('../server/agent/record.ts');
+let visions: typeof import('../server/vision.ts');
 
 before(async () => {
   desk = await import('../server/advise/ask.ts');
@@ -32,6 +34,8 @@ before(async () => {
   goals = await import('../server/goals.ts');
   thread = await import('../server/advise/conversation.ts');
   types = await import('../server/tools/types.ts');
+  record = await import('../server/agent/record.ts');
+  visions = await import('../server/vision.ts');
 });
 
 const realFetch = globalThis.fetch;
@@ -39,6 +43,8 @@ afterEach(() => {
   globalThis.fetch = realFetch;
   for (const file of readdirSync(TEMP)) rmSync(join(TEMP, file), { recursive: true, force: true });
   goals.resetGoalCache();
+  record.resetRecordCache();
+  visions.resetVisionCache();
   // The advisor remembers between questions (D93); each test starts a fresh thread.
   thread.forget();
 });
@@ -84,7 +90,12 @@ function scripted(replies: string[]): { asks: string[] } {
 /** The action door as the route builds it, with the board replaced by a list. */
 function door(snap: Snapshot) {
   const queued: { kind: JobKind; subject: JobSubject }[] = [];
-  const act = () => actions.actionsFor({ snapshot: snap, dispatch: (kind, subject) => void queued.push({ kind, subject }) });
+  const act = (turn = 'turn-1', words = 'test') =>
+    actions.actionsFor({
+      snapshot: snap, turn, words, keep: 500,
+      dispatch: (kind, subject) => void queued.push({ kind, subject }),
+      refresh: () => goals.applyGoals(snap),
+    });
   return { queued, act };
 }
 
@@ -198,7 +209,7 @@ test('what it changed comes from the door, never from its words', async () => {
   ]);
   const d = door(snap);
   const answer = await desk.ask(snap, 'read a again', settings(), { act: d.act });
-  assert.deepEqual(answer.changes.map((c) => c.text), ['a: read again (queued)']);
+  assert.deepEqual(answer.changes.map((c) => c.text), ['a: queued to be read again']);
   assert.equal(answer.unbacked, false, 'it did change something');
 });
 
@@ -267,7 +278,7 @@ test('the next turn knows what the last one changed and proposed', async () => {
   await desk.ask(snap, 'read a again and show me a grouping', settings(), { act: d.act });
   await desk.ask(snap, 'yes, do that', settings(), { act: d.act });
   const earlier = asks[2]!.split('LATEST QUESTION')[0]!;
-  assert.match(earlier, /You changed: a: read again \(queued\)/);
+  assert.match(earlier, /You changed: a: queued to be read again/);
   assert.match(earlier, /You proposed filing, not yet done: Webhooks \(a, b\)/);
 });
 

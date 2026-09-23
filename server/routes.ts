@@ -3,21 +3,26 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 
-import { refKey, type JobKind, type Settings } from '../shared/types.ts';
+import { randomUUID } from 'node:crypto';
+
+import { refKey, type JobKind, type Settings, type Snapshot } from '../shared/types.ts';
 import { ask } from './advise/ask.ts';
 import { forget, thread } from './advise/conversation.ts';
 import { actionsFor } from './agent/actions.ts';
+import { markSeen } from './agent/record.ts';
+import { undoChange, undoTurn } from './agent/undo.ts';
 import { cannotAsk } from './work/asks.ts';
 import { distributeVisions } from './advise/vision.ts';
 import { LlmError, fetchModelsRaw, listModels } from './advise/client.ts';
 import { GitHubError, splitRepoKey, verifyToken } from './github.ts';
-import { GoalError, assignBranch, createGoal, deleteGoal, listGoals, regroup, updateGoal } from './goals.ts';
+import { GoalError, assignBranch, createGoal, deleteGoal, listGoals, updateGoal } from './goals.ts';
 import { VisionError, clearVision, confirmVision, setVision } from './vision.ts';
 import { loadSettings, saveSettings, toSafe } from './settings.ts';
 import { resetBoardState } from './work/run.ts';
 import {
   currentResponse,
   dispatchWork,
+  reapplyAll,
   reapplyGoals,
   reapplyVisions,
   refresh,
@@ -323,9 +328,10 @@ api.post('/ask', async (c) => {
   if (!snapshot) return c.json({ error: 'nothing has been read from GitHub yet' }, 400);
   try {
     const body = (await c.req.json()) as { question?: unknown };
-    const answer = await ask(snapshot, String(body.question ?? ''), loadSettings(), {
+    const settings = loadSettings();
+    const answer = await ask(snapshot, String(body.question ?? ''), settings, {
       // Built per answer, around the snapshot on screen — the only door to a change (D94).
-      act: () => actionsFor({ snapshot, dispatch: dispatchWork }),
+      act: (turn, words) => doorFor(snapshot, turn, words, settings.agentHistory),
     });
     return c.json({ answer });
   } catch (err) {
@@ -339,6 +345,35 @@ api.post('/ask', async (c) => {
  */
 /** The conversation the server is still carrying, so a reload can show it (finding 6). */
 api.get('/ask', (c) => c.json({ answers: thread(loadSettings().advisorMemoryMinutes) }));
+
+// ---------------------------------------------------------------------------
+// The agent's changes — the feed, and taking them back (D94, Q81)
+// ---------------------------------------------------------------------------
+
+/** Undo one change. Refused, with the reason, when it has been changed again since. */
+api.post('/changes/:id/undo', (c) => {
+  const result = undoChange(c.req.param('id'));
+  if (result.ok) reapplyAll();
+  return c.json(result, result.ok ? 200 : 409);
+});
+
+/** Undo everything one prompt changed. Reports each, so a partial undo says what stayed. */
+api.post('/changes/undo-turn', async (c) => {
+  const body = (await c.req.json()) as { turn?: unknown };
+  if (typeof body.turn !== 'string') return c.json({ error: 'which answer?' }, 400);
+  const results = undoTurn(body.turn);
+  if (results.some((r) => r.ok)) reapplyAll();
+  return c.json({ results });
+});
+
+/** Mark changes as looked at — some, or all. The dateline's count follows. */
+api.post('/changes/seen', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { ids?: unknown };
+  const ids = Array.isArray(body.ids) ? body.ids.filter((id): id is string => typeof id === 'string') : 'all';
+  const marked = markSeen(ids);
+  if (marked > 0) reapplyAll();
+  return c.json({ marked });
+});
 
 api.delete('/ask', (c) => {
   forget();
@@ -368,9 +403,19 @@ api.post('/goals/regroup', async (c) => {
         return { title: typeof item.title === 'string' ? item.title : '', branches };
       })
       .filter((g) => g.title.trim() && g.branches.length > 0);
-    const result = regroup(groups);
-    reapplyGoals();
-    return c.json({ ...result, goals: listGoals() });
+    // Accepting the agent's proposal is filing it through the same door, under the same
+    // answer — so it lands in the feed and "undo all" on that answer takes it back.
+    const turn = typeof (body as { turn?: unknown }).turn === 'string' ? (body as { turn: string }).turn : randomUUID();
+    const door = doorFor(snapshot, turn, 'accepted the proposed filing', loadSettings().agentHistory);
+    const byName = (ref: { repoKey: string; branch: string }) =>
+      snapshot.branches.find((b) => b.repoKey === ref.repoKey && b.name === ref.branch)!;
+    let moved = 0;
+    for (const group of groups) {
+      const branches = group.branches.map(byName);
+      const result = group.title.trim().toLowerCase() === 'unfiled' ? door.unfile(branches) : door.file(group.title, branches);
+      moved += result.done.filter((line) => !line.startsWith('Goal ')).length;
+    }
+    return c.json({ moved, changes: door.did(), goals: listGoals() });
   } catch (err) {
     return c.json({ error: describe(err) }, 400);
   }
@@ -427,6 +472,11 @@ api.get('/events', (c) =>
     }
   }),
 );
+
+/** The agent's door for one answer, around the snapshot on screen. */
+function doorFor(snapshot: Snapshot, turn: string, words: string, keep: number) {
+  return actionsFor({ snapshot, dispatch: dispatchWork, turn, words, keep, refresh: reapplyAll });
+}
 
 function describe(err: unknown): string {
   if (

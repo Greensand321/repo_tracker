@@ -264,6 +264,24 @@ a:hover { color: var(--text-hi); }
 .answer .groups { margin-top: 10px; padding: 8px 12px 6px; border: 1px solid var(--line-3); border-radius: 8px; }
 .answer .groups .prop { padding: 7px 0; }
 .answer .groups .q-acts { margin-top: 8px; }
+/* ---- the changes feed (D94) ---- */
+.crow { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto; gap: 8px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.crow:last-child { border-bottom: 0; }
+.cglyph { font-size: 9px; color: var(--faint); }
+.crow.unseen .cglyph { color: var(--now); }
+.crow.flag .cglyph, .crow.flag .cmeta { color: #d8a54a; }
+.cbody { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ctext { font-size: 12px; color: var(--dim); line-height: 1.4; overflow-wrap: anywhere; }
+.crow.unseen .ctext { color: var(--text); }
+.crow.undone .ctext { color: var(--faint); text-decoration: line-through; }
+.cmeta { font-family: var(--mono); font-size: 9.5px; }
+.cclock { font-family: var(--mono); font-size: 9.5px; color: var(--faint); white-space: nowrap; }
+.cundo { font-family: var(--mono); font-size: 9.5px; color: var(--muted); border: 1px solid var(--line-2); border-radius: 5px; padding: 1px 6px; }
+.cundo:hover { color: var(--now); border-color: #62c9c055; }
+.cstate { font-family: var(--mono); font-size: 9.5px; color: var(--faint); }
+.dateline .flagged { color: #d8a54a; font-family: var(--mono); font-size: 10.5px; }
+.dateline .flagged:hover { color: var(--text-hi); }
+.answer .undo-all { margin-top: 6px; }
 .answer .a-warn { font-family: var(--mono); font-size: 11px; color: var(--bad); margin-top: 8px; line-height: 1.5; }
 .answer .started { font-family: var(--mono); font-size: 11px; color: var(--now); margin-top: 8px; line-height: 1.7; }
 
@@ -537,3 +555,4 @@ a:hover { color: var(--text-hi); }
 .prop:last-child { border-bottom: 0; }
 .prop .mono { font-family: var(--mono); font-size: 11px; color: var(--dim); }
 .prop .reflect { margin-top: 4px; }
+.answer .started .gone { color: var(--faint); text-decoration: line-through; }

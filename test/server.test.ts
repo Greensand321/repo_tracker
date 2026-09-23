@@ -99,9 +99,10 @@ test('the desk can start work and propose a regrouping; the work lands and the p
   const disk = JSON.parse(readFileSync(join(TEMP, 'dispatched.json'), 'utf8')) as { jobs: unknown[] };
   assert.equal(disk.jobs.length, 0, 'cleared once it landed');
 
-  const filed = await routes.api.request('/goals/regroup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ groups: payload.answer.groups }) });
-  const result = await filed.json() as { created: number; moved: number; goals: { id: string; title: string; branches: unknown[] }[] };
-  assert.equal(result.created, 1);
+  const filed = await routes.api.request('/goals/regroup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ groups: payload.answer.groups, turn: 'accepted-turn' }) });
+  const result = await filed.json() as { moved: number; changes: { text: string }[]; goals: { id: string; title: string; branches: unknown[] }[] };
+  assert.equal(result.moved, 1);
+  assert.deepEqual(result.changes.map((c) => c.text), ['Goal "Webhooks" created', 'feat/retry: filed under "Webhooks"'], 'recorded, so undoable');
   assert.equal(result.goals[0]!.title, 'Webhooks');
   assert.equal(feature()!.goalId, result.goals[0]!.id, 'on the page at once');
 });

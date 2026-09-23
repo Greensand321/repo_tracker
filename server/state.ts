@@ -10,6 +10,7 @@ import { refKey, type Snapshot, type SnapshotResponse } from '../shared/types.ts
 import { applyAssist } from './advise/assist.ts';
 import { applyCached, llmReady } from './advise/enrich.ts';
 import { applyWork, resumeDispatched, runBoard, unpark } from './work/run.ts';
+import { feed } from './agent/record.ts';
 import { dispatch } from './work/dispatched.ts';
 import type { JobKind, JobSubject } from '../shared/types.ts';
 import { collect } from './collect.ts';
@@ -114,6 +115,7 @@ export async function refresh(): Promise<void> {
     // And what is left to do about all that — derived, not stored (D68). Also free, and
     // done before anyone sees the snapshot so the floor is populated from the first frame.
     applyWork(next, settings);
+    next.changes = feed();
 
     snapshot = next;
     lastError = null;
@@ -195,6 +197,7 @@ function carryOver(target: Snapshot): void {
   applyCached(target, settings);
   applyAssist(target, settings);
   applyWork(target, settings);
+  target.changes = feed();
   announce('snapshot');
 }
 
@@ -211,6 +214,7 @@ export function reapplyGoals(): void {
   applyGoals(snapshot);
   applyAssist(snapshot, settings);
   applyWork(snapshot, settings);
+  snapshot.changes = feed();
   announce('snapshot');
 }
 
@@ -228,6 +232,7 @@ export function reapplyVisions(): void {
   // Saying what a branch is for puts an assessment on the board, and clearing a vision
   // takes one off. The floor should show that the moment you type it, not a minute later.
   applyWork(snapshot, settings);
+  snapshot.changes = feed();
   announce('snapshot');
 }
 
@@ -242,6 +247,7 @@ export function dispatchWork(kind: JobKind, subject: JobSubject): void {
   dispatch(kind, subject);
   if (!snapshot) return;
   applyWork(snapshot, loadSettings());
+  snapshot.changes = feed();
   announce('snapshot');
   if (llmReady(loadSettings())) void dispatchInBackground(snapshot);
 }
@@ -298,6 +304,7 @@ export function retryJob(id: string): boolean {
     return true;
   }
   applyWork(snapshot, loadSettings());
+  snapshot.changes = feed();
   announce('snapshot');
   if (llmReady(loadSettings())) void workInBackground(snapshot);
   return true;
@@ -325,4 +332,19 @@ export function stopPolling(): void {
 
 function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Re-merge all of Plane B into the snapshot on screen and tell the pages — what a change
+ * made by the agent, or an undo of one, owes the page. Coalesced: a batch of forty filings
+ * is one redraw, not forty.
+ */
+export function reapplyAll(): void {
+  if (!snapshot) return;
+  const settings = loadSettings();
+  applyGoals(snapshot);
+  applyAssist(snapshot, settings);
+  applyWork(snapshot, settings);
+  snapshot.changes = feed();
+  announceSnapshot();
 }

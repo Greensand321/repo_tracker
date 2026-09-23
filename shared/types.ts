@@ -20,6 +20,12 @@ export type Snapshot = {
    * structure plus what is already on disk — never stored, never queued (D68).
    */
   work: WorkState;
+  /**
+   * What the agent has changed, newest first — the feed the owner checks it by (D94). Read
+   * from its own record at the edge, like goals. Absent only in a snapshot built before the
+   * edge ran, which every surface treats as "nothing yet".
+   */
+  changes?: ChangeFeed;
   warnings: string[]; // one unreachable repo must never cost you the others
   rateLimit: RateLimit | null;
   llm: LlmStatus;
@@ -287,6 +293,48 @@ export type WorkState = {
    * about forty summaries is a reason to stop reading notices (Q71).
    */
   finished: Job[];
+};
+
+// ---------------------------------------------------------------------------
+// The agent's changes — what it did when asked, and how to take it back (D94)
+// ---------------------------------------------------------------------------
+
+export type ChangeKind = 'queue' | 'goal.create' | 'goal.update' | 'goal.delete' | 'file' | 'vision' | 'note';
+
+/**
+ * One change the agent made, as the owner sees it. Everything one prompt changed shares a
+ * `turn`, which is what *undo all* reverts.
+ */
+export type Change = {
+  id: string;
+  at: string;
+  /** The answer that made it. */
+  turn: string;
+  /** What the owner said, so a change can be judged against what was asked. */
+  words: string;
+  kind: ChangeKind;
+  /** Plain English: "claude/foo filed under Webhooks". */
+  text: string;
+  /** Queued work runs whatever happens next, so it cannot be taken back. Everything else can. */
+  undoable: boolean;
+  /** When it was undone, or null. */
+  undone: string | null;
+  /** Whether the owner has looked at it in the feed. */
+  seen: boolean;
+  /**
+   * A goal marked done. The one change D64 warned is never gone back to, so it is the one
+   * the feed makes hardest to miss (Q78).
+   */
+  flag: 'goal-done' | null;
+};
+
+export type ChangeFeed = {
+  /** Newest first, capped. The whole record is on disk; this is what the page draws. */
+  recent: Change[];
+  /** Changes the owner has not looked at. */
+  unseen: number;
+  /** Of those, goals the agent marked done. */
+  goalsDone: number;
 };
 
 // ---------------------------------------------------------------------------

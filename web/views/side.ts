@@ -6,7 +6,7 @@
  * summary: literal branch names, ahead/behind, age, nothing else. No diffstats.
  */
 
-import type { Branch, Snapshot } from '../../shared/types.ts';
+import type { Branch, Change, Snapshot } from '../../shared/types.ts';
 import { elapsed, esc, plural, relativeTime } from '../format.ts';
 import {
   dotClass,
@@ -301,5 +301,41 @@ function ask(branch: Branch, head: string, body: string, actions: [string, strin
     <div class="q-acts">
       ${actions.map(([label, attrs], i) => `<button class="q-btn ${i === 0 ? 'yes' : ''}" ${attrs}>${esc(label)}</button>`).join('')}
     </div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// The changes feed — what the agent did when asked, and how to take it back (D94)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every change the agent made, newest first, each with its own undo.
+ *
+ * It exists so autonomy never needs a click first: you look here afterwards instead. A
+ * goal marked done is flagged — the change D64 warned is never gone back to, so it is the
+ * one made hardest to miss (Q78). Unseen rows are marked until "mark all seen".
+ */
+export function renderChanges(snapshot: Snapshot, now = new Date()): string {
+  const recent = snapshot.changes?.recent ?? [];
+  if (recent.length === 0) return '';
+  return recent.map((change) => changeRow(change, now)).join('');
+}
+
+function changeRow(change: Change, now: Date): string {
+  const done = change.flag === 'goal-done';
+  const state = change.undone
+    ? '<span class="cstate">undone</span>'
+    : change.undoable
+      ? `<button class="cundo" data-undo="${esc(change.id)}" title="Put this back as it was">undo</button>`
+      : '<span class="cstate" title="Queued work runs whatever happens next">queued</span>';
+  const classes = ['crow', change.seen ? '' : 'unseen', done ? 'flag' : '', change.undone ? 'undone' : ''].filter(Boolean).join(' ');
+  return `<div class="${classes}" title="You asked: ${esc(change.words)}">
+    <span class="cglyph">${done ? '&#9873;' : change.undone ? '&#8630;' : '&#9670;'}</span>
+    <span class="cbody">
+      <span class="ctext">${esc(change.text)}</span>
+      ${done && !change.undone ? '<span class="cmeta">marked done by the agent — check it</span>' : ''}
+    </span>
+    <span class="cclock">${esc(relativeTime(change.at, now))}</span>
+    ${state}
   </div>`;
 }
