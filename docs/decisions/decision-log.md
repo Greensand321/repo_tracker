@@ -721,14 +721,17 @@ process other than the browser opener. A prompt is a request, not a guarantee.
 
 What replaces ask-first is **act, show, undo**: every write goes through one action layer
 that records it with its before and after and the words that asked for it; the page lists
-what was done from that record, never from the model's prose; and every action can be
-undone. Two limits stay by design: it cannot see or change credentials, and it may lower its
-spending limits but never raise them.
+what was done from that record, never from the model's prose; and every change can be
+undone, singly or all of one prompt's changes at once.
 
-The mechanics — phases, the notebook of standing instructions, which settings it may touch —
-are in [`../plans/agent-autonomy.md`](../plans/agent-autonomy.md), **awaiting the owner's
-confirmation.** This entry records the direction, which is the owner's; the plan's details
-are not yet agreed.
+The owner's answers the same day set the rest. **It never acts unprompted** — which drops
+the standing orders an earlier draft proposed, since a rule firing on a background read is
+acting without being asked. **It may mark a goal done on its own judgement within a
+request**, and every change lands in a changes feed, goal-done flagged, so a wrong one is
+caught rather than gone back to never (D64's worry, answered with visibility instead of a
+click). **It changes no settings**: it reads them and suggests, and the owner applies; the
+settings screen gains reset-to-defaults. Undo history is the last 500 changes, and it never
+asks before a large change. Plan: [`../plans/agent-autonomy.md`](../plans/agent-autonomy.md).
 
 ## 2. Carried over from the old documents
 
