@@ -156,8 +156,8 @@ test('a suggestion reaches the answer, and the agent changed no setting', async 
 });
 
 test('it is told it may only suggest', () => {
-  for (const canAct of [true, false]) {
-    assert.match(desk.systemFor(canAct), /"settings" tool/);
-    assert.match(desk.systemFor(canAct), /Change a setting\. You may only suggest one/);
+  for (const mode of ['act', 'read'] as const) {
+    assert.match(desk.systemFor(mode), /"settings" tool/);
+    assert.match(desk.systemFor(mode), /Change a setting\. You may only suggest one/);
   }
 });

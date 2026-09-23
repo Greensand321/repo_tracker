@@ -42,6 +42,10 @@ const state = {
   undone: new Set<string>(),
   /** Setting suggestions the owner applied, as `turn:setting`. */
   applied: new Set<string>(),
+  /** Requests in flight, so a double click does not send two (`undo:id`, `turn:id`, `apply:…`). */
+  busy: new Set<string>(),
+  /** The settings as last read, so a suggestion already in place reads as applied. */
+  settings: null as SafeSettings | null,
   /**
    * Defaults for tunables the settings screen has no field for, filled by "reset to
    * defaults" and sent with the next save — so reset means every tunable, not just the
@@ -428,14 +432,14 @@ function renderStarted(answer: Answer): string {
     const known = new Map((state.data?.snapshot?.changes?.recent ?? []).map((c) => [c.id, c] as const));
     const rows = answer.changes.map((c) => {
       const live = c.id ? known.get(c.id) : undefined;
-      const undone = Boolean(live?.undone) || (c.id !== null && state.undone.has(c.id));
-      const canUndo = c.id !== null && !undone && (live ? live.undoable : true);
+      const undone = c.undone || Boolean(live?.undone) || (c.id !== null && state.undone.has(c.id));
+      const canUndo = c.id !== null && !undone && (live ? live.undoable : c.undoable);
       const mark = undone ? ' <span class="cstate">undone</span>' : canUndo ? ` <button class="cundo" data-undo="${esc(c.id!)}">undo</button>` : '';
       return `<div class="${undone ? 'gone' : ''}">&#9670; ${esc(c.text)}${mark}</div>`;
     });
     const open = answer.changes.filter((c) => {
       const live = c.id ? known.get(c.id) : undefined;
-      return c.id !== null && !(live?.undone || state.undone.has(c.id)) && (live ? live.undoable : true);
+      return c.id !== null && !(c.undone || live?.undone || state.undone.has(c.id)) && (live ? live.undoable : c.undoable);
     });
     // Everything this one prompt changed, taken back at once (Q81).
     const all = open.length > 1
@@ -454,7 +458,8 @@ function renderSuggestions(answer: Answer): string {
   const list = answer.suggestions ?? [];
   if (list.length === 0) return '';
   const rows = list.map((x) => {
-    const done = state.applied.has(`${answer.turn}:${x.setting}`);
+    // Applied here, or already what the settings say — after a reload, or by hand.
+    const done = state.applied.has(`${answer.turn}:${x.setting}`) || state.settings?.[x.setting] === x.to;
     const shown = (v: number | boolean): string => (typeof v === 'boolean' ? (v ? 'on' : 'off') : String(v));
     return `<div class="suggest-row">
       <span class="slabel">${esc(x.label)}</span>
@@ -471,7 +476,9 @@ function renderSuggestions(answer: Answer): string {
 /** The owner applying one suggestion. A PUT like the settings screen's, of one key. */
 async function applySuggestion(turn: string, setting: string, raw: string): Promise<void> {
   const t = TUNABLES.find((x) => x.key === setting);
-  if (!t) return;
+  const key = `apply:${turn}:${setting}`;
+  if (!t || state.busy.has(key)) return;
+  state.busy.add(key);
   const value = t.type === 'boolean' ? raw === 'true' : Number(raw);
   try {
     const res = await fetch('/api/settings', {
@@ -487,6 +494,8 @@ async function applySuggestion(turn: string, setting: string, raw: string): Prom
     await loadSnapshot();
   } catch (err) {
     showFailure('Could not apply that setting:', err);
+  } finally {
+    state.busy.delete(key);
   }
 }
 
@@ -503,19 +512,29 @@ async function removeNote(id: string): Promise<void> {
 
 /** Take one change back. A refusal says why — usually that it was changed again since. */
 async function undoOne(id: string): Promise<void> {
+  const key = `undo:${id}`;
+  if (state.busy.has(key)) return;
+  state.busy.add(key);
   try {
     const res = await fetch(`/api/changes/${encodeURIComponent(id)}/undo`, { method: 'POST' });
     const result = (await res.json()) as { ok: boolean; text: string };
-    if (result.ok) state.undone.add(id);
+    // Undone already — by the other list, or a click that raced this one — is what was wanted.
+    if (result.ok || result.text === 'already undone') state.undone.add(id);
     else window.alert(`Not undone: ${result.text}`);
+    renderAnswers();
     await loadSnapshot();
   } catch (err) {
     showFailure('Could not undo that:', err);
+  } finally {
+    state.busy.delete(key);
   }
 }
 
 /** Everything one prompt changed. What could not be undone is listed, not hidden. */
 async function undoAll(turn: string): Promise<void> {
+  const key = `turn:${turn}`;
+  if (state.busy.has(key)) return;
+  state.busy.add(key);
   try {
     const res = await fetch('/api/changes/undo-turn', {
       method: 'POST',
@@ -523,12 +542,15 @@ async function undoAll(turn: string): Promise<void> {
       body: JSON.stringify({ turn }),
     });
     const { results } = (await res.json()) as { results: { id: string; ok: boolean; text: string }[] };
-    for (const r of results) if (r.ok) state.undone.add(r.id);
-    const refused = results.filter((r) => !r.ok);
+    for (const r of results) if (r.ok || r.text === 'already undone') state.undone.add(r.id);
+    const refused = results.filter((r) => !r.ok && r.text !== 'already undone');
     if (refused.length > 0) window.alert(`Not undone:\n${refused.map((r) => `· ${r.text}`).join('\n')}`);
+    renderAnswers();
     await loadSnapshot();
   } catch (err) {
     showFailure('Could not undo those:', err);
+  } finally {
+    state.busy.delete(key);
   }
 }
 
@@ -579,16 +601,38 @@ async function acceptGroups(index: number): Promise<void> {
       // Under the answer that proposed it, so "undo all" on that answer takes it back.
       body: JSON.stringify({ groups: item.answer.groups, turn: item.answer.turn }),
     });
-    const payload = (await res.json()) as { error?: string; changes?: Answer['changes'] };
+    const payload = (await res.json()) as { error?: string; changes?: Answer['changes']; refused?: string[] };
     if (!res.ok) throw new Error(payload.error ?? 'could not file them');
-    item.filed = 'done';
-    item.answer.changes = [...item.answer.changes, ...(payload.changes ?? [])];
+    const added = payload.changes ?? [];
+    const known = new Set(item.answer.changes.map((c) => c.id));
+    item.answer.changes = [...item.answer.changes, ...added.filter((c) => !known.has(c.id))];
+    // Done unless nothing was filed and something refused: a proposal that could not be
+    // filed stays on offer, while one that already held needs nothing more.
+    const refused = payload.refused ?? [];
+    item.filed = added.length > 0 || refused.length === 0 ? 'done' : 'offered';
+    if (refused.length > 0) window.alert(`Not filed:\n${refused.map((r) => `· ${r}`).join('\n')}`);
+    renderAnswers();
     await loadSnapshot();
   } catch (err) {
     item.filed = 'offered';
     showFailure('Could not file them:', err);
     renderAnswers();
   }
+}
+
+/**
+ * An answer as the page can draw it. One from a server of a different version — or a
+ * restart part-way — may lack a field; a missing list must not stop every redraw after it.
+ */
+function drawable(answer: Answer): Answer {
+  return {
+    ...answer,
+    ranking: answer.ranking ?? [],
+    groups: answer.groups ?? [],
+    suggestions: answer.suggestions ?? [],
+    looked: answer.looked ?? [],
+    changes: (answer.changes ?? []).map((c) => ({ ...c, undoable: c.undoable ?? c.id !== null, undone: c.undone ?? false })),
+  };
 }
 
 /**
@@ -602,10 +646,11 @@ async function restoreThread(): Promise<void> {
     if (!payload.answers || payload.answers.length === 0 || state.asked.length > 0) return;
     state.asked = payload.answers.map((answer) => ({
       question: answer.question,
-      answer,
+      answer: drawable(answer),
       error: null,
       pending: false,
-      filed: 'offered' as const,
+      // Accepted before the reload: not offered again.
+      filed: answer.groupsFiled ? ('done' as const) : ('offered' as const),
     }));
     renderAnswers();
     $('#newThread').classList.remove('hidden');
@@ -634,7 +679,7 @@ async function askAdvisor(): Promise<void> {
     });
     const payload = (await res.json()) as { answer?: Answer; error?: string };
     if (!res.ok || !payload.answer) throw new Error(payload.error ?? 'the advisor could not answer');
-    item.answer = payload.answer;
+    item.answer = drawable(payload.answer);
   } catch (err) {
     item.error = err instanceof Error ? err.message : String(err);
   } finally {
@@ -1009,6 +1054,7 @@ function applyProviderChoice(): void {
 
 /** The settings the page itself draws with. */
 function readPageSettings(settings: SafeSettings): void {
+  state.settings = settings;
   state.maxQuestions = settings.maxOpenQuestions;
   state.lineWords = settings.nowLineWords;
   state.agentEnabled = settings.agentEnabled;
@@ -1017,19 +1063,35 @@ function readPageSettings(settings: SafeSettings): void {
 /**
  * Every tunable back to its default, on screen only — nothing is saved until Save (Q79).
  * The token, the key, the repos, the provider and the model are not tunables and are left
- * exactly as they are.
+ * exactly as they are — and so is whether the assistant is on at all, which is what you pay
+ * for, like the model (D95).
+ *
+ * Tunables with no field here are reset too, and named in the note: a reset that quietly
+ * changed what it could not show would be the one surprise this button must not have.
  */
 function resetSettingsForm(): void {
   state.resetHidden = {};
+  const unseen: string[] = [];
   for (const t of TUNABLES) {
+    if (KEPT_ON_RESET.has(t.key)) continue;
     const value = DEFAULT_SETTINGS[t.key];
     const field = document.getElementById(t.key) as HTMLInputElement | null;
-    if (!field) state.resetHidden[t.key] = value;
-    else if (t.type === 'boolean') field.checked = Boolean(value);
-    else field.value = String(value);
+    if (field) {
+      if (t.type === 'boolean') field.checked = Boolean(value);
+      else field.value = String(value);
+      continue;
+    }
+    state.resetHidden[t.key] = value;
+    const now = state.settings?.[t.key];
+    if (now !== undefined && now !== value) unseen.push(`${t.label} ${String(now)} → ${String(value)}`);
   }
-  $('#settingsNote').textContent = 'Defaults filled in. Nothing changes until you save.';
+  $('#settingsNote').textContent = unseen.length > 0
+    ? `Defaults filled in, and these with no field here: ${unseen.join(' · ')}. Nothing changes until you save.`
+    : 'Defaults filled in. Nothing changes until you save.';
 }
+
+/** Not tuning, so reset leaves them be. */
+const KEPT_ON_RESET = new Set<TunableKey>(['llmEnabled']);
 
 async function openSettings(): Promise<void> {
   try {
@@ -1189,13 +1251,14 @@ function wire(): void {
     const retry = target.closest<HTMLElement>('[data-retry]');
     if (retry) { void retryJob(retry.dataset['retry'] ?? ''); return; }
 
-    const undoBtn = target.closest<HTMLElement>('[data-undo]');
-    if (undoBtn) { void undoOne(undoBtn.dataset['undo'] ?? ''); return; }
-    const undoTurnBtn = target.closest<HTMLElement>('[data-undo-turn]');
-    if (undoTurnBtn) { void undoAll(undoTurnBtn.dataset['undoTurn'] ?? ''); return; }
+    const undoBtn = target.closest<HTMLButtonElement>('[data-undo]');
+    if (undoBtn) { undoBtn.disabled = true; void undoOne(undoBtn.dataset['undo'] ?? ''); return; }
+    const undoTurnBtn = target.closest<HTMLButtonElement>('[data-undo-turn]');
+    if (undoTurnBtn) { undoTurnBtn.disabled = true; void undoAll(undoTurnBtn.dataset['undoTurn'] ?? ''); return; }
     if (target.closest('#changesSeen')) { void markChangesSeen(); return; }
-    const apply = target.closest<HTMLElement>('[data-apply]');
+    const apply = target.closest<HTMLButtonElement>('[data-apply]');
     if (apply) {
+      apply.disabled = true;
       void applySuggestion(apply.dataset['apply'] ?? '', apply.dataset['setting'] ?? '', apply.dataset['to'] ?? '');
       return;
     }

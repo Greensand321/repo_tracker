@@ -754,12 +754,59 @@ imports `saveSettings`.
 
 **Reset leaves alone what is not tuning.** The token, the key, the repos, the provider and
 the model say who you are and what you pay for; resetting them would lock the program out
-of GitHub or the model. Every tunable is reset, including those with no field on the
-screen, and nothing changes until Save.
+of GitHub or the model. **Whether the assistant is on at all** (`llmEnabled`) is left alone
+too, for the same reason: switching it back on is a decision to pay, not a default to fall
+back to (found in the audit, D96). Every other tunable is reset, including those with no
+field on the screen, which the note under the buttons names with their old and new values;
+nothing changes until Save. A field left blank, or not a number, keeps its current value
+rather than becoming the minimum.
 
 **The owner's own edits are not in the agent's record.** Removing a note from the notebook
 panel is like editing a goal by hand: the owner did it, so there is nothing to catch or
 undo. The record exists to answer "what did the agent change?".
+
+### D96 — The audit before main: undo checks for later changes, the record keeps whole prompts, repo text is data
+
+Three reviewers audited phases 1–5 on 23 Sep, before the merge to main: one on the door,
+the record and undo; one on the ask loop and its tools; one on the routes and the page.
+About thirty findings were confirmed, all fixed, each with a test (`test/agent-audit.test.ts`
+and the end of `test/server.test.ts`). Five of them changed how something works, so they
+are recorded here.
+
+**An undo waits for any later change to the same thing that still stands.** It used to
+check only that the value was still what the change left. Done → not done → done again
+looks untouched, so undoing the first would silently throw away the third. Now a later
+entry in the record for the same goal field, branch filing, purpose or note blocks the undo
+until that later one is undone. Undo-all works newest first, so it still unpicks a whole
+prompt. Hand edits are still caught by the value check. The one hole left is the owner
+editing by hand back to exactly the value the agent set. It is rare, and closing it would
+need a version stamp on every field, not just on the goal as a whole.
+
+**The record drops whole prompts, never part of one, and never the one being written.**
+Cutting through a prompt left an "undo all" that reported every step undone while the rest
+stayed in place. A prompt larger than `agentHistory` is kept whole, over the limit.
+
+**Everything from the repos is data, never instructions.** Commit messages, titles, READMEs
+and notes go into the prompt. A test showed a model obeying a commit subject by writing a
+standing brief instruction. The system prompt now says outright that only the owner's
+latest question gives instructions, and every piece of free text is flattened to one line,
+so none can fake a new section of the prompt. **A purpose marked as "the owner's words"
+must mostly use words from the owner's latest message**; otherwise it is written as a guess,
+which the owner confirms with one click. So text in a repo cannot pose as the owner's own
+purpose, and a guess still never replaces the owner's words.
+
+**A failure part-way through an answer returns what was done.** A provider error, or a
+file that would not save, after changes were already made used to discard the whole
+answer: the list of changes, the undo-all and the conversation's memory of it. Now the
+answer comes back unfinished, with the changes and what went wrong. A failure before
+anything changed is still an ordinary error.
+
+**Claims are read from how a sentence opens.** The unbacked-claim flag now fires on a
+sentence that opens with a change ("I've filed…", "Filed a and b…", "Done."), including with
+curly apostrophes. A verb later in a sentence ("the re-read I queued is still running"), a
+negation ("I made no changes"), a proposal shown for acceptance, or a suggestion does not
+fire it. A claim to have changed a setting, or anything on GitHub, is flagged even beside
+real changes, because it can never be true.
 
 ## 2. Carried over from the old documents
 

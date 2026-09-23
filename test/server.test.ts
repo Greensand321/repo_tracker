@@ -169,3 +169,63 @@ test('the owner removes a note from the panel, and the brief is written again wi
   assert.equal((await routes.api.request(`/notes/${note.id}`, { method: 'DELETE' })).status, 404);
   await until(idle, 'quiet');
 });
+
+// ---------------------------------------------------------------------------
+// The audit, 23 Sep — the routes' part (test/agent-audit.test.ts has the rest)
+// ---------------------------------------------------------------------------
+
+const post = (path: string, body: string) =>
+  routes.api.request(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+
+test('bodies that are not what a route needs are refused, not guessed at', async () => {
+  assert.equal((await post('/changes/undo-turn', 'not json')).status, 400);
+  assert.equal((await post('/changes/undo-turn', 'null')).status, 400);
+  assert.equal((await post('/changes/seen', JSON.stringify({ ids: 'one' }))).status, 400, 'a string is not "all"');
+});
+
+test('a field left blank, or not a number, keeps the setting it had', async () => {
+  const before = await (await routes.api.request('/settings')).json() as Record<string, unknown>;
+  const res = await routes.api.request('/settings', {
+    method: 'PUT', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ agentCallsPerQuestion: '', workers: 'abc', maxOpenQuestions: null, commitsPerBranch: '40' }),
+  });
+  const saved = await res.json() as Record<string, unknown>;
+  assert.equal(saved['agentCallsPerQuestion'], before['agentCallsPerQuestion'], 'blank is not 0');
+  assert.equal(saved['workers'], before['workers'], 'not a number is not the default');
+  assert.equal(saved['maxOpenQuestions'], before['maxOpenQuestions']);
+  assert.equal(saved['commitsPerBranch'], 40, 'a number typed as text still counts');
+  await until(idle, 'the read a save starts');
+  state.stopPolling();
+});
+
+test('a proposal accepted is remembered as accepted, with what it changed, for a reload', async () => {
+  provider.deskReplies = [JSON.stringify({
+    answer: 'I would file it under Retries.',
+    groups: [{ title: 'Retries', branches: [{ repo: 'greensand321/harbor-api', branch: 'feat/retry' }] }],
+  })];
+  const asked = await (await post('/ask', JSON.stringify({ question: 'show me a grouping first' }))).json() as
+    { answer: { turn: string; groups: unknown[] } };
+  const filed = await (await post('/goals/regroup', JSON.stringify({ groups: asked.answer.groups, turn: asked.answer.turn }))).json() as
+    { moved: number; refused: string[]; changes: { id: string; text: string }[] };
+  assert.equal(filed.moved, 1);
+  assert.deepEqual(filed.refused, []);
+
+  const moved = filed.changes.find((c) => c.text.startsWith('feat/retry'))!;
+  await post(`/changes/${moved.id}/undo`, '{}');
+  const restored = await (await routes.api.request('/ask')).json() as
+    { answers: { turn: string; groupsFiled: boolean; changes: { id: string; undone: boolean; undoable: boolean }[] }[] };
+  const shown = restored.answers.find((a) => a.turn === asked.answer.turn)!;
+  assert.equal(shown.groupsFiled, true, 'not offered again after a reload');
+  assert.equal(shown.changes.find((c) => c.id === moved.id)?.undone, true, 'and undone since, as the record says');
+});
+
+test('a proposal under a title two goals share files nothing, and says why', async () => {
+  for (let i = 0; i < 2; i++) await post('/goals', JSON.stringify({ title: 'Gamma' }));
+  const res = await post('/goals/regroup', JSON.stringify({
+    groups: [{ title: 'Gamma', branches: [{ repoKey: 'greensand321/harbor-api', branch: 'feat/retry' }] }],
+  }));
+  const result = await res.json() as { moved: number; refused: string[]; changes: unknown[] };
+  assert.equal(result.moved, 0);
+  assert.equal(result.changes.length, 0);
+  assert.match(result.refused[0]!, /Gamma: more than one goal is called "Gamma"/);
+});

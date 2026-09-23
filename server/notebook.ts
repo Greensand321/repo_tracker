@@ -25,7 +25,13 @@ let cache: File | null = null;
 function load(): File {
   if (cache) return cache;
   const parsed = readJson<Partial<File>>(FILE);
-  cache = { notes: Array.isArray(parsed?.notes) ? parsed.notes : [] };
+  // Only well-formed notes: one with no text would throw out of every place that reads it.
+  const notes = Array.isArray(parsed?.notes) ? parsed.notes : [];
+  cache = {
+    notes: notes.filter((n): n is Note =>
+      !!n && typeof n === 'object' && typeof n.id === 'string' && typeof n.text === 'string' && (n.kind === 'remember' || n.kind === 'brief'))
+      .map((n) => ({ id: n.id, kind: n.kind, text: n.text, at: typeof n.at === 'string' ? n.at : new Date(0).toISOString() })),
+  };
   return cache;
 }
 
@@ -40,7 +46,8 @@ export function listNotes(kind?: NoteKind): Note[] {
 }
 
 export function addNote(kind: NoteKind, text: string): Note {
-  const note: Note = { id: randomUUID().slice(0, 8), kind, text: text.trim(), at: new Date().toISOString() };
+  // One line: it is printed into prompts, where a newline could pass for a new section.
+  const note: Note = { id: randomUUID().slice(0, 8), kind, text: oneLine(text), at: new Date().toISOString() };
   persist({ notes: [...load().notes, note] });
   return note;
 }
@@ -58,6 +65,8 @@ export function restoreNote(note: Note): void {
   if (load().notes.some((n) => n.id === note.id)) return;
   persist({ notes: [...load().notes, note].sort((a, b) => a.at.localeCompare(b.at)) });
 }
+
+export const oneLine = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
 export function resetNotebookCache(): void {
   cache = null;

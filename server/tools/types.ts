@@ -129,6 +129,12 @@ export type Tool = {
   description: string;
   /** `free` reads memory, `disk` reads this program's own records, `github` is a call. */
   cost: 'free' | 'disk' | 'github';
+  /**
+   * It changes something (the advisor's tools only). A write is never answered from the
+   * loop's cache of repeated calls — filing the same branch again after unfiling it must
+   * really file it — and after one, earlier reads are stale and are asked again.
+   */
+  writes?: true;
   args: ToolArg[];
   /** Returns text, already shaped for a prompt. Capped by the caller, not by the tool. */
   run(args: Record<string, unknown>, ctx: ToolContext): Promise<string> | string;

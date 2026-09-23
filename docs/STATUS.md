@@ -40,6 +40,17 @@ server's list of accepted settings did not include it. Settings are now one tabl
 (`shared/settings.ts`) that the store, the route, the agent, the suggestions and reset all
 read, so they cannot drift apart again.
 
+**Audited before main (D96).** Three reviewers went through the door, the loop and the page;
+every confirmed finding was fixed with a test. Among them:
+- A provider error part-way through an answer threw away the changes it had already made.
+- Filing a branch again after unfiling it in the same answer was served from a cache and
+  never ran.
+- An undo could overwrite a later change that happened to look the same.
+- The claim flag both cried wolf and missed curly apostrophes.
+- A text in a commit message could pose as your own words for a branch's purpose.
+- Reset quietly turned the assistant back on.
+- Undo buttons appeared on queued work, which can't be undone.
+
 **Next:** use it on the real fleet. The stub runs show the mechanics work. What they cannot
 show is how well your model picks the right tool from a real, messy request. If it
 struggles, the fixes are phase 7 (native tool calling, once `npm run probe` says your
@@ -362,6 +373,7 @@ Then, in whatever order they earn it:
 | 17 Sep 2026 | **Six full interfaces built** in the variant C language (`docs/design/explorations/`). D6 "The Ledger" recommended. D54–D56 recorded |
 | 17 Sep 2026 | **The brief was 400ing on every read** — three call sites never sent the mandatory OpenCode session header, and nothing surfaced it on screen. D66, D67 |
 | 17 Sep 2026 | **The assistant, stage A**: vision per branch, vision-vs-reality assessment, goal judgement, the brief, and the questions panel. D61–D65 |
+| 23 Sep 2026 | **Audit before main**: three reviewers, about thirty findings, all fixed with tests. Undo waits for later changes; the record keeps whole prompts; repo text is data; a failure part-way returns what was done; claims read from how a sentence opens; reset leaves the assistant's switch alone; blank settings keep their value. D96. Merged to main |
 | 23 Sep 2026 | **The advisor becomes an agent** (phases 1–5): it files, edits goals and purposes, keeps a notebook the brief follows, queues and retries work — through one door that records every change, lists it from the record, and undoes one or everything one prompt did. Settings: read and suggested, applied by you; reset to defaults. Settings became one table, which fixed *Line words* never saving. D94, D95 |
 | 23 Sep 2026 | **Audit of the advisor**: it cannot act on anything asked of it, can claim edits it never made, sees 60 of ~100 branches, fails bulk requests part-way. Direction settled — full autonomy over the program, reads only on GitHub (D94). Plan written and confirmed with the owner's answers |
 | 21 Sep 2026 | **The advisor holds a conversation**: recent turns resent, bounded and expiring after 30 quiet minutes, with the state always read fresh. There is no process kept alive — a chatbot is a transcript. D93 |

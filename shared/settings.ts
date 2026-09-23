@@ -42,8 +42,8 @@ export const TUNABLES: readonly Tunable[] = [
   n('briefEveryMinutes', 0, 1440, 'Brief (min)', 'Minutes between routine rewrites of the brief, the dearest call; 0 rewrites it on every change.'),
   n('advisorMemoryMinutes', 0, 1440, 'Memory (min)', 'Minutes of quiet before the advisor forgets the conversation; 0 remembers nothing.'),
   b('agentEnabled', 'Let the advisor make the changes I ask for', 'Off, the advisor answers and reads but changes nothing.'),
-  n('agentCallsPerQuestion', 0, 40, 'Steps', 'Model calls one answer may make; each lookup or change is one.'),
-  n('agentSeconds', 15, 600, 'Answer time (s)', 'How long one answer may take, all its steps together.'),
+  n('agentCallsPerQuestion', 0, 40, 'Steps', 'Lookups and changes one answer may make, each one a model call; the answer itself is one call more. 0 leaves it no tools.'),
+  n('agentSeconds', 15, 600, 'Answer time (s)', 'How long one answer may take, all its steps together — checked between steps, so a call already running finishes.'),
   n('agentHistory', 50, 5000, 'Changes kept', 'How many of the advisor\'s changes are kept in the record, and so can be undone.'),
   b('toolsEnabled', 'Look things up before answering', 'Whether background jobs may read READMEs, touched files and nearby branches.'),
   // The worst case for a read is llmMaxPerRun jobs times this plus one, so it is capped
@@ -67,10 +67,14 @@ export function tunable(key: string): Tunable | null {
 export function coerceTunable(t: Tunable, value: unknown): number | boolean | null {
   if (t.type === 'boolean') {
     if (typeof value === 'boolean') return value;
-    if (value === 'true' || value === 'on') return true;
-    if (value === 'false' || value === 'off') return false;
+    const word = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (word === 'true' || word === 'on' || word === 'yes') return true;
+    if (word === 'false' || word === 'off' || word === 'no') return false;
     return null;
   }
+  // A blank is "no value", not zero: `Number('')` is 0, which is the minimum of half the
+  // table and switches things off.
+  if (typeof value === 'string' && !value.trim()) return null;
   const num = typeof value === 'string' ? Number(value.trim()) : value;
   if (typeof num !== 'number' || !Number.isFinite(num)) return null;
   return Math.min(t.max, Math.max(t.min, Math.round(num)));

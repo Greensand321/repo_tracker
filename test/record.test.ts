@@ -208,15 +208,25 @@ test('queued work is listed but cannot be undone — it runs regardless', () => 
   assert.match(undo.undoChange(queued!.id!).text, /cannot be taken back/);
 });
 
-test('the record keeps the last N and survives a restart (Q80)', () => {
+test('the record keeps the last N, a whole prompt at a time, and survives a restart (Q80)', () => {
   const s = snap([branch('a')]);
-  const d = door(s, 't', 5);
-  for (let i = 0; i < 4; i++) {
-    d.act.file(`G${i}`, s.branches);
-  }
-  // Each call made a goal and a filing: eight entries, five kept.
+  // Four prompts, each making a goal and a filing: eight entries against a limit of five.
+  for (let i = 0; i < 4; i++) door(s, `t${i}`, 5).act.file(`G${i}`, s.branches);
   record.resetRecordCache();
   const kept = record.allEntries();
-  assert.equal(kept.length, 5);
+  assert.equal(kept.length, 4, 'two whole prompts dropped, never half of one');
+  assert.deepEqual([...new Set(kept.map((e) => e.turn))], ['t2', 't3']);
   assert.match(kept[kept.length - 1]!.text, /G3/, 'the newest survive');
+});
+
+test('a prompt bigger than the limit is kept whole, so undo all still undoes all of it', () => {
+  const names = Array.from({ length: 12 }, (_, i) => `b${i}`);
+  const s = snap(names.map(branch));
+  door(s, 'old', 5).act.file('Old', [s.branches[0]!]);
+  const d = door(s, 'big', 5);
+  d.act.file('Big', s.branches);
+  assert.equal(d.act.did().length, 13, 'the goal and all twelve filings are listed');
+  assert.ok(record.allEntries().every((e) => e.turn === 'big'), 'older prompts made room');
+  assert.ok(undo.undoTurn('big').every((r) => r.ok));
+  assert.equal(goals.listGoals().find((g) => g.title === 'Big'), undefined, 'and all of it undoes');
 });

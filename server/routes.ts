@@ -6,10 +6,10 @@ import { streamSSE } from 'hono/streaming';
 import { randomUUID } from 'node:crypto';
 
 import { refKey, type JobKind, type Settings, type Snapshot } from '../shared/types.ts';
-import { ask } from './advise/ask.ts';
-import { forget, thread } from './advise/conversation.ts';
+import { ask, type Answer } from './advise/ask.ts';
+import { amend as amendAnswer, forget, thread } from './advise/conversation.ts';
 import { actionsFor } from './agent/actions.ts';
-import { markSeen } from './agent/record.ts';
+import { findEntry, markSeen } from './agent/record.ts';
 import { undoChange, undoTurn } from './agent/undo.ts';
 import { cannotAsk } from './work/asks.ts';
 import { distributeVisions } from './advise/vision.ts';
@@ -19,7 +19,7 @@ import { GoalError, assignBranch, createGoal, deleteGoal, listGoals, updateGoal 
 import { VisionError, clearVision, confirmVision, setVision } from './vision.ts';
 import { removeNote } from './notebook.ts';
 import { loadSettings, saveSettings, toSafe } from './settings.ts';
-import { TUNABLES, type TunableKey } from '../shared/settings.ts';
+import { TUNABLES, coerceTunable, type TunableKey } from '../shared/settings.ts';
 import { resetBoardState } from './work/run.ts';
 import {
   currentResponse,
@@ -82,12 +82,18 @@ api.put('/settings', async (c) => {
   }
 
   // Exactly the tunables, typed as the table says: a number where it is a number, and a
-  // switch only when it really is true or false.
+  // switch only when it really is true or false. A field left blank, or something that is
+  // not a number at all, is "not sent" — it keeps the current value rather than becoming
+  // the minimum (`Number('')` is 0) or quietly falling back to the default.
   const tuned = patch as Record<TunableKey, number | boolean>;
   for (const t of TUNABLES) {
     const value = (body as Record<string, unknown>)[t.key];
-    if (t.type === 'number' && value !== undefined) tuned[t.key] = Number(value);
-    if (t.type === 'boolean' && typeof value === 'boolean') tuned[t.key] = value;
+    if (t.type === 'boolean') {
+      if (typeof value === 'boolean') tuned[t.key] = value;
+    } else if (typeof value === 'number' || typeof value === 'string') {
+      const n = coerceTunable(t, value);
+      if (n !== null) tuned[t.key] = n;
+    }
   }
   for (const key of ['llmBaseUrl', 'llmModel'] as const) {
     if (typeof body[key] === 'string') patch[key] = body[key];
@@ -329,7 +335,22 @@ api.post('/ask', async (c) => {
  * are untouched by this, and nothing on the page changes (D93).
  */
 /** The conversation the server is still carrying, so a reload can show it (finding 6). */
-api.get('/ask', (c) => c.json({ answers: thread(loadSettings().advisorMemoryMinutes) }));
+api.get('/ask', (c) => c.json({ answers: thread(loadSettings().advisorMemoryMinutes).map(asItStandsNow) }));
+
+/**
+ * An answer's changes as the record has them now — undone since, or aged out of the record
+ * and so past undoing — rather than as they were when it was given. A reloaded page would
+ * otherwise offer undo buttons that can only fail.
+ */
+function asItStandsNow(answer: Answer): Answer {
+  return {
+    ...answer,
+    changes: (answer.changes ?? []).map((change) => {
+      const entry = change.id ? findEntry(change.id) : null;
+      return { ...change, undoable: entry?.undoable === true, undone: entry ? entry.undone !== null : change.undone };
+    }),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // The agent's changes — the feed, and taking them back (D94, Q81)
@@ -346,8 +367,8 @@ api.post('/changes/:id/undo', (c) => {
 
 /** Undo everything one prompt changed. Reports each, so a partial undo says what stayed. */
 api.post('/changes/undo-turn', async (c) => {
-  const body = (await c.req.json()) as { turn?: unknown };
-  if (typeof body.turn !== 'string') return c.json({ error: 'which answer?' }, 400);
+  const body = (await c.req.json().catch(() => null)) as { turn?: unknown } | null;
+  if (!body || typeof body.turn !== 'string') return c.json({ error: 'which answer?' }, 400);
   const results = undoTurn(body.turn);
   if (results.some((r) => r.ok)) reapplyAll();
   if (results.some((r) => r.ok && r.brief)) dispatchWork('brief', { kind: 'fleet' });
@@ -356,8 +377,10 @@ api.post('/changes/undo-turn', async (c) => {
 
 /** Mark changes as looked at — some, or all. The dateline's count follows. */
 api.post('/changes/seen', async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as { ids?: unknown };
-  const ids = Array.isArray(body.ids) ? body.ids.filter((id): id is string => typeof id === 'string') : 'all';
+  const body = (await c.req.json().catch(() => ({}))) as { ids?: unknown } | null;
+  // No ids means all of them; ids that are not a list are a mistake, not "all".
+  if (body?.ids !== undefined && !Array.isArray(body.ids)) return c.json({ error: 'ids must be a list' }, 400);
+  const ids = Array.isArray(body?.ids) ? body.ids.filter((id): id is string => typeof id === 'string') : 'all';
   const marked = markSeen(ids);
   if (marked > 0) reapplyAll();
   return c.json({ marked });
@@ -411,12 +434,25 @@ api.post('/goals/regroup', async (c) => {
     const byName = (ref: { repoKey: string; branch: string }) =>
       snapshot.branches.find((b) => b.repoKey === ref.repoKey && b.name === ref.branch)!;
     let moved = 0;
+    const refused: string[] = [];
     for (const group of groups) {
       const branches = group.branches.map(byName);
-      const result = group.title.trim().toLowerCase() === 'unfiled' ? door.unfile(branches) : door.file(group.title, branches);
-      moved += result.done.filter((line) => !line.startsWith('Goal ')).length;
+      // One group that cannot be filed — two goals of that title, a file that would not
+      // save — is reported, and the rest are still filed.
+      try {
+        const result = group.title.trim().toLowerCase() === 'unfiled' ? door.unfile(branches) : door.file(group.title, branches);
+        moved += result.done.filter((line) => !line.startsWith('Goal ')).length;
+        // "Already under that goal", "not filed": the proposal already holds there — not a failure.
+        const failed = result.refused.filter((why) => !/is already under|is not filed/.test(why));
+        refused.push(...failed.map((why) => `${group.title}: ${why}`));
+      } catch (err) {
+        refused.push(`${group.title}: ${describe(err)}`);
+      }
     }
-    return c.json({ moved, changes: door.did(), goals: listGoals() });
+    const changes = door.did();
+    // The answer the server keeps now says it was accepted and what that changed.
+    if (changes.length > 0) amendAnswer(turn, changes, changes.map((ch) => ch.text));
+    return c.json({ moved, refused, changes, goals: listGoals() });
   } catch (err) {
     return c.json({ error: describe(err) }, 400);
   }

@@ -13,12 +13,19 @@
 
 import type { Branch, Goal, Snapshot } from '../../shared/types.ts';
 
+/**
+ * Free text on one line. Commit messages, titles and notes are written by the coding
+ * agents or typed by hand; a newline inside one could pass for a new section of the prompt
+ * — a fake "LATEST QUESTION:" — so none survives into it.
+ */
+const flat = (text: string): string => text.replace(/\s+/g, ' ').trim();
+
 export function describeGoal(goal: Goal): string {
-  const bits = [`  "${goal.title}"`, `id ${goal.id}`, `${goal.branches.length} branches`];
-  if (goal.milestone) bits.push(`milestone ${goal.milestone}`);
+  const bits = [`  "${flat(goal.title)}"`, `id ${goal.id}`, `${goal.branches.length} branches`];
+  if (goal.milestone) bits.push(`milestone ${flat(goal.milestone)}`);
   if (goal.done) bits.push('marked done');
-  if (goal.judgement) bits.push(`looks ${goal.judgement.state}: ${goal.judgement.because}`);
-  if (goal.note) bits.push(`the owner's note: "${goal.note}"`);
+  if (goal.judgement) bits.push(`looks ${goal.judgement.state}: ${flat(goal.judgement.because)}`);
+  if (goal.note) bits.push(`the owner's note: "${flat(goal.note)}"`);
   return bits.join(' · ');
 }
 
@@ -40,19 +47,19 @@ export function describeBranch(branch: Branch, goal: Goal | null): string {
   // the advisor guessing at what the owner has already written down.
   if (branch.vision) {
     const whose = branch.vision.state === 'proposed' ? ' (a guess — not confirmed)' : " (the owner's words)";
-    out.push(`    FOR: ${branch.vision.text}${whose}`);
+    out.push(`    FOR: ${flat(branch.vision.text)}${whose}`);
   }
-  if (branch.title) out.push(`    TITLE: ${branch.title}`);
+  if (branch.title) out.push(`    TITLE: ${flat(branch.title)}`);
   if (branch.recap) {
-    out.push(`    LAST: ${branch.recap.last}`);
-    if (branch.recap.done) out.push(`    DONE: ${branch.recap.done}`);
-    if (branch.recap.next) out.push(`    LEFT: ${branch.recap.next}`);
+    out.push(`    LAST: ${flat(branch.recap.last)}`);
+    if (branch.recap.done) out.push(`    DONE: ${flat(branch.recap.done)}`);
+    if (branch.recap.next) out.push(`    LEFT: ${flat(branch.recap.next)}`);
   } else if (branch.summary) {
-    out.push(`    DID: ${branch.summary}`);
+    out.push(`    DID: ${flat(branch.summary)}`);
   }
-  if (branch.assessment) out.push(`    COMPARED: ${branch.assessment.verdict} — ${branch.assessment.because}`);
+  if (branch.assessment) out.push(`    COMPARED: ${branch.assessment.verdict} — ${flat(branch.assessment.because)}`);
   // Three messages is enough to tell what a branch is doing without paying for fifty.
-  for (const commit of branch.commits.slice(0, 3)) out.push(`    commit: ${commit.message}`);
+  for (const commit of branch.commits.slice(0, 3)) out.push(`    commit: ${flat(commit.message)}`);
   return out.join('\n');
 }
 
@@ -62,15 +69,15 @@ export function describeBranch(branch: Branch, goal: Goal | null): string {
  * rest.
  */
 export function indexLine(branch: Branch, goal: Goal | null): string {
-  const what = branch.title ?? branch.commits[0]?.message ?? 'nothing of its own';
+  const what = flat(branch.title ?? branch.commits[0]?.message ?? 'nothing of its own');
   const stands =
     branch.assessment?.verdict === 'drifted' ? 'drifted'
     : branch.assessment?.verdict === 'done' || branch.progress === 'done' ? 'done'
-    : branch.recap?.next ? `left: ${branch.recap.next}`
+    : branch.recap?.next ? `left: ${flat(branch.recap.next)}`
     : branch.ci.state === 'failing' ? 'CI red'
     : branch.relevance === 'quiet' ? 'quiet'
     : (branch.progress ?? 'unread');
-  const bits = [`- ${branch.repoKey} ${branch.name}`, clip(what, 70), stands, goal ? `goal "${goal.title}"` : 'unfiled'];
+  const bits = [`- ${branch.repoKey} ${branch.name}`, clip(what, 70), stands, goal ? `goal "${flat(goal.title)}"` : 'unfiled'];
   if (branch.pr) bits.push(`PR ${branch.pr.state}`);
   if (branch.lastActivity) bits.push(branch.lastActivity.slice(0, 10));
   return bits.join(' · ');
@@ -79,9 +86,13 @@ export function indexLine(branch: Branch, goal: Goal | null): string {
 /** The register, newest first: `cap` in full, the rest one line each. */
 export function register(snapshot: Snapshot, cap: number): { full: string[]; index: string[]; total: number } {
   const goalOf = new Map(snapshot.goals.map((g) => [g.id, g] as const));
-  const threads = snapshot.branches
-    .filter((b) => !b.isBase)
-    .sort((a, b) => Date.parse(b.lastActivity ?? '') - Date.parse(a.lastActivity ?? ''));
+  // Newest first; a branch with no date of its own goes last rather than making the sort
+  // compare NaN, which leaves the order to chance.
+  const when = (b: Branch): number => {
+    const t = Date.parse(b.lastActivity ?? '');
+    return Number.isNaN(t) ? -Infinity : t;
+  };
+  const threads = snapshot.branches.filter((b) => !b.isBase).sort((a, b) => when(b) - when(a) || a.name.localeCompare(b.name));
   const goal = (b: Branch): Goal | null => goalOf.get(b.goalId ?? '') ?? null;
   const keep = Math.max(0, cap);
   return {

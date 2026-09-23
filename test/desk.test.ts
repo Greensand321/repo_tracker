@@ -238,11 +238,13 @@ test('describing the state is not a claim', () => {
 });
 
 test('it is told what it cannot do, and told differently when changes are off', () => {
-  assert.match(desk.systemFor(true), /Change anything on GitHub/);
-  assert.match(desk.systemFor(true), /Change a setting/);
-  assert.match(desk.systemFor(true), /never ask first/);
-  assert.match(desk.systemFor(false), /switched off in the owner's settings/);
-  assert.doesNotMatch(desk.systemFor(false), /never ask first/);
+  assert.match(desk.systemFor('act'), /Change anything on GitHub/);
+  assert.match(desk.systemFor('act'), /Change a setting/);
+  assert.match(desk.systemFor('act'), /never ask first/);
+  assert.match(desk.systemFor('read'), /switched off in the owner's settings/);
+  assert.doesNotMatch(desk.systemFor('read'), /never ask first/);
+  assert.match(desk.systemFor('none'), /You have no tools this time/);
+  assert.doesNotMatch(desk.systemFor('none'), /"branch" reads any/);
 });
 
 // ---------------------------------------------------------------------------
@@ -366,8 +368,9 @@ test('purposes: a guess is marked as one, the owner\'s words are kept, and names
   assert.match(out, /owner already said/);
   assert.equal(visions.getVision({ repoKey: 'o/r', branch: 'b' })?.state, 'proposed');
 
-  String(tools.setVision.run({ items: [{ branch: 'a', purpose: 'What they told me' }], yours: true }, ctxFor(snap, door(snap).act())));
-  assert.equal(visions.getVision({ repoKey: 'o/r', branch: 'a' })?.text, 'What they told me', 'yours=true is the owner speaking');
+  const owner = door(snap).act('t2', 'a is for what they told me, write that down');
+  String(tools.setVision.run({ items: [{ branch: 'a', purpose: 'What they told me' }], yours: true }, ctxFor(snap, owner)));
+  assert.equal(visions.getVision({ repoKey: 'o/r', branch: 'a' })?.text, 'What they told me', 'yours=true, in the owner\'s words, is the owner speaking');
 });
 
 test('a batch with an unknown name does the rest and names what it could not find', () => {

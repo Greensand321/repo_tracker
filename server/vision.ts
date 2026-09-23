@@ -196,6 +196,11 @@ export function getAssessment(
   return stored;
 }
 
+/** The stored judgement as it is, unchecked — for the record to keep beside a purpose change. */
+export function assessmentOf(ref: BranchRef): Assessment | null {
+  return entry(load(), refKey(ref.repoKey, ref.branch)).assessment;
+}
+
 export function putAssessment(ref: BranchRef, assessment: Assessment): void {
   const all = load();
   const key = refKey(ref.repoKey, ref.branch);

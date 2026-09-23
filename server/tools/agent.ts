@@ -45,6 +45,7 @@ export const queueWork: Tool = {
   description:
     'Start work in the background: "summarise" reads branches again, "assess" checks them against what they are for again, "draft-vision" proposes what they are for, "brief" rewrites the brief (no branches). It QUEUES — the result lands on the page later, so never describe one. Free.',
   cost: 'free',
+  writes: true,
   args: [
     { name: 'kind', type: 'string', required: true, about: QUEUE_KINDS.join(' | ') },
     { name: 'branches', type: 'list', required: false, about: 'which branches, as "owner/repo name" or just the name. Not for brief' },
@@ -101,6 +102,7 @@ export const createGoal: Tool = {
   name: 'create_goal',
   description: 'Make a new goal. Refused if one of that title exists — use file to put branches under an existing one. Free; undoable.',
   cost: 'free',
+  writes: true,
   args: [
     { name: 'title', type: 'string', required: true, about: 'a short title' },
     { name: 'note', type: 'string', required: false, about: "the owner's note, if they gave one" },
@@ -116,6 +118,7 @@ export const updateGoal: Tool = {
   description:
     'Change a goal: rename it, change its note or milestone, or mark it done or not done. Give only what changes. Marking done is flagged for the owner to check. Free; undoable.',
   cost: 'free',
+  writes: true,
   args: [
     { name: 'goal', type: 'string', required: true, about: 'the goal, by its exact title or id' },
     { name: 'title', type: 'string', required: false, about: 'the new title' },
@@ -140,6 +143,7 @@ export const deleteGoal: Tool = {
   name: 'delete_goal',
   description: 'Delete a goal. Its branches become unfiled; nothing on GitHub is touched. Free; undoable, members and all.',
   cost: 'free',
+  writes: true,
   args: [{ name: 'goal', type: 'string', required: true, about: 'the goal, by its exact title or id' }],
   run(args, ctx) {
     return report(door(ctx).deleteGoal(str(args, 'goal')), []);
@@ -151,6 +155,7 @@ export const fileBranches: Tool = {
   description:
     'File branches under a goal — moving them from wherever they were. A title no goal has yet makes that goal. Do a whole regrouping as one call per goal. Free; undoable.',
   cost: 'free',
+  writes: true,
   args: [
     { name: 'goal', type: 'string', required: true, about: 'the goal, by its exact title or id — or a new title' },
     { name: 'branches', type: 'list', required: true, about: 'the branches, as "owner/repo name" or just the name' },
@@ -167,6 +172,7 @@ export const unfileBranches: Tool = {
   name: 'unfile',
   description: 'Take branches out of whatever goal holds them. Free; undoable.',
   cost: 'free',
+  writes: true,
   args: [{ name: 'branches', type: 'list', required: true, about: 'the branches, as "owner/repo name" or just the name' }],
   run(args, ctx) {
     const act = door(ctx);
@@ -185,6 +191,7 @@ export const setVision: Tool = {
   description:
     'Say what branches are FOR — one falsifiable sentence each. yours=true only when the owner told you the purpose in this conversation; otherwise it is saved as your guess, marked for the owner to confirm, and it never replaces the owner\'s own words. Free; undoable.',
   cost: 'free',
+  writes: true,
   args: [
     { name: 'items', type: 'list', required: true, about: 'a list of {"branch": "owner/repo name", "purpose": "..."}' },
     { name: 'yours', type: 'boolean', required: false, about: "true only when these are the owner's stated purposes" },
@@ -196,7 +203,11 @@ export const setVision: Tool = {
     const items: { branch: Branch; text: string; yours: boolean }[] = [];
     const missing: string[] = [];
     for (const row of raw) {
-      const item = (row ?? {}) as { branch?: unknown; repo?: unknown; purpose?: unknown; vision?: unknown; text?: unknown };
+      if (!row || typeof row !== 'object') {
+        missing.push(`${String(row)} (each item is {"branch": "...", "purpose": "..."})`);
+        continue;
+      }
+      const item = row as { branch?: unknown; repo?: unknown; purpose?: unknown; vision?: unknown; text?: unknown };
       const text = [item.purpose, item.vision, item.text].find((v): v is string => typeof v === 'string') ?? '';
       // A string goes through the resolver whole, so "owner/repo name" splits as it should.
       const hit = resolveBranch(typeof item.repo === 'string' ? { repo: item.repo, branch: item.branch } : item.branch, ctx.snapshot);
@@ -212,6 +223,7 @@ export const confirmVision: Tool = {
   name: 'confirm_purpose',
   description: "Accept guesses at what branches are for, as they stand — when the owner says they are right. Free; undoable.",
   cost: 'free',
+  writes: true,
   args: [{ name: 'branches', type: 'list', required: true, about: 'the branches, as "owner/repo name" or just the name' }],
   run(args, ctx) {
     const act = door(ctx);
@@ -225,6 +237,7 @@ export const clearVision: Tool = {
   name: 'clear_purpose',
   description: 'Clear what branches are said to be for. Free; undoable.',
   cost: 'free',
+  writes: true,
   args: [{ name: 'branches', type: 'list', required: true, about: 'the branches, as "owner/repo name" or just the name' }],
   run(args, ctx) {
     const act = door(ctx);
@@ -243,6 +256,7 @@ export const rememberNote: Tool = {
   description:
     'Write in the notebook, when the owner says "remember…" or "from now on…". for="brief" is an instruction every brief follows ("lead with anything red") — the brief is rewritten with it at once; for="conversation" is something to know in every conversation. Free; undoable.',
   cost: 'free',
+  writes: true,
   args: [
     { name: 'text', type: 'string', required: true, about: "the owner's instruction or fact, in a sentence" },
     { name: 'for', type: 'string', required: true, about: 'brief | conversation' },
@@ -258,6 +272,7 @@ export const forgetNote: Tool = {
   name: 'forget',
   description: 'Take a note out of the notebook, by its id (shown beside each) or its exact words. Free; undoable.',
   cost: 'free',
+  writes: true,
   args: [{ name: 'note', type: 'string', required: true, about: 'the note id, or its exact words' }],
   run(args, ctx) {
     return report(door(ctx).forget(str(args, 'note')), []);
@@ -289,6 +304,7 @@ export const retryParked: Tool = {
   name: 'retry',
   description: 'Try parked work again — by job id from the board, or "all". Free.',
   cost: 'free',
+  writes: true,
   args: [{ name: 'jobs', type: 'list', required: true, about: 'job ids from the board, or ["all"]' }],
   run(args, ctx) {
     const raw = args['jobs'];

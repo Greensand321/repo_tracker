@@ -40,10 +40,15 @@ export type Turn = {
   proposed: string | null;
   /** Settings it suggested. Only the owner can apply them, so a follow-up is told so. */
   suggested: string[];
+  /** Its words claimed a change that was not made — so the next turn does not believe them. */
+  unbacked: boolean;
   shown: Answer | null;
 };
 
-export type TurnExtras = { answer?: Answer; did?: string[]; proposed?: string | null; suggested?: string[] };
+export type TurnExtras = { answer?: Answer; did?: string[]; proposed?: string | null; suggested?: string[]; unbacked?: boolean };
+
+/** How many of one answer's changes the transcript lists before saying how many more. */
+const MAX_DID = 40;
 
 /**
  * How many exchanges are carried. Six is enough for a real back-and-forth and still small
@@ -88,9 +93,10 @@ export function remember(question: string, answer: string, extras: TurnExtras = 
     question,
     answer: answer.slice(0, MAX_ANSWER_CHARS),
     at: now,
-    did: (extras.did ?? []).slice(0, 40),
+    did: extras.did ?? [],
     proposed: extras.proposed ?? null,
     suggested: (extras.suggested ?? []).slice(0, 3),
+    unbacked: extras.unbacked ?? false,
     shown: extras.answer ?? null,
   });
   if (turns.length > MAX_TURNS) turns = turns.slice(-MAX_TURNS);
@@ -115,6 +121,20 @@ export function thread(memoryMinutes: number, now = Date.now()): Answer[] {
     .reverse();
 }
 
+/**
+ * The owner accepted an answer's proposed regrouping: what that filed joins the answer, in
+ * the transcript and in the copy a reload draws — which would otherwise offer the proposal
+ * again and leave out what accepting it changed.
+ */
+export function amend(turnId: string, changes: Answer['changes'], texts: string[]): void {
+  const turn = turns.find((t) => t.shown?.turn === turnId);
+  if (!turn?.shown) return;
+  const known = new Set(turn.shown.changes.map((c) => c.id));
+  turn.shown = { ...turn.shown, groupsFiled: true, changes: [...turn.shown.changes, ...changes.filter((c) => !known.has(c.id))] };
+  turn.did = [...turn.did, ...texts];
+  turn.proposed = null;
+}
+
 /** The batch this conversation belongs to. Stable while it lives (D66). */
 export const threadId = (): string => sessionId;
 
@@ -129,7 +149,10 @@ export function transcript(list: Turn[]): string {
     [
       `You were asked: ${turn.question}`,
       `You answered: ${turn.answer}`,
-      ...(turn.did.length > 0 ? [`You changed: ${turn.did.join('; ')}`] : []),
+      ...(turn.unbacked ? ['(That answer claimed a change, but nothing was changed.)'] : []),
+      ...(turn.did.length > 0
+        ? [`You changed: ${turn.did.slice(0, MAX_DID).join('; ')}${turn.did.length > MAX_DID ? `; and ${turn.did.length - MAX_DID} more` : ''}`]
+        : []),
       ...(turn.proposed ? [`You proposed filing, not yet done: ${turn.proposed}`] : []),
       ...(turn.suggested.length > 0
         ? [`You suggested settings, which only the owner can apply: ${turn.suggested.join('; ')}`]
