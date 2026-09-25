@@ -1,10 +1,28 @@
 # Status — where the project stands
 
-**Updated:** 23 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant · the workroom · the agent** · **Branch:** `claude/kind-meitner-cpis9v`
+**Updated:** 25 Sep 2026 · **Stage 1 · Stage 2 · the interface · the assistant · the workroom · the agent · the command log (planned)** · **Branch:** `claude/amazing-mendel-f4sr13`
 
 > Keep this short and current. It is the first thing to read after any time away.
 
 ---
+
+## Next: the command log — one door for every change (decided, not built)
+
+On 25 Sep the owner chose the assistant's long-term architecture, once (D97). Every change to
+the program's own data, whoever makes it (you, the agent, a background station, the program
+at startup), goes through **one door** and lands in **one log**, with before and after and
+what caused it. The agent's action door, record and undo, built on 23 Sep, are the first
+version of it. The plan moves your own buttons and the stations onto the same door. It also
+moves the door into `server/kernel/`, a folder that knows nothing about repos, so it can be
+copied into the project management software.
+
+**Outputs are kept (D98).** A summary, purpose or verdict is replaced only when the branch
+moves or someone asks. A prompt edit, a model switch or a settings change no longer throws
+the fleet's summaries away; they are labelled *written with an older prompt*, and one button
+refreshes them.
+
+Plan and build order: [`plans/command-log.md`](plans/command-log.md), five phases, each
+leaving the program working. Open questions Q82–Q85 all have defaults.
 
 ## The advisor is an agent now — it runs the program when you ask, and never touches GitHub
 
@@ -268,9 +286,10 @@ would fail at the worst moment.
 
 ## The next concrete action
 
-**Confirm, change or reject [`plans/agent-autonomy.md`](plans/agent-autonomy.md)** — in
-particular its five open questions, Q77–Q81, each of which has a default. Phase 1 starts on
-your word.
+**Phase 1 of [`plans/command-log.md`](plans/command-log.md)**: build `server/kernel/`
+and move the agent's actions onto it, with no change in behaviour. Every existing test must
+pass unchanged, and a new test must show the kernel imports nothing from the rest of the
+program. Skim Q82–Q85 first; each has a default, so none blocks the start.
 
 Alongside that: **run it for real.** Every station, the desk and the tools have only ever answered a stub.
 Open it, watch the first read on the floor, ask the desk to rank something and to regroup
@@ -298,7 +317,9 @@ Then, in whatever order they earn it:
 
 - **Summaries are cached on head SHA + prompt version + model.** Editing the prompt in
   `server/advise/prompt.ts` bumps `PROMPT_VERSION` and regenerates everything — otherwise
-  you would get a silent mix of old and new.
+  you would get a silent mix of old and new. **Decided to change (D98):** once phase 3 of
+  `plans/command-log.md` lands, only a new head or a request replaces an output, and the
+  prompt version and model become labels.
 - **Every cited commit is checked against the branch.** An invented SHA is dropped rather
   than rendered as a link.
 - **A fatal provider error stops the run** rather than failing identically 99 more times.
@@ -363,6 +384,7 @@ Then, in whatever order they earn it:
 
 | Date | What happened |
 |---|---|
+| 25 Sep 2026 | **The architecture is chosen**: a command log, where every change by every actor goes through one door and is recorded (D97). AI outputs are kept, replaced only when the branch moves or someone asks (D98). Planned in `plans/command-log.md`; nothing built |
 | 13 Sep 2026 | Spec v0.1 → v0.3; build plan v0.2; Phase 0 plan; mockups explored |
 | 15 Sep 2026 | Repo reorganized; 29 questions raised; **product redefined** — agents on GitHub, not a developer at a keyboard |
 | 16 Sep 2026 | All questions closed (D20–D36); Stage 1 planned and **built** |

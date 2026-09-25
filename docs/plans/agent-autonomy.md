@@ -4,6 +4,10 @@
 phases 1–5 built 23 Sep** (6 and 7 wait on Stage 3 and a probe) · Decisions: D94, D95 · Supersedes the limits in D84, and
 [`agent-plan.md`](agent-plan.md) (a draft that was never agreed).
 
+> **25 Sep:** the action door, record and undo built here become the kernel of
+> [`command-log.md`](command-log.md) (D97), which puts the owner and the stations through the
+> same door. Nothing here is overturned; §3's mechanism is widened.
+
 ---
 
 ## What this is for

@@ -2,6 +2,7 @@
 
 | File | Scope | Status |
 |---|---|---|
+| **`command-log.md`** | **The architecture**: every change, by every actor, through one door into one log; a kernel that can be copied into another program; outputs kept, not regenerated | ✅ **Chosen 25 Sep** (D97, D98). Not built. Q82–Q85 have defaults. |
 | **`agent-autonomy.md`** | **The agent** — the advisor changes anything the program owns when asked (settings excepted), reads only on GitHub, every change recorded, notified and undoable | ✅ **Confirmed 23 Sep** (Q77–Q81 answered). Phases 1–5 being built. D94. |
 | `workroom.md` | The board, the floor, tools at the stations, dispatch, the desk | ✅ Steps 1–6 built. Step 6's limits superseded by `agent-autonomy.md`. |
 | `agent-plan.md` | Making the advisor agent-native — tools, context, the loop | ⛔ Superseded 23 Sep by `agent-autonomy.md`. Never agreed; kept as reasoning. |

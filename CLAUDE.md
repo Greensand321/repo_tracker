@@ -84,6 +84,14 @@ Plan: [`docs/plans/agent-autonomy.md`](docs/plans/agent-autonomy.md). Settings a
 table**, `shared/settings.ts`: add a setting there, not in the route or the store (D95).
 Workroom plan: [`docs/plans/workroom.md`](docs/plans/workroom.md).
 
+**The architecture is a command log (D97), decided, not yet built.** Every change to Plane
+B, by every actor (owner, agent, station, system), goes through one door (`execute`) into one
+log, beside the state stores. The door is moving into `server/kernel/`, which must import
+nothing from the rest of the program, so it can be copied into another one. Do not add a
+write that goes around the door. **An AI output is kept** (D98): only a new head or a request
+replaces it, never a prompt, model or setting change. Plan:
+[`docs/plans/command-log.md`](docs/plans/command-log.md).
+
 **Every file the program keeps goes through `server/jsonfile.ts`** (D85): atomic writes, and
 a broken file set aside rather than overwritten. Pruning is scoped to repos a read reached
 (D86) — a repo GitHub would not serve is missing, not deleted.

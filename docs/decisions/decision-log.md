@@ -808,6 +808,64 @@ negation ("I made no changes"), a proposal shown for acceptance, or a suggestion
 fire it. A claim to have changed a setting, or anything on GitHub, is flagged even beside
 real changes, because it can never be true.
 
+### D97 — The architecture is a command log: every change, by every actor, through one door
+
+The owner, 25 Sep, asked for the long-term architecture of the assistant to be chosen once,
+not assembled from features. It has to be extendable: the code copied into the owner's
+project management software and working with basic wiring. Five whole architectures were
+compared: the reconciler (today's board, extended), an agent loop at the centre, a command
+log, an external agent over MCP, and a workflow engine.
+
+**Chosen: the command log.** Every change to Plane B, whoever makes it (the owner, the agent,
+a station, the program itself at startup), is a *command* that is checked, applied through
+the store that owns the data, and recorded in one log, with before and after and what caused
+it. Who may issue each command is declared on the command. The log sits **beside** the state
+stores, not instead of them: nothing is rebuilt by replaying it. That keeps undo, audit and
+sync without the event-schema versioning of full event sourcing.
+
+**Why this one.** It is the only core that makes the others parts of itself rather than
+rivals. The board becomes a policy that reads state. The agent loop becomes an actor that
+issues commands. An MCP server would be an adapter that lists them. A multi-step errand would
+be an actor that waits on the log. Choosing the agent loop as the core would have made
+robustness depend on the model. Choosing the reconciler needs a side path for every request.
+The kernel is small and knows nothing about repos (a registry, `execute`, the log, undo,
+subscribe), so it is the part that moves to the next program.
+
+**What it keeps.** D94's door, record and undo are the first version of it: they become the
+kernel, and the owner's routes and the stations are moved onto it. The board still derives
+(D68); routine jobs are not logged, only what they write. Reading GitHub is observation, not a
+command: that stays in the Snapshot and the dated history (D31). Plane A stays read-only
+(D94).
+
+**What it changes.** D95's "the owner's own edits are not in the agent's record" becomes:
+every change is logged, and the feed shows the agent's by default. `dispatched.json` (D72)
+becomes the outstanding requests in the log. D81's "done when the answer is newer than the
+question" becomes "done when an entry exists whose cause is the request".
+Plan: [`../plans/command-log.md`](../plans/command-log.md).
+
+### D98 — An AI output is kept; it is replaced only when the branch moves or someone asks
+
+The owner, 25 Sep: summaries should *"save across sessions and not get regenerated
+automatically. If I tell my agent to refresh that branch then I expect them to do it, the
+obvious exception is when a branch is recently updated."*
+
+An output (summary, recap, drafted purpose, assessment) is replaced in two cases: **the
+branch has a new head**, which the routine board picks up as today, or **someone asked**,
+meaning the owner or the agent on the owner's request. Nothing else replaces it. The prompt
+version, the model, the station's tools and settings such as `nowLineWords` become **labels
+on the output**, shown small ("written with an older prompt"), and no longer parts of its
+cache key. A refresh-older command re-reads every output written under an older prompt or
+model when the owner asks for it.
+
+**Why.** Everything else that regenerated an output did so without anyone asking. Each prompt
+bump (v2, v3) and the Line words change sent the whole fleet back to be paid for again, and
+the owner experienced this as "it doesn't save".
+
+**This narrows D39 and D74**: the version and the tool set stop invalidating and start
+labelling. **It reverses D91's** "shortening the line rewrites the summaries to fit": old ones
+keep their length until they are refreshed. An assessment still moves when the purpose's text
+moves, because that change was made by somebody. The brief keeps its interval (D87).
+
 ## 2. Carried over from the old documents
 
 Still true, and still good reasons.
